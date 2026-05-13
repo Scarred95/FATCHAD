@@ -1,0 +1,104 @@
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 3 / 4;
+  margin: 0 auto;
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  touch-action: pan-y;
+  cursor: grab;
+  transition: border-color var(--dur-quick), box-shadow var(--dur-quick);
+}
+
+.card[data-intent='-1'] {
+  border-color: var(--color-warning);
+  box-shadow: -8px 8px 32px rgba(240, 176, 32, 0.15), var(--shadow-card);
+}
+
+.card[data-intent='1'] {
+  border-color: var(--color-success);
+  box-shadow: 8px 8px 32px rgba(74, 222, 128, 0.15), var(--shadow-card);
+}
+
+.image {
+  height: 35%;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.imageFade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, var(--color-bg-elevated) 100%);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  min-height: 0;
+}
+
+.title {
+  font-size: var(--fs-display-md);
+  color: var(--color-text);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.description {
+  color: var(--color-text-dim);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-style: italic;
+}
+
+.hintFooter {
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--color-text-faint);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.edgeLabel {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: 0.2em;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick);
+}
+
+.edgeLabel[data-side='left'] {
+  left: var(--space-4);
+  background: var(--color-warning);
+  color: var(--color-bg-base);
+}
+
+.edgeLabel[data-side='right'] {
+  right: var(--space-4);
+  background: var(--color-success);
+  color: var(--color-bg-base);
+}
+
+.edgeLabel[data-active='true'] {
+  opacity: 1;
+}

@@ -1,0 +1,355 @@
+[
+  {
+    "_id": "evt_tut_01_awakening",
+    "title": "Du wachst auf.",
+    "description": "Vor dir liegt die Welt. Sie ist kaputt, aber sie ist da. Jemand muss sie übernehmen — warum nicht du?",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_none": ["tutorial_started", "tutorial_done"]
+    },
+    "choices": [
+      {
+        "text": "Aufstehen.",
+        "effects": {},
+        "sets_flags": ["tutorial_started"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_02_stats", "position": "top" }
+        ]
+      },
+      {
+        "text": "Aufstehen.",
+        "effects": {},
+        "sets_flags": ["tutorial_started"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_02_stats", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_02_stats",
+    "title": "Vier Werte. Vier Wege.",
+    "description": "Geld, Aura, Respekt, Rizz. Sie steigen und fallen mit jeder Entscheidung. Lass uns das mal ausprobieren — wähle, was dir am wichtigsten ist.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_started"],
+      "flags_none": ["tutorial_chose_path"]
+    },
+    "choices": [
+      {
+        "text": "Geld regiert die Welt.",
+        "effects": { "moneten": 10 },
+        "sets_flags": ["tutorial_chose_path", "path_money"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_03_extremes", "position": "top" }
+        ]
+      },
+      {
+        "text": "Charisma öffnet jede Tür.",
+        "effects": { "rizz": 10 },
+        "sets_flags": ["tutorial_chose_path", "path_charm"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_03_extremes", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_03_extremes",
+    "title": "Vorsicht: beide Enden sind tödlich.",
+    "description": "Ein Wert auf 0? Du bist erledigt. Aber ein Wert auf 100? Auch erledigt. Zu viel Geld macht dich zum Feindbild. Zu viel Aura, und du bist nur noch eine Karikatur. Balance ist alles.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_chose_path"],
+      "flags_none": ["tutorial_knows_extremes"]
+    },
+    "choices": [
+      {
+        "text": "Verstanden.",
+        "effects": {},
+        "sets_flags": ["tutorial_knows_extremes"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_04_chaos", "position": "top" }
+        ]
+      },
+      {
+        "text": "Klingt wie eine Herausforderung.",
+        "effects": { "chaos": 5 },
+        "sets_flags": ["tutorial_knows_extremes", "tutorial_overconfident"],
+        "hints": {
+          "chaos": "unknown"
+        },
+        "adds_to_deck": [
+          { "card_id": "evt_tut_04_chaos", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_04_chaos",
+    "title": "Chaos.",
+    "description": "Eine fünfte Anzeige. Sie geht von -100 bis +100. Sie tötet dich nicht — aber sie verändert, welche Karten du siehst. Bei -100 herrscht totale Ordnung. Bei +100 totaler Wahnsinn. Beide Extreme gewinnen das Spiel.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_knows_extremes"],
+      "flags_none": ["tutorial_knows_chaos"]
+    },
+    "choices": [
+      {
+        "text": "Ordnung soll mein Weg sein.",
+        "effects": { "chaos": -5, "respekt": 5 },
+        "sets_flags": ["tutorial_knows_chaos"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_05_flags", "position": "top" }
+        ]
+      },
+      {
+        "text": "Wahnsinn klingt unterhaltsamer.",
+        "effects": { "chaos": 5, "aura": 5 },
+        "sets_flags": ["tutorial_knows_chaos"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_05_flags", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_05_flags",
+    "title": "Das Spiel merkt sich alles.",
+    "description": "Jede Entscheidung kann Spuren hinterlassen — Markierungen, die später Karten freischalten oder blockieren. Wirst du dich an alle deine schmutzigen Geheimnisse erinnern?",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_knows_chaos"],
+      "flags_none": ["tutorial_set_flag"]
+    },
+    "choices": [
+      {
+        "text": "Ich habe nichts zu verbergen.",
+        "effects": { "respekt": 5 },
+        "sets_flags": ["tutorial_set_flag", "tutorial_clean_path"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_06_followup", "position": "top" }
+        ]
+      },
+      {
+        "text": "Geheimnisse sind Macht.",
+        "effects": { "aura": 5, "rizz": 5 },
+        "sets_flags": ["tutorial_set_flag", "tutorial_dirty_path"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_06_followup", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_06_followup",
+    "title": "Siehst du? Es funktioniert.",
+    "description": "Diese Karte erscheint nur, weil du in der letzten Runde eine bestimmte Entscheidung getroffen hast. Hättest du anders gewählt, würdest du jetzt etwas anderes lesen. So baut das Spiel sich um dich herum auf.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_any": ["tutorial_clean_path", "tutorial_dirty_path"],
+      "flags_none": ["tutorial_saw_followup"]
+    },
+    "choices": [
+      {
+        "text": "Beeindruckend.",
+        "effects": {},
+        "sets_flags": ["tutorial_saw_followup"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_07_scheduled_setup", "position": "top" }
+        ]
+      },
+      {
+        "text": "Ich bin gespannt, was als nächstes kommt.",
+        "effects": {},
+        "sets_flags": ["tutorial_saw_followup"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_07_scheduled_setup", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_07_scheduled_setup",
+    "title": "Manche Saat braucht Zeit.",
+    "description": "Du kannst eine Entscheidung treffen, deren Folgen erst später eintreten. Probier's — wir verschieben eine Konsequenz um zwei Züge.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_saw_followup"],
+      "flags_none": ["tutorial_scheduled"]
+    },
+    "choices": [
+      {
+        "text": "Etwas in Bewegung setzen.",
+        "effects": { "chaos": 5 },
+        "sets_flags": ["tutorial_scheduled"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_08_filler_a", "position": "top" },
+          { "card_id": "evt_tut_08_filler_b", "position": "top" },
+          { "card_id": "evt_tut_09_payoff",   "in_turns": 2 }
+        ]
+      },
+      {
+        "text": "Abwarten und Tee trinken.",
+        "effects": { "respekt": 5 },
+        "sets_flags": ["tutorial_scheduled"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_08_filler_a", "position": "top" },
+          { "card_id": "evt_tut_08_filler_b", "position": "top" },
+          { "card_id": "evt_tut_09_payoff",   "in_turns": 2 }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_08_filler_a",
+    "title": "Ein normaler Tag.",
+    "description": "Nichts Dramatisches. Du gehst durch die Welt, triffst kleine Entscheidungen, baust dich auf. Genau so wird es sich die meiste Zeit anfühlen.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_scheduled"],
+      "flags_none": ["tutorial_filler_a_done"]
+    },
+    "choices": [
+      {
+        "text": "Etwas Geld verdienen.",
+        "effects": { "moneten": 5 },
+        "sets_flags": ["tutorial_filler_a_done"]
+      },
+      {
+        "text": "Networking betreiben.",
+        "effects": { "rizz": 3, "aura": 3 },
+        "sets_flags": ["tutorial_filler_a_done"]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_08_filler_b",
+    "title": "Noch ein Tag.",
+    "description": "Das Spiel kennt viele Kategorien — Politik, Medien, Kriminalität, das Übernatürliche. Was du bekommst, hängt davon ab, wer du gerade bist.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_filler_a_done"],
+      "flags_none": ["tutorial_filler_b_done"]
+    },
+    "choices": [
+      {
+        "text": "Die Lage beobachten.",
+        "effects": { "respekt": 3 },
+        "sets_flags": ["tutorial_filler_b_done"]
+      },
+      {
+        "text": "Lärm machen.",
+        "effects": { "aura": 5, "chaos": 3 },
+        "sets_flags": ["tutorial_filler_b_done"]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_09_payoff",
+    "title": "Die Saat geht auf.",
+    "description": "Erinnerst du dich an die Entscheidung von vorhin? Hier ist die Konsequenz. So wird es im Spiel oft sein — was du heute tust, kommt morgen zurück.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_filler_b_done"],
+      "flags_none": ["tutorial_payoff_done"]
+    },
+    "choices": [
+      {
+        "text": "Profitieren.",
+        "effects": { "moneten": 10, "chaos": 5 },
+        "sets_flags": ["tutorial_payoff_done"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_10_finale", "position": "top" }
+        ]
+      },
+      {
+        "text": "Die Kontrolle behalten.",
+        "effects": { "respekt": 10, "chaos": -5 },
+        "sets_flags": ["tutorial_payoff_done"],
+        "adds_to_deck": [
+          { "card_id": "evt_tut_10_finale", "position": "top" }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_tut_10_finale",
+    "title": "Genug geübt.",
+    "description": "Du kennst die Regeln: vier Werte, beide Extreme tödlich. Chaos als Genre-Schalter. Flags als Gedächtnis. Karten, die in die Zukunft greifen. Es gibt Endings, die du gewinnst, indem du Chaos auf ±100 treibst — und es gibt versteckte Pfade, die zu eigenen Schlüssen führen. Aber das findest du selbst heraus.",
+    "category": "tutorial",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["tutorial_payoff_done"],
+      "flags_none": ["tutorial_done"]
+    },
+    "choices": [
+      {
+        "text": "Bring's.",
+        "effects": {},
+        "sets_flags": ["tutorial_done"],
+        "clears_flags": [
+          "tutorial_started",
+          "tutorial_chose_path",
+          "tutorial_knows_extremes",
+          "tutorial_knows_chaos",
+          "tutorial_set_flag",
+          "tutorial_saw_followup",
+          "tutorial_scheduled",
+          "tutorial_filler_a_done",
+          "tutorial_filler_b_done",
+          "tutorial_payoff_done"
+        ]
+      },
+      {
+        "text": "Bring's.",
+        "effects": {},
+        "sets_flags": ["tutorial_done"],
+        "clears_flags": [
+          "tutorial_started",
+          "tutorial_chose_path",
+          "tutorial_knows_extremes",
+          "tutorial_knows_chaos",
+          "tutorial_set_flag",
+          "tutorial_saw_followup",
+          "tutorial_scheduled",
+          "tutorial_filler_a_done",
+          "tutorial_filler_b_done",
+          "tutorial_payoff_done"
+        ]
+      }
+    ]
+  }
+]
+

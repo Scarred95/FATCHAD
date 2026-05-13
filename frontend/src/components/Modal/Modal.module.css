@@ -1,0 +1,85 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  box-shadow: var(--shadow-card);
+}
+
+.title {
+  font-size: var(--fs-display-md);
+  margin-bottom: var(--space-3);
+  color: var(--color-text);
+}
+
+.body {
+  color: var(--color-text-dim);
+  margin-bottom: var(--space-5);
+  line-height: var(--lh-body);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.action {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  transition: transform var(--dur-instant), background var(--dur-quick), color var(--dur-quick);
+}
+
+.action[data-variant='primary'] {
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+}
+
+.action[data-variant='primary']:hover {
+  box-shadow: var(--shadow-glow);
+}
+
+.action[data-variant='ghost'] {
+  background: transparent;
+  color: var(--color-text-dim);
+  border: var(--border-thin);
+}
+
+.action[data-variant='ghost']:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.action[data-variant='danger'] {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.action[data-variant='danger']:hover {
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.action:active {
+  transform: scale(0.97);
+}

@@ -1,0 +1,295 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// CARD TEMPLATE — FATCHAD
+// ─────────────────────────────────────────────────────────────────────────────
+// Copy one of the examples below into a *.json file inside events/.
+// The seeder (scripts/seed_events.py) only reads *.json, so this file is safe.
+//
+// STATS (all 0–100 except chaos which is -100 to +100):
+//   moneten  — money / resources
+//   aura     — public image / brand
+//   respekt  — political/social standing
+//   rizz     — personal magnetism / charm
+//   chaos    — systemic instability (negative = grey eminence, positive = chaos agent)
+//
+// DEATH CONDITIONS (triggered when stat hits the boundary):
+//   moneten  0  → death_bankrupt      moneten  100 → death_revolution
+//   aura     0  → death_irrelevant    aura     100 → death_jumped_shark
+//   respekt  0  → death_couped        respekt  100 → death_conspiracy
+//   rizz     0  → death_frozen_out    rizz     100 → death_drowned_in_drama
+//   chaos  -100 → win: grey_eminence  chaos   +100 → win: chaos_agent
+//
+// WIN CONDITIONS:
+//   chaos -100 → grey_eminence    chaos +100 → chaos_agent
+//   triggers_ending on a choice → custom win (currently always "won" — see TODO in endings.py)
+//   (No time-based or stat-hold wins — survival alone is not a victory.)
+//
+// IMPORTANT FLAG (top-level "important": true):
+//   When the engine walks past an ineligible card looking for a drawable one,
+//   non-important cards get dropped (their moment passed). Cards marked
+//   "important" are re-shuffled into a random position in the deck instead,
+//   so they get another chance once their requirements unlock.
+//   Use for questline/arc cards that MUST eventually play.
+// ─────────────────────────────────────────────────────────────────────────────
+
+[
+
+  // ── 1. MINIMAL CARD ──────────────────────────────────────────────────────
+  // The bare minimum. No requirements, no flag side-effects, just a choice.
+  {
+    "_id": "evt_example_minimal",          // unique ID, convention: evt_<snake_case>
+    "title": "Ein einfaches Angebot",
+    "description": "Jemand bietet dir etwas an. Nimmst du es?",
+    "category": "social",                  // see _categories.md for the full list
+    "weight": 10,                          // relative draw probability during refill
+                                           // 0 = never drawn by refill (use for questline cards)
+                                           // 1–5 = rare, 10 = normal, 50+ = common
+    "choices": [
+      {
+        "text": "Ja.",
+        "effects": { "moneten": 10, "aura": -5 }
+      },
+      {
+        "text": "Nein.",
+        "effects": { "respekt": 5 }
+      }
+    ]
+  },
+
+
+  // ── 2. CARD WITH REQUIREMENTS ────────────────────────────────────────────
+  // Only drawable when specific flags and stat ranges are met.
+  {
+    "_id": "evt_example_requirements",
+    "title": "Die Einladung",
+    "description": "Ein exklusiver Kreis öffnet dir die Türen — aber nur wenn du etwas zu bieten hast.",
+    "category": "social",
+    "weight": 8,
+    "requires": {
+      // ALL of these flags must be active
+      "flags_all": ["tutorial_done", "some_prerequisite_flag"],
+
+      // NONE of these flags may be active (used to prevent repeats or block certain paths)
+      "flags_none": ["already_invited", "blacklisted"],
+
+      // AT LEAST ONE of these flags must be active
+      "flags_any": ["path_money", "path_charm"],
+
+      // Stat range constraints (min and/or max, both optional per stat)
+      "stats": {
+        "moneten":  { "min": 30 },
+        "respekt":  { "min": 20, "max": 80 },
+        "chaos":    { "max": 40 }
+      }
+    },
+    "choices": [
+      {
+        "text": "Zusagen.",
+        "effects": { "aura": 15, "moneten": -10 },
+        "sets_flags": ["already_invited"]
+      },
+      {
+        "text": "Absagen.",
+        "effects": { "respekt": -5 }
+      }
+    ]
+  },
+
+
+  // ── 3. CARD WITH FLAG SIDE-EFFECTS AND EXPLICIT HINTS ────────────────────
+  // Choices that set/clear flags and override the auto-derived UI hints.
+  {
+    "_id": "evt_example_flags",
+    "title": "Der Deal",
+    "description": "Eine zwielichtige Gestalt unterbreitet dir ein Angebot.",
+    "category": "kriminalitaet",
+    "weight": 6,
+    "requires": {
+      "flags_all": ["tutorial_done"]
+    },
+    "choices": [
+      {
+        "text": "Einschlagen.",
+        "effects": { "moneten": 25, "respekt": -15, "chaos": 10 },
+        "sets_flags": ["dirty_money", "criminal_contact"],
+        "hints": {
+          // Explicit hints override auto-derived arrows.
+          // Use to mislead the player or show uncertainty.
+          // Values: "up" ↑  "down" ↓  "unknown" ?  "hidden" (don't show this stat at all)
+          "moneten": "up",
+          "respekt": "unknown",   // player doesn't know how bad it'll be
+          "chaos":   "hidden"     // hidden consequence
+        }
+      },
+      {
+        "text": "Ablehnen.",
+        "effects": { "respekt": 10 },
+        "sets_flags": ["refused_crime"],
+        "clears_flags": ["criminal_contact"]  // also clears that flag's timer if one exists
+      }
+    ]
+  },
+
+
+  // ── 4. CARD THAT ADDS CARDS TO THE DECK ──────────────────────────────────
+  // Immediate adds go into the deck at a position.
+  // Scheduled adds (in_turns) fire N turns from now regardless of deck state.
+  {
+    "_id": "evt_example_deck_additions",
+    "title": "Du setzt etwas in Gang",
+    "description": "Manche Entscheidungen haben Konsequenzen, die Zeit brauchen.",
+    "category": "politik",
+    "weight": 8,
+    "choices": [
+      {
+        "text": "Den schnellen Weg wählen.",
+        "effects": { "moneten": -20, "chaos": 15 },
+        "adds_to_deck": [
+          // Immediate add — lands in deck right now at a random position
+          {
+            "card_id": "evt_immediate_consequence",
+            "position": "shuffle"   // "top" = next card, "bottom" = last, "shuffle" = random
+          }
+        ]
+      },
+      {
+        "text": "Langfristig planen.",
+        "effects": { "respekt": 10 },
+        "adds_to_deck": [
+          // Scheduled — goes to the scheduled list, fires exactly on turn current+8
+          // Regardless of refills, this card WILL appear (inserted at top when due)
+          {
+            "card_id": "evt_delayed_payoff",
+            "in_turns": 8
+          },
+          // You can mix immediate and scheduled adds in one choice
+          {
+            "card_id": "evt_also_immediate",
+            "position": "bottom"
+          }
+        ]
+      }
+    ]
+  },
+
+
+  // ── 5. ENDING CARD ───────────────────────────────────────────────────────
+  // A card that concludes a questline. weight: 0 so it's never drawn by refill —
+  // it should only appear via adds_to_deck from another card.
+  // important: true so if the player isn't quite at the chaos threshold when
+  // the card surfaces, it gets re-shuffled instead of dropped — the finale
+  // waits patiently for the right moment.
+  {
+    "_id": "evt_example_ending",
+    "title": "Das Ende einer Ära",
+    "description": "Es ist soweit. Alles hat zu diesem Moment geführt.",
+    "category": "ending",
+    "weight": 0,                            // 0 = never refill-drawn; only via adds_to_deck
+    "important": true,                      // re-shuffle if requirements aren't met yet
+    "requires": {
+      "flags_all": ["questline_finale_unlocked"],
+      "stats": { "chaos": { "min": 30 } }   // extra gate for safety
+    },
+    "choices": [
+      {
+        "text": "Den Thron beanspruchen.",
+        "effects": {},
+        "hints": { "aura": "unknown", "respekt": "unknown" },
+        "triggers_ending": "my_custom_ending"   // ends the game immediately as "won"
+                                                 // TODO: backend needs win/loss field per ending
+      },
+      {
+        "text": "Zurücktreten.",
+        "effects": { "chaos": -20, "respekt": -30 },
+        "clears_flags": ["questline_finale_unlocked"]
+      }
+    ]
+  },
+
+
+  // ── 6. COMPLETE QUESTLINE EXAMPLE (3 cards) ──────────────────────────────
+  // Cards that chain together. Only the entry card has weight > 0.
+  // Follow-up cards are injected via adds_to_deck.
+
+  {
+    "_id": "evt_ql_journalist_intro",       // QL = questline prefix (convention, not enforced)
+    "title": "Die neugierige Journalistin",
+    "description": "Eine Reporterin fragt nach. Sie lächelt zu viel.",
+    "category": "medien",
+    "weight": 10,
+    "requires": {
+      "flags_all":  ["tutorial_done"],
+      "flags_none": ["journalist_resolved"]
+    },
+    "choices": [
+      {
+        "text": "Charmant ausweichen.",
+        "effects": { "rizz": 5, "aura": 10 },
+        "sets_flags": ["journalist_charmed"],
+        "adds_to_deck": [
+          { "card_id": "evt_ql_journalist_follow", "in_turns": 3 }
+        ]
+      },
+      {
+        "text": "Kühl abwimmeln.",
+        "effects": { "aura": -5, "respekt": 5 },
+        "sets_flags": ["journalist_hostile"],
+        "adds_to_deck": [
+          { "card_id": "evt_ql_journalist_follow", "in_turns": 3 }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_ql_journalist_follow",
+    "title": "Der Artikel erscheint",
+    "description": "Sie hat geschrieben. Der Ton hängt davon ab, wie du sie behandelt hast.",
+    "category": "medien",
+    "weight": 0,                            // only reachable via the intro card
+    "requires": {
+      "flags_any": ["journalist_charmed", "journalist_hostile"]
+    },
+    "choices": [
+      {
+        "text": "Das Narrativ kontrollieren.",
+        "effects": { "moneten": -15, "aura": 10 },
+        "sets_flags": ["journalist_resolved"],
+        "clears_flags": ["journalist_charmed", "journalist_hostile"]
+      },
+      {
+        "text": "Ignorieren und hoffen.",
+        "effects": { "chaos": 10 },
+        "sets_flags": ["journalist_resolved", "scandal_brewing"],
+        "clears_flags": ["journalist_charmed", "journalist_hostile"],
+        "adds_to_deck": [
+          { "card_id": "evt_ql_journalist_scandal", "in_turns": 5 }
+        ]
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_ql_journalist_scandal",
+    "title": "Der Skandal bricht aus",
+    "description": "Die Story wurde aufgegriffen. Jetzt spricht jeder darüber.",
+    "category": "medien",
+    "weight": 0,
+    "requires": {
+      "flags_all": ["scandal_brewing"]
+    },
+    "choices": [
+      {
+        "text": "Öffentlich Reue zeigen.",
+        "effects": { "aura": -10, "rizz": 5, "respekt": -10 },
+        "clears_flags": ["scandal_brewing"]
+      },
+      {
+        "text": "Jemanden anderen beschuldigen.",
+        "effects": { "chaos": 20, "respekt": -5, "rizz": 10 },
+        "clears_flags": ["scandal_brewing"],
+        "sets_flags": ["made_enemies"]
+      }
+    ]
+  }
+
+]

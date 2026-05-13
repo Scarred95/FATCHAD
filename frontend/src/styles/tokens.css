@@ -1,0 +1,113 @@
+:root {
+  /* ─── Backgrounds ──────────────────────────────────────────── */
+  --color-bg-base: #0a0a0f;
+  --color-bg-elevated: #16161e;
+  --color-bg-overlay: #1f1f2a;
+  --color-bg-overlay-strong: #2a2a38;
+
+  /* ─── Text ─────────────────────────────────────────────────── */
+  --color-text: #f5f5fa;
+  --color-text-dim: #8888a0;
+  --color-text-faint: #4a4a5a;
+
+  /* ─── Accents ──────────────────────────────────────────────── */
+  --color-accent: #ff3e7f;
+  --color-accent-glow: rgba(255, 62, 127, 0.5);
+  --color-accent-soft: rgba(255, 62, 127, 0.12);
+
+  --color-danger: #ff4444;
+  --color-warning: #f0b020;
+  --color-success: #4ade80;
+
+  /* ─── Stat colors ──────────────────────────────────────────── */
+  --color-stat-moneten: #f0c040;
+  --color-stat-aura: #c060f0;
+  --color-stat-respekt: #f06060;
+  --color-stat-rizz: #60d0f0;
+  --color-stat-chaos: #ff6020;
+  --color-stat-chaos-low: #6080ff;
+
+  /* ─── Chaos ambient (runtime-updated 0..1, signed -1..1) ───── */
+  --chaos: 0;            /* normalized 0..1 magnitude  */
+  --chaos-signed: 0;     /* signed -1..1 polarity      */
+
+  /* ─── Typography ───────────────────────────────────────────── */
+  --font-display: 'Anton', 'Bebas Neue', 'Impact', system-ui, sans-serif;
+  --font-body: 'Inter', 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  --fs-display-xl: clamp(3.5rem, 14vw, 7rem);
+  --fs-display-lg: clamp(2.5rem, 9vw, 4.5rem);
+  --fs-display-md: clamp(1.75rem, 5vw, 2.5rem);
+  --fs-display-sm: 1.4rem;
+  --fs-body-lg: 1.125rem;
+  --fs-body: 1rem;
+  --fs-body-sm: 0.875rem;
+  --fs-body-xs: 0.75rem;
+
+  --lh-display: 0.95;
+  --lh-body: 1.45;
+
+  --tracking-display: 0.04em;
+  --tracking-body: 0;
+  --tracking-loose: 0.16em;
+
+  /* ─── Spacing ──────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ─── Radii ────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ─── Borders ──────────────────────────────────────────────── */
+  --border-thin: 1px solid var(--color-text-faint);
+  --border-mid: 1px solid var(--color-text-dim);
+  --border-accent: 1px solid var(--color-accent);
+
+  /* ─── Shadows ──────────────────────────────────────────────── */
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 12px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 24px var(--color-accent-glow);
+
+  /* ─── Motion ───────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-instant: 80ms;
+  --dur-quick: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 400ms;
+  --dur-stage: 800ms;
+
+  /* ─── Layout ───────────────────────────────────────────────── */
+  --layout-max: 480px;
+  --layout-page-pad: var(--space-5);
+  --header-h: 56px;
+  --statbar-h: 80px;
+}
+
+/* Chaos-driven ambient hue shift on the page background.
+   Subtly warms toward chaos+, cools toward chaos-. */
+body {
+  background:
+    radial-gradient(
+      ellipse at top,
+      hsl(
+        calc(260 + var(--chaos-signed) * 60),
+        calc(20% + var(--chaos) * 30%),
+        calc(6% + var(--chaos) * 4%)
+      ),
+      var(--color-bg-base) 70%
+    );
+  transition: background var(--dur-slow) var(--ease-out);
+}

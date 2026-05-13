@@ -1,0 +1,119 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  gap: var(--space-2);
+}
+
+.cardArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  position: relative;
+  padding: var(--space-3) 0;
+}
+
+.cardWrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.choices2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) var(--space-4);
+}
+
+.choices3 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) var(--space-4);
+}
+
+.fatal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  color: var(--color-text-dim);
+}
+
+.fatal button {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  border-radius: var(--radius-md);
+}
+
+.dim { color: var(--color-text-dim); }
+
+.emptyCard {
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 3 / 4;
+  background: var(--color-bg-elevated);
+  border: 1px dashed var(--color-text-faint);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-6);
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: var(--fs-display-md);
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
+}
+
+.emptySub {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+.retryBtn {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  border-radius: var(--radius-md);
+}
+
+.retryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.endingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px) saturate(0.4);
+  background: rgba(10, 10, 15, 0.6);
+  z-index: 5;
+}
+
+.endingLabel {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-xl);
+  letter-spacing: 0.3em;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  text-shadow: 0 0 24px var(--color-accent-glow);
+}

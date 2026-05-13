@@ -1,0 +1,187 @@
+.page {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.banner {
+  position: relative;
+  padding: var(--space-7) var(--space-4) var(--space-6);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(255, 62, 127, 0.08), transparent 70%),
+    var(--color-bg-elevated);
+  border: var(--border-thin);
+  overflow: hidden;
+}
+
+.banner[data-status='won'] {
+  background:
+    linear-gradient(180deg, rgba(255, 200, 80, 0.12), transparent 70%),
+    var(--color-bg-elevated);
+  border-color: rgba(255, 200, 80, 0.4);
+  box-shadow: 0 0 64px rgba(255, 200, 80, 0.15);
+}
+
+.banner[data-status='lost'] {
+  background:
+    linear-gradient(180deg, rgba(255, 68, 68, 0.12), transparent 70%),
+    var(--color-bg-elevated);
+  border-color: rgba(255, 68, 68, 0.35);
+}
+
+.banner[data-status='abandoned'] {
+  border-color: var(--color-text-faint);
+}
+
+.bannerLabel {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  display: block;
+  margin-bottom: var(--space-3);
+}
+
+.bannerTitle {
+  font-size: var(--fs-display-lg);
+  color: var(--color-text);
+}
+
+.banner[data-status='won'] .bannerTitle {
+  color: var(--color-stat-moneten);
+  text-shadow: 0 0 24px rgba(240, 192, 64, 0.4);
+}
+
+.banner[data-status='lost'] .bannerTitle {
+  color: var(--color-danger);
+}
+
+.flavor {
+  color: var(--color-text-dim);
+  font-style: italic;
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  max-width: 36ch;
+  margin: 0 auto;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-lg);
+}
+
+.statGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-base);
+  border-radius: var(--radius-sm);
+}
+
+.statName {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-text);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  padding: var(--space-3);
+  background: var(--color-bg-base);
+  border-radius: var(--radius-sm);
+}
+
+.meta dt {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-dim);
+}
+
+.meta dd {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  color: var(--color-text);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.primary {
+  padding: var(--space-4);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  border-radius: var(--radius-md);
+}
+
+.primary:active { transform: scale(0.97); }
+
+.secondary {
+  padding: var(--space-3);
+  background: transparent;
+  color: var(--color-text);
+  border: var(--border-mid);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  border-radius: var(--radius-md);
+}
+
+.secondary:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+.tertiary {
+  padding: var(--space-2);
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  text-align: center;
+  display: block;
+}
+
+.tertiary:hover { color: var(--color-text); }
+
+.dim { color: var(--color-text-dim); text-align: center; padding: var(--space-7); }
+.errorMsg { color: var(--color-danger); padding: var(--space-7); text-align: center; }
+.backLink { color: var(--color-text-dim); text-align: center; display: block; }

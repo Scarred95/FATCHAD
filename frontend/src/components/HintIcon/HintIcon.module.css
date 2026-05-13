@@ -1,0 +1,32 @@
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px 3px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--stat-color);
+  color: var(--stat-color);
+  font-size: var(--fs-body-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.arrow {
+  font-size: 0.85rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.hint[data-direction='up'] .arrow {
+  color: var(--color-success);
+}
+
+.hint[data-direction='down'] .arrow {
+  color: var(--color-danger);
+}
+
+.hint[data-direction='unknown'] .arrow {
+  color: var(--color-warning);
+}

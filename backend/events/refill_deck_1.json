@@ -1,0 +1,369 @@
+[
+  {
+    "_id": "evt_rd1_buergermeister_kaffee",
+    "title": "Kaffee mit dem Bürgermeister",
+    "description": "Er will reden. Es geht angeblich nur um die Stadt.",
+    "category": "politik",
+    "weight": 12,
+    "choices": [
+      {
+        "text": "Hingehen.",
+        "effects": { "respekt": 8, "moneten": -5 }
+      },
+      {
+        "text": "Absagen.",
+        "effects": { "respekt": -6, "aura": 4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_anonyme_quelle",
+    "title": "Eine anonyme Quelle",
+    "description": "Jemand schickt dir Akten. Echtheit unklar, Sprengkraft groß.",
+    "category": "politik",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Veröffentlichen.",
+        "effects": { "aura": 12, "respekt": -10, "chaos": 8 },
+        "hints": { "respekt": "unknown" }
+      },
+      {
+        "text": "Verbrennen.",
+        "effects": { "respekt": 6 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_parteitag",
+    "title": "Der Parteitag",
+    "description": "Du sollst eine Rede halten. Das Mikrofon wartet, die Kameras auch.",
+    "category": "politik",
+    "weight": 9,
+    "choices": [
+      {
+        "text": "Großes Versprechen machen.",
+        "effects": { "aura": 10, "respekt": 5, "chaos": 5 }
+      },
+      {
+        "text": "Vage bleiben.",
+        "effects": { "respekt": 4, "rizz": -3 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_gesetzesentwurf",
+    "title": "Ein neuer Gesetzesentwurf",
+    "description": "Es geht um Steuern. Deine Unterschrift fehlt noch.",
+    "category": "politik",
+    "weight": 11,
+    "choices": [
+      {
+        "text": "Zustimmen.",
+        "effects": { "moneten": 8, "respekt": -5 }
+      },
+      {
+        "text": "Blockieren.",
+        "effects": { "respekt": 8, "moneten": -8 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_lobbyist_dinner",
+    "title": "Ein Lobbyist lädt zum Essen",
+    "description": "Sehr teures Restaurant. Sehr unauffällige Ecke.",
+    "category": "politik",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Erscheinen und zuhören.",
+        "effects": { "moneten": 12, "aura": -6 },
+        "hints": { "aura": "unknown" }
+      },
+      {
+        "text": "Höflich ablehnen.",
+        "effects": { "respekt": 6 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_alter_freund",
+    "title": "Ein alter Freund meldet sich",
+    "description": "Lange nichts gehört. Jetzt klingt er nervös.",
+    "category": "social",
+    "weight": 12,
+    "choices": [
+      {
+        "text": "Treffen.",
+        "effects": { "rizz": 8, "moneten": -4 }
+      },
+      {
+        "text": "Ignorieren.",
+        "effects": { "rizz": -6, "respekt": 2 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_charity_gala",
+    "title": "Charity-Gala",
+    "description": "Smoking, Champagner, sehr ernst dreinschauende Reiche.",
+    "category": "social",
+    "weight": 11,
+    "choices": [
+      {
+        "text": "Großzügig spenden.",
+        "effects": { "moneten": -15, "aura": 14 }
+      },
+      {
+        "text": "Nur fürs Foto erscheinen.",
+        "effects": { "aura": 5, "respekt": -3 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_dating_app",
+    "title": "Eine Nachricht aus dem Nichts",
+    "description": "Eine Bekanntschaft schreibt: 'Bist du noch wach?'",
+    "category": "social",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Antworten.",
+        "effects": { "rizz": 10, "respekt": -3 }
+      },
+      {
+        "text": "Stummschalten.",
+        "effects": { "rizz": -4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_familienfeier",
+    "title": "Familienfeier",
+    "description": "Tante Renate hat Fragen. Viele Fragen.",
+    "category": "social",
+    "weight": 9,
+    "choices": [
+      {
+        "text": "Geduldig durchhalten.",
+        "effects": { "respekt": 5, "rizz": -2 }
+      },
+      {
+        "text": "Früh verschwinden.",
+        "effects": { "rizz": 4, "respekt": -5 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_nachbarschaftsstreit",
+    "title": "Streit in der Nachbarschaft",
+    "description": "Jemand parkt seit Tagen vor deinem Tor. Die Stimmung kippt.",
+    "category": "social",
+    "weight": 8,
+    "choices": [
+      {
+        "text": "Selbst klären.",
+        "effects": { "respekt": 6, "rizz": -4 }
+      },
+      {
+        "text": "Anzeige erstatten.",
+        "effects": { "respekt": -3, "aura": -5, "chaos": 4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_steuerpruefung",
+    "title": "Steuerprüfung",
+    "description": "Ein freundlicher Brief mit sehr unfreundlichen Implikationen.",
+    "category": "economy",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Anwalt einschalten.",
+        "effects": { "moneten": -12, "respekt": 4 }
+      },
+      {
+        "text": "Selbst regeln.",
+        "effects": { "moneten": -6, "chaos": 6 },
+        "hints": { "moneten": "unknown" }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_krypto_pitch",
+    "title": "Ein Krypto-Pitch",
+    "description": "Ein junger Mann mit gewagter Frisur erklärt dir die Zukunft des Geldes.",
+    "category": "economy",
+    "weight": 11,
+    "choices": [
+      {
+        "text": "Investieren.",
+        "effects": { "moneten": 18, "aura": -4, "chaos": 8 },
+        "hints": { "moneten": "unknown" }
+      },
+      {
+        "text": "Höflich nicken und gehen.",
+        "effects": { "respekt": 4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_gehaltsverhandlung",
+    "title": "Gehaltsverhandlung mit dem Vorstand",
+    "description": "Sie warten auf eine Zahl. Du auch.",
+    "category": "economy",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Hoch pokern.",
+        "effects": { "moneten": 15, "respekt": -6 }
+      },
+      {
+        "text": "Bescheiden bleiben.",
+        "effects": { "moneten": 5, "respekt": 6 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_immobilienangebot",
+    "title": "Ein Penthouse zum Schnäppchenpreis",
+    "description": "Der Makler lächelt zu viel. Das Angebot läuft heute Nacht ab.",
+    "category": "economy",
+    "weight": 9,
+    "choices": [
+      {
+        "text": "Sofort zuschlagen.",
+        "effects": { "moneten": -20, "aura": 12 },
+        "hints": { "moneten": "down" }
+      },
+      {
+        "text": "Erst prüfen lassen.",
+        "effects": { "moneten": 0, "respekt": 4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_streik",
+    "title": "Deine Belegschaft streikt",
+    "description": "Sie wollen mehr. Du hast genau zwei Optionen, wie immer.",
+    "category": "economy",
+    "weight": 8,
+    "choices": [
+      {
+        "text": "Forderungen erfüllen.",
+        "effects": { "moneten": -10, "aura": 8, "respekt": 5 }
+      },
+      {
+        "text": "Hart bleiben.",
+        "effects": { "moneten": 6, "aura": -10, "chaos": 8 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_stromausfall",
+    "title": "Großflächiger Stromausfall",
+    "description": "Halbe Stadt im Dunkeln. Niemand weiß, warum.",
+    "category": "chaos",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Krisenmanager spielen.",
+        "effects": { "aura": 10, "moneten": -5, "chaos": -5 }
+      },
+      {
+        "text": "Im Kerzenschein abwarten.",
+        "effects": { "rizz": 4, "chaos": 8 },
+        "hints": { "chaos": "unknown" }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_seltsamer_brief",
+    "title": "Ein seltsamer Brief",
+    "description": "Kein Absender. Nur ein Wort: 'Bald.'",
+    "category": "chaos",
+    "weight": 8,
+    "choices": [
+      {
+        "text": "Sicherheitsleute alarmieren.",
+        "effects": { "moneten": -8, "respekt": 4, "chaos": -3 }
+      },
+      {
+        "text": "Wegwerfen und vergessen.",
+        "effects": { "rizz": 3, "chaos": 10 },
+        "hints": { "chaos": "unknown" }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_ki_panne",
+    "title": "Eine KI-Panne",
+    "description": "Ein Algorithmus hat irgendwo etwas Dummes entschieden. Die Schlagzeilen sind schon da.",
+    "category": "chaos",
+    "weight": 9,
+    "choices": [
+      {
+        "text": "Verantwortung übernehmen.",
+        "effects": { "aura": 6, "moneten": -8, "chaos": -4 }
+      },
+      {
+        "text": "Auf den Hersteller zeigen.",
+        "effects": { "respekt": -4, "chaos": 8, "rizz": 5 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_virales_meme",
+    "title": "Du bist ein Meme",
+    "description": "Ein 0,7-Sekunden-Clip von dir geht durch die Decke. Niemand weiß genau, warum.",
+    "category": "chaos",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Den Trend reiten.",
+        "effects": { "aura": 14, "respekt": -8, "rizz": 6, "chaos": 6 }
+      },
+      {
+        "text": "Stoisch ignorieren.",
+        "effects": { "respekt": 6, "aura": -4 }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd1_komet",
+    "title": "Komet am Nachthimmel",
+    "description": "Astronom*innen sind aufgeregt. Verschwörungstheoretiker*innen auch.",
+    "category": "chaos",
+    "weight": 7,
+    "choices": [
+      {
+        "text": "Zeichen deuten lassen.",
+        "effects": { "aura": 8, "chaos": 12, "rizz": 4 },
+        "hints": { "chaos": "unknown" }
+      },
+      {
+        "text": "Wissenschaftliche Erklärung pushen.",
+        "effects": { "respekt": 8, "aura": -3, "chaos": -4 }
+      }
+    ]
+  }
+]

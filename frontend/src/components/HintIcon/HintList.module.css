@@ -1,0 +1,9 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.list[data-align='start']  { justify-content: flex-start; }
+.list[data-align='center'] { justify-content: center; }
+.list[data-align='end']    { justify-content: flex-end; }

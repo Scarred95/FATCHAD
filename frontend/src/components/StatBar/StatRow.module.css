@@ -1,0 +1,15 @@
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  height: var(--statbar-h);
+}
+
+.divider {
+  width: 1px;
+  background: var(--color-text-faint);
+  align-self: stretch;
+  margin: 0 var(--space-1);
+  opacity: 0.5;
+}
