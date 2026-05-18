@@ -87,6 +87,28 @@ body {
   border-radius: var(--radius-md);
 }
 
+/* Scanline overlay shown when |chaos| crosses the "extreme" threshold.
+   Lives on the body so it sits above everything but ::-attached pseudos. */
+body.chaosExtreme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 3px,
+    rgba(255, 255, 255, 0.02) 3px 4px
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 9;
+  animation: scanline 4.2s steps(40) infinite;
+}
+
+@keyframes scanline {
+  0%, 100% { transform: translateY(0); opacity: 0.9; }
+  50%      { transform: translateY(2px); opacity: 1; }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

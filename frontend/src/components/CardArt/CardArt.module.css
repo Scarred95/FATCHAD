@@ -1,0 +1,52 @@
+.art {
+  flex: 0 0 38%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 50%, var(--color-bg-elevated) 100%);
+}
+
+.stripes {
+  position: absolute;
+  inset: 0;
+}
+
+.corner {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 500 10px/1 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  z-index: 2;
+}
+
+/* Top-left: category label, deliberately faded so it reads as a quiet
+   filing-cabinet tag rather than competing with the title. */
+.category {
+  color: rgba(245, 245, 250, 0.5);
+}
+
+/* Top-right: deck name in the same chip/bubble that used to hold "Stapel".
+   Solid pill so the deck identity feels like a stamp on the dossier. */
+.deckChip {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text);
+  padding: 4px 10px;
+  border: 1px solid rgba(245, 245, 250, 0.3);
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}

@@ -1,39 +1,106 @@
+/* Game page intentionally bypasses the global `.page` 480px ceiling — the
+   option gutters need viewport width to breathe alongside the card. */
+.gamePage {
+  width: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  position: relative;
+  /* Sit above the fixed ScreenGlow (z-index 0). */
+  z-index: 1;
+  max-width: none;
+}
+
+/* The mobile-shell rows (header + stats) keep the 480px ceiling so they
+   feel consistent with the rest of the app. */
+.gameTop {
+  width: 100%;
+  max-width: var(--layout-max);
+  margin: 0 auto;
+}
+
+.cardArena {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  position: relative;
+  isolation: isolate;
+}
+
+.cardRow {
+  flex: 1;
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  /* Wide gutters: option text sits near the screen edge while the card
+     stays a comfortable phone-sized column in the middle. */
+  grid-template-columns:
+    minmax(0, 1fr)
+    clamp(200px, 28vw, 280px)
+    minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(var(--space-4), 6vw, 96px);
+  padding: 0 var(--space-5);
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+}
+
+@media (max-width: 380px) {
+  .cardRow {
+    grid-template-columns: minmax(0, 1fr) clamp(170px, 50%, 220px) minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+  }
+}
+
+.cardStack {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  max-height: 460px;
+  aspect-ratio: 3 / 4;
+  margin: 0 auto;
+}
+
+.cardWrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Peek-card stand-ins behind the active card — pure visual cue.
+   Kept very subtle (translucent fill + faint outline) so the peeks don't
+   read as a hard black slab when the live card is mid-swipe and exposes
+   them. */
+.peek {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  background: rgba(245, 245, 250, 0.025);
+  border: 1px solid rgba(245, 245, 250, 0.08);
+  pointer-events: none;
+  transform-origin: top center;
+}
+.peek1 { transform: translateY(8px) scale(0.97); z-index: 1; opacity: 0.55; }
+.peek2 { transform: translateY(16px) scale(0.94); z-index: 0; opacity: 0.3; }
+
+/* Fallback page used for the loading / error skeleton. */
 .page {
   display: flex;
   flex-direction: column;
   padding: var(--space-2);
   gap: var(--space-2);
-}
-
-.cardArea {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  position: relative;
-  padding: var(--space-3) 0;
-}
-
-.cardWrap {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.choices2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-2) var(--space-4);
-}
-
-.choices3 {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-2) var(--space-4);
 }
 
 .fatal {
@@ -60,9 +127,8 @@
 .dim { color: var(--color-text-dim); }
 
 .emptyCard {
-  width: 100%;
-  max-width: 380px;
-  aspect-ratio: 3 / 4;
+  position: absolute;
+  inset: 0;
   background: var(--color-bg-elevated);
   border: 1px dashed var(--color-text-faint);
   border-radius: var(--radius-xl);
@@ -107,6 +173,7 @@
   backdrop-filter: blur(8px) saturate(0.4);
   background: rgba(10, 10, 15, 0.6);
   z-index: 5;
+  border-radius: var(--radius-xl);
 }
 
 .endingLabel {

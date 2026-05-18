@@ -28,9 +28,20 @@ const STAT_COLOR: Record<MainStatName, string> = {
 export default function StatBar({ stat, value, delta }: Props) {
   const danger = value <= 15 || value >= 85;
   const [pulseKey, setPulseKey] = useState(0);
+  // The delta number lingers in the store until the next choice, so we
+  // gate it locally: each non-zero delta makes it visible for ~1.6s,
+  // long enough for the float-up to settle, then we let AnimatePresence
+  // exit it.
+  const [showDelta, setShowDelta] = useState(false);
 
   useEffect(() => {
-    if (delta && delta !== 0) setPulseKey((k) => k + 1);
+    if (delta && delta !== 0) {
+      setPulseKey((k) => k + 1);
+      setShowDelta(true);
+      const t = setTimeout(() => setShowDelta(false), 1600);
+      return () => clearTimeout(t);
+    }
+    setShowDelta(false);
   }, [delta]);
 
   return (
@@ -70,7 +81,7 @@ export default function StatBar({ stat, value, delta }: Props) {
       </div>
       <span className="sr-only">{LABEL[stat]}: {value}</span>
       <AnimatePresence>
-        {delta !== undefined && delta !== 0 && (
+        {showDelta && delta !== undefined && delta !== 0 && (
           <motion.span
             key={pulseKey}
             className={styles.delta}
@@ -78,7 +89,7 @@ export default function StatBar({ stat, value, delta }: Props) {
             initial={{ opacity: 0, y: 0 }}
             animate={{ opacity: 1, y: -22 }}
             exit={{ opacity: 0, y: -34 }}
-            transition={{ duration: 0.9, ease: 'easeOut' }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
           >
             {delta > 0 ? `+${delta}` : delta}
           </motion.span>

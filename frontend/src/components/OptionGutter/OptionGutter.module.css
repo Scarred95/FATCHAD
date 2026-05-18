@@ -1,0 +1,107 @@
+.gutter {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  background: transparent;
+  color: var(--color-text-faint);
+  border: none;
+  min-width: 0;
+  text-align: left;
+  transition: color var(--dur-quick);
+}
+
+.gutter:hover:not(:disabled):not(.empty):not(.active) {
+  color: var(--color-text-dim);
+}
+
+.gutter:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.empty {
+  pointer-events: none;
+}
+
+.left {
+  text-align: left;
+  align-items: flex-start;
+  padding-left: 0;
+  padding-right: var(--space-3);
+}
+
+.right {
+  text-align: right;
+  align-items: flex-end;
+  padding-right: 0;
+  padding-left: var(--space-3);
+}
+
+.down {
+  text-align: center;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 auto;
+  max-width: min(420px, 100%);
+}
+
+.active {
+  color: var(--color-text);
+}
+
+.arrow {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--color-text-dim);
+  line-height: 1;
+  display: block;
+  transition: color var(--dur-quick), text-shadow var(--dur-quick);
+}
+
+.down .arrow {
+  display: inline-block;
+}
+
+.active .arrow {
+  color: var(--color-accent);
+  text-shadow: 0 0 10px var(--color-accent-glow), 0 0 22px rgba(255, 62, 127, 0.55);
+}
+
+.text {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  line-height: 1.05;
+  color: inherit;
+  text-wrap: balance;
+  transition: color var(--dur-quick), text-shadow var(--dur-quick);
+}
+
+.down .text {
+  flex: 0 1 auto;
+}
+
+.active .text {
+  color: var(--color-text);
+  text-shadow:
+    0 0 12px var(--color-accent-glow),
+    0 0 28px rgba(255, 62, 127, 0.55),
+    0 0 56px rgba(255, 62, 127, 0.35);
+}
+
+@media (max-width: 380px) {
+  .text {
+    font-size: 1rem;
+  }
+  .arrow {
+    font-size: 1.15rem;
+  }
+}

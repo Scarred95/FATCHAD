@@ -1,0 +1,79 @@
+[
+  {
+    "_id": "evt_rd2_dreifachfrage_party",
+    "title": "Drei Einladungen, ein Abend",
+    "description": "Dein Telefon glüht. Drei Partys, drei Welten, ein Du.",
+    "category": "social",
+    "deck_name": "Trilemma I",
+    "weight": 10,
+    "choices": [
+      {
+        "text": "Zur Galerie.",
+        "effects": { "aura": 8, "moneten": -4 },
+        "hints": { "aura": "up", "moneten": "down" }
+      },
+      {
+        "text": "Zum Politiker.",
+        "effects": { "respekt": 9, "rizz": -3 },
+        "hints": { "respekt": "up", "rizz": "down" }
+      },
+      {
+        "text": "Zum Hinterhof-Rave.",
+        "effects": { "rizz": 10, "respekt": -5, "chaos": 6 },
+        "hints": { "rizz": "up", "chaos": "up" }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd2_anruf_des_anwalts",
+    "title": "Der Anwalt ruft",
+    "description": "Es ist nichts Großes. Noch. Du sollst dich entscheiden, bevor es eins wird.",
+    "category": "politik",
+    "deck_name": "Trilemma I",
+    "weight": 9,
+    "choices": [
+      {
+        "text": "Sofort zahlen.",
+        "effects": { "moneten": -12, "respekt": 5 },
+        "hints": { "moneten": "down", "respekt": "up" }
+      },
+      {
+        "text": "Verhandeln lassen.",
+        "effects": { "moneten": -4, "aura": -3, "chaos": 4 },
+        "hints": { "moneten": "down", "chaos": "up" }
+      },
+      {
+        "text": "Ignorieren.",
+        "effects": { "respekt": -8, "chaos": 10 },
+        "hints": { "respekt": "down", "chaos": "unknown" }
+      }
+    ]
+  },
+
+  {
+    "_id": "evt_rd2_unbekannte_nachricht",
+    "title": "Eine unbekannte Nachricht",
+    "description": "Ein Foto. Eine Zahl. Kein Absender. Du hast genau eine Reaktion frei.",
+    "category": "chaos",
+    "deck_name": "Trilemma I",
+    "weight": 8,
+    "choices": [
+      {
+        "text": "Antworten.",
+        "effects": { "rizz": 4, "chaos": 8 },
+        "hints": { "rizz": "up", "chaos": "up" }
+      },
+      {
+        "text": "Screenshot teilen.",
+        "effects": { "aura": 6, "respekt": -4, "chaos": 5 },
+        "hints": { "aura": "up", "respekt": "down" }
+      },
+      {
+        "text": "Löschen und schweigen.",
+        "effects": { "aura": -3, "chaos": -4 },
+        "hints": { "aura": "down", "chaos": "down" }
+      }
+    ]
+  }
+]

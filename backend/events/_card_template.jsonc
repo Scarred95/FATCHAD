@@ -40,6 +40,8 @@
     "title": "Ein einfaches Angebot",
     "description": "Jemand bietet dir etwas an. Nimmst du es?",
     "category": "social",                  // see _categories.md for the full list
+    "deck_name": "Aufstieg I",             // human-readable name of the deck/pack this card belongs to;
+                                           // shown in the card-art top-right corner
     "weight": 10,                          // relative draw probability during refill
                                            // 0 = never drawn by refill (use for questline cards)
                                            // 1–5 = rare, 10 = normal, 50+ = common

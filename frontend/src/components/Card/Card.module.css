@@ -1,9 +1,7 @@
 .card {
-  position: relative;
-  width: 100%;
-  max-width: 380px;
-  aspect-ratio: 3 / 4;
-  margin: 0 auto;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   background: var(--color-bg-elevated);
   border: var(--border-thin);
   border-radius: var(--radius-xl);
@@ -15,20 +13,22 @@
   touch-action: pan-y;
   cursor: grab;
   transition: border-color var(--dur-quick), box-shadow var(--dur-quick);
+  will-change: transform;
 }
 
 .card[data-intent='-1'] {
   border-color: var(--color-warning);
-  box-shadow: -8px 8px 32px rgba(240, 176, 32, 0.15), var(--shadow-card);
+  box-shadow: -8px 8px 28px rgba(240, 176, 32, 0.18), var(--shadow-card);
 }
 
 .card[data-intent='1'] {
   border-color: var(--color-success);
-  box-shadow: 8px 8px 32px rgba(74, 222, 128, 0.15), var(--shadow-card);
+  box-shadow: 8px 8px 28px rgba(74, 222, 128, 0.18), var(--shadow-card);
 }
 
+/* image variant — used when a card carries a real image_url */
 .image {
-  height: 35%;
+  flex: 0 0 38%;
   width: 100%;
   background-size: cover;
   background-position: center;
@@ -38,7 +38,7 @@
 .imageFade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 40%, var(--color-bg-elevated) 100%);
+  background: linear-gradient(to bottom, transparent 50%, var(--color-bg-elevated) 100%);
 }
 
 .body {
@@ -46,59 +46,45 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-5) var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-2);
   min-height: 0;
+  overflow: hidden;
 }
 
 .title {
-  font-size: var(--fs-display-md);
+  font-size: var(--fs-display-sm);
   color: var(--color-text);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .description {
   color: var(--color-text-dim);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
+  font-size: var(--fs-body-sm);
+  line-height: 1.4;
   font-style: italic;
+  text-wrap: pretty;
 }
 
-.hintFooter {
-  padding: var(--space-3) var(--space-5) var(--space-5);
-  min-height: 56px;
+.foot {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  color: var(--color-text-faint);
+  border-top: 1px solid var(--color-text-faint);
+  background: rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-top: 1px solid var(--color-text-faint);
-  background: rgba(0, 0, 0, 0.18);
+  gap: var(--space-2);
 }
 
-.edgeLabel {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  letter-spacing: 0.2em;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--dur-quick);
+.footText {
+  font: 500 0.65rem / 1 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
 }
 
-.edgeLabel[data-side='left'] {
-  left: var(--space-4);
-  background: var(--color-warning);
-  color: var(--color-bg-base);
+.footArrow {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--color-text-dim);
 }
 
-.edgeLabel[data-side='right'] {
-  right: var(--space-4);
-  background: var(--color-success);
-  color: var(--color-bg-base);
-}
-
-.edgeLabel[data-active='true'] {
-  opacity: 1;
-}

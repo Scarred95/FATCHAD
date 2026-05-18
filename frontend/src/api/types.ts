@@ -27,6 +27,9 @@ export interface CardResponse {
   id: string;
   title: string;
   description: string;
+  category: string;
+  /** Human-readable name of the deck/pack this card was authored in. */
+  deck_name: string | null;
   image_url: string | null;
   choices: ChoicePreview[];
 }

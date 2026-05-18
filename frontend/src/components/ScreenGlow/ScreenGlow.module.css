@@ -1,0 +1,44 @@
+.glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gw {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: transparent;
+  transition: opacity 260ms var(--ease-out), background 360ms var(--ease-out);
+}
+
+.top    { clip-path: polygon(50% 50%, 0% 0%, 100% 0%); }
+.right  { clip-path: polygon(50% 50%, 100% 0%, 100% 100%); }
+.bottom { clip-path: polygon(50% 50%, 100% 100%, 0% 100%); }
+.left   { clip-path: polygon(50% 50%, 0% 100%, 0% 0%); }
+
+.left.on {
+  opacity: 1;
+  background: linear-gradient(to right,
+    rgba(240, 176, 32, 0.40) 0%,
+    rgba(240, 176, 32, 0.10) 28%,
+    transparent 60%);
+}
+
+.right.on {
+  opacity: 1;
+  background: linear-gradient(to left,
+    rgba(74, 222, 128, 0.40) 0%,
+    rgba(74, 222, 128, 0.10) 28%,
+    transparent 60%);
+}
+
+.bottom.on {
+  opacity: 1;
+  background: linear-gradient(to top,
+    rgba(255, 62, 127, 0.40) 0%,
+    rgba(255, 62, 127, 0.10) 28%,
+    transparent 60%);
+}

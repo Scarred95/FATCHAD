@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import StatIcon from '../StatIcon/StatIcon';
 import styles from './ChaosBar.module.css';
 
@@ -13,6 +14,20 @@ export default function ChaosBar({ value, delta }: Props) {
   const pct = Math.min(50, Math.abs(value) / 2);
   const direction = value >= 0 ? 'pos' : 'neg';
   const danger = Math.abs(value) >= 85;
+
+  // Match StatBar: keep the delta on-screen briefly, then fade. Without
+  // this gate the value lingers until the next choice is submitted.
+  const [showDelta, setShowDelta] = useState(false);
+  const [pulseKey, setPulseKey] = useState(0);
+  useEffect(() => {
+    if (delta && delta !== 0) {
+      setPulseKey((k) => k + 1);
+      setShowDelta(true);
+      const t = setTimeout(() => setShowDelta(false), 1600);
+      return () => clearTimeout(t);
+    }
+    setShowDelta(false);
+  }, [delta]);
 
   return (
     <div className={styles.wrap} data-danger={danger}>
@@ -41,17 +56,20 @@ export default function ChaosBar({ value, delta }: Props) {
           transition={{ type: 'spring', stiffness: 240, damping: 28 }}
         />
       </div>
-      {delta !== undefined && delta !== 0 && (
-        <motion.span
-          className={styles.delta}
-          key={delta + ':' + value}
-          initial={{ opacity: 0, y: 0 }}
-          animate={{ opacity: 1, y: -22 }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
-        >
-          {delta > 0 ? `+${delta}` : delta}
-        </motion.span>
-      )}
+      <AnimatePresence>
+        {showDelta && delta !== undefined && delta !== 0 && (
+          <motion.span
+            key={pulseKey}
+            className={styles.delta}
+            initial={{ opacity: 0, y: 0 }}
+            animate={{ opacity: 1, y: -22 }}
+            exit={{ opacity: 0, y: -34 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          >
+            {delta > 0 ? `+${delta}` : delta}
+          </motion.span>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

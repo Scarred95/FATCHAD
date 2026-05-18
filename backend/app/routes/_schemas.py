@@ -42,6 +42,8 @@ class CardResponse(BaseModel):
     id: str
     title: str
     description: str
+    category: str
+    deck_name: str | None = None
     choices: list[ChoicePreview]
     image_url: str | None = None
 
@@ -52,6 +54,8 @@ class CardResponse(BaseModel):
             id=event.id,
             title=event.title,
             description=event.description,
+            category=event.category,
+            deck_name=event.deck_name,
             image_url=event.image_url,
             choices=[
                 ChoicePreview(text=c.text, hints=_resolve_hints(c))

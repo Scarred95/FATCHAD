@@ -17,10 +17,15 @@ export function useChaosAmbient(chaos: number | undefined | null) {
     el.style.setProperty('--chaos-signed', signed.toFixed(3));
     el.style.setProperty('--chaos', mag.toFixed(3));
     el.dataset.chaos = c.toString();
+    // Above |chaos| 75 the world starts to glitch — a body class swaps in
+    // the scanline overlay defined in globals.css. Threshold is intentionally
+    // lower than the ±100 endgame so the player has visual warning.
+    document.body.classList.toggle('chaosExtreme', Math.abs(c) >= 75);
     return () => {
       el.style.setProperty('--chaos-signed', '0');
       el.style.setProperty('--chaos', '0');
       el.dataset.chaos = '0';
+      document.body.classList.remove('chaosExtreme');
     };
   }, [chaos]);
 }

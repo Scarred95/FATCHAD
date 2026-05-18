@@ -86,6 +86,11 @@ class Event(BaseModel):
     title: str
     description: str
     category: str
+    # Human-readable name of the deck/pack this card belongs to. Surfaced in
+    # the card-art top-right corner so the player can see which storyline /
+    # source pack a card is drawn from. Optional — older content may not
+    # declare it; the UI falls back to a generic label.
+    deck_name: Optional[str] = None
     weight: int = Field(default=10, ge=0)
     # If True, this card is preserved when ineligible — re-shuffled to a random
     # position in the deck instead of being dropped. Use for questline / arc

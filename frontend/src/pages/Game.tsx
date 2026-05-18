@@ -2,9 +2,10 @@ import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Card from '../components/Card/Card';
-import ChoiceButton from '../components/ChoiceButton/ChoiceButton';
 import Header, { BackArrow, IconButton, MenuDots } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
+import OptionGutter from '../components/OptionGutter/OptionGutter';
+import ScreenGlow from '../components/ScreenGlow/ScreenGlow';
 import StatRow from '../components/StatBar/StatRow';
 import { useChaosAmbient } from '../hooks/useChaosAmbient';
 import { useRunStore } from '../stores/runStore';
@@ -29,9 +30,10 @@ export default function Game() {
 
   const [confirmExit, setConfirmExit] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  // Bubbled up from the Card's swipe hook so the choice buttons can mirror
-  // the active commit direction. Resets to 0 each time a new Card mounts.
-  const [swipeIntent, setSwipeIntent] = useState<-1 | 0 | 1>(0);
+  // Bubbled up from the Card's swipe hook so the option gutters can light
+  // the side the user is pulling toward. Resets to 0 each time a new Card
+  // mounts. 'down' is only ever set when the current card has a 3rd choice.
+  const [swipeIntent, setSwipeIntent] = useState<-1 | 0 | 1 | 'down'>(0);
 
   useEffect(() => {
     if (runId && (!state || state._id !== runId)) {
@@ -49,8 +51,11 @@ export default function Game() {
 
   useChaosAmbient(state?.stats.chaos);
 
-  // 2-choice swipe: index 0 = swipe left, index 1 = swipe right.
-  const swipeable = !!currentCard && currentCard.choices.length === 2 && !isSubmitting;
+  const hasDown = !!currentCard && currentCard.choices.length >= 3;
+  // Swipe is enabled on every card. 2-choice cards commit on horizontal
+  // swipes (index 0 / 1); 3-choice cards additionally commit on a down
+  // swipe (index 2). The gutters remain tappable in all cases.
+  const swipeable = !!currentCard && !isSubmitting;
 
   const handleChoice = useCallback(
     async (index: number) => {
@@ -82,65 +87,95 @@ export default function Game() {
   const ended = state.status !== 'active';
 
   return (
-    <main className={`page ${styles.page}`}>
-      <Header
-        left={
-          <IconButton label="Zurück" onClick={() => setConfirmExit(true)}>
-            <BackArrow />
-          </IconButton>
-        }
-        center={`Zug ${state.turn}`}
-        right={
-          <IconButton label="Menü" onClick={() => setMenuOpen(true)}>
-            <MenuDots />
-          </IconButton>
-        }
-      />
+    <main className={styles.gamePage}>
+      <ScreenGlow intent={swipeIntent} chaos={state.stats.chaos} hasDown={hasDown} />
 
-      <StatRow stats={state.stats} deltas={lastDeltas} />
+      <div className={styles.gameTop}>
+        <Header
+          left={
+            <IconButton label="Zurück" onClick={() => setConfirmExit(true)}>
+              <BackArrow />
+            </IconButton>
+          }
+          center={`Zug ${state.turn}`}
+          right={
+            <IconButton label="Menü" onClick={() => setMenuOpen(true)}>
+              <MenuDots />
+            </IconButton>
+          }
+        />
 
-      <div className={styles.cardArea}>
-        {ended ? (
-          <motion.div
-            className={styles.endingOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className={styles.endingLabel}>Ende</div>
-          </motion.div>
-        ) : currentCard ? (
-          // No AnimatePresence: React 18 StrictMode + framer-motion v11
-          // AnimatePresence(mode="wait") has a known bug where the new child
-          // mounts at `initial` and never advances to `animate`. Keyed
-          // motion.div alone runs initial→animate reliably on each mount.
-          <motion.div
-            key={currentCard.id}
-            initial={{ opacity: 0, y: -32, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 28 }}
-            className={styles.cardWrap}
-          >
-            <Card
-              card={currentCard}
-              swipeable={swipeable}
-              onCommit={handleChoice}
-              onIntentChange={setSwipeIntent}
-            />
-          </motion.div>
-        ) : (
-          <EmptyCard onRetry={() => runId && loadRun(runId)} loading={isLoading} />
-        )}
+        <StatRow stats={state.stats} deltas={lastDeltas} />
       </div>
 
-      {!ended && currentCard && (
-        <ChoiceRow
-          card={currentCard}
-          intent={swipeable ? swipeIntent : 0}
-          disabled={isSubmitting}
-          onChoose={handleChoice}
-        />
-      )}
+      <div className={styles.cardArena}>
+        <div className={styles.cardRow}>
+          <OptionGutter
+            position="left"
+            choice={currentCard?.choices[0]}
+            active={swipeIntent === -1}
+            disabled={isSubmitting || !currentCard || ended}
+            onClick={() => handleChoice(0)}
+          />
+
+          <div className={styles.cardStack}>
+            {/* Peek cards behind for stack illusion */}
+            {state.deck[1] && <div className={`${styles.peek} ${styles.peek1}`} aria-hidden />}
+            {state.deck[2] && <div className={`${styles.peek} ${styles.peek2}`} aria-hidden />}
+
+            {ended ? (
+              <motion.div
+                className={styles.endingOverlay}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.8 }}
+              >
+                <div className={styles.endingLabel}>Ende</div>
+              </motion.div>
+            ) : currentCard ? (
+              // No AnimatePresence: React 18 StrictMode + framer-motion v11
+              // AnimatePresence(mode="wait") has a known bug where the new
+              // child mounts at `initial` and never advances to `animate`.
+              // A keyed motion.div runs initial→animate reliably on mount.
+              <motion.div
+                key={currentCard.id}
+                initial={{ opacity: 0, y: -32, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                className={styles.cardWrap}
+              >
+                <Card
+                  card={currentCard}
+                  swipeable={swipeable}
+                  hasDown={hasDown}
+                  onCommit={handleChoice}
+                  onIntentChange={setSwipeIntent}
+                />
+              </motion.div>
+            ) : (
+              <EmptyCard onRetry={() => runId && loadRun(runId)} loading={isLoading} />
+            )}
+          </div>
+
+          <OptionGutter
+            position="right"
+            choice={currentCard?.choices[1]}
+            active={swipeIntent === 1}
+            disabled={isSubmitting || !currentCard || ended}
+            onClick={() => handleChoice(1)}
+          />
+        </div>
+
+        {hasDown && currentCard && (
+          <OptionGutter
+            position="down"
+            choice={currentCard.choices[2]}
+            active={swipeIntent === 'down'}
+            disabled={isSubmitting || ended}
+            onClick={() => handleChoice(2)}
+          />
+        )}
+      </div>
 
       <Modal
         open={confirmExit}
@@ -178,53 +213,6 @@ export default function Game() {
         onClose={() => setMenuOpen(false)}
       />
     </main>
-  );
-}
-
-interface ChoiceRowProps {
-  card: import('../api/types').CardResponse;
-  intent: -1 | 0 | 1;
-  disabled: boolean;
-  onChoose: (i: number) => void;
-}
-
-function ChoiceRow({ card, intent, disabled, onChoose }: ChoiceRowProps) {
-  if (card.choices.length === 2) {
-    return (
-      <div className={styles.choices2}>
-        <ChoiceButton
-          choice={card.choices[0]}
-          index={0}
-          arrow={-1}
-          active={intent === -1}
-          disabled={disabled}
-          onClick={onChoose}
-        />
-        <ChoiceButton
-          choice={card.choices[1]}
-          index={1}
-          arrow={1}
-          active={intent === 1}
-          disabled={disabled}
-          onClick={onChoose}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.choices3}>
-      {card.choices.map((c, i) => (
-        <ChoiceButton
-          key={i}
-          choice={c}
-          index={i}
-          arrow={0}
-          disabled={disabled}
-          onClick={onChoose}
-        />
-      ))}
-    </div>
   );
 }
 

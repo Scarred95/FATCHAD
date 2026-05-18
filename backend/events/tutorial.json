@@ -4,6 +4,7 @@
     "title": "Du wachst auf.",
     "description": "Vor dir liegt die Welt. Sie ist kaputt, aber sie ist da. Jemand muss sie übernehmen — warum nicht du?",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -34,6 +35,7 @@
     "title": "Vier Werte. Vier Wege.",
     "description": "Geld, Aura, Respekt, Rizz. Sie steigen und fallen mit jeder Entscheidung. Lass uns das mal ausprobieren — wähle, was dir am wichtigsten ist.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -65,6 +67,7 @@
     "title": "Vorsicht: beide Enden sind tödlich.",
     "description": "Ein Wert auf 0? Du bist erledigt. Aber ein Wert auf 100? Auch erledigt. Zu viel Geld macht dich zum Feindbild. Zu viel Aura, und du bist nur noch eine Karikatur. Balance ist alles.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -99,6 +102,7 @@
     "title": "Chaos.",
     "description": "Eine fünfte Anzeige. Sie geht von -100 bis +100. Sie tötet dich nicht — aber sie verändert, welche Karten du siehst. Bei -100 herrscht totale Ordnung. Bei +100 totaler Wahnsinn. Beide Extreme gewinnen das Spiel.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -130,6 +134,7 @@
     "title": "Das Spiel merkt sich alles.",
     "description": "Jede Entscheidung kann Spuren hinterlassen — Markierungen, die später Karten freischalten oder blockieren. Wirst du dich an alle deine schmutzigen Geheimnisse erinnern?",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -161,6 +166,7 @@
     "title": "Siehst du? Es funktioniert.",
     "description": "Diese Karte erscheint nur, weil du in der letzten Runde eine bestimmte Entscheidung getroffen hast. Hättest du anders gewählt, würdest du jetzt etwas anderes lesen. So baut das Spiel sich um dich herum auf.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -192,6 +198,7 @@
     "title": "Manche Saat braucht Zeit.",
     "description": "Du kannst eine Entscheidung treffen, deren Folgen erst später eintreten. Probier's — wir verschieben eine Konsequenz um zwei Züge.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -227,6 +234,7 @@
     "title": "Ein normaler Tag.",
     "description": "Nichts Dramatisches. Du gehst durch die Welt, triffst kleine Entscheidungen, baust dich auf. Genau so wird es sich die meiste Zeit anfühlen.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -252,6 +260,7 @@
     "title": "Noch ein Tag.",
     "description": "Das Spiel kennt viele Kategorien — Politik, Medien, Kriminalität, das Übernatürliche. Was du bekommst, hängt davon ab, wer du gerade bist.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -277,6 +286,7 @@
     "title": "Die Saat geht auf.",
     "description": "Erinnerst du dich an die Entscheidung von vorhin? Hier ist die Konsequenz. So wird es im Spiel oft sein — was du heute tust, kommt morgen zurück.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {
@@ -308,6 +318,7 @@
     "title": "Genug geübt.",
     "description": "Du kennst die Regeln: vier Werte, beide Extreme tödlich. Chaos als Genre-Schalter. Flags als Gedächtnis. Karten, die in die Zukunft greifen. Es gibt Endings, die du gewinnst, indem du Chaos auf ±100 treibst — und es gibt versteckte Pfade, die zu eigenen Schlüssen führen. Aber das findest du selbst heraus.",
     "category": "tutorial",
+    "deck_name": "Tutorial",
     "weight": 0,
     "important": true,
     "requires": {

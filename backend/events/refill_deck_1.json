@@ -4,6 +4,7 @@
     "title": "Kaffee mit dem Bürgermeister",
     "description": "Er will reden. Es geht angeblich nur um die Stadt.",
     "category": "politik",
+    "deck_name": "Aufstieg I",
     "weight": 12,
     "choices": [
       {
@@ -22,6 +23,7 @@
     "title": "Eine anonyme Quelle",
     "description": "Jemand schickt dir Akten. Echtheit unklar, Sprengkraft groß.",
     "category": "politik",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -41,6 +43,7 @@
     "title": "Der Parteitag",
     "description": "Du sollst eine Rede halten. Das Mikrofon wartet, die Kameras auch.",
     "category": "politik",
+    "deck_name": "Aufstieg I",
     "weight": 9,
     "choices": [
       {
@@ -59,6 +62,7 @@
     "title": "Ein neuer Gesetzesentwurf",
     "description": "Es geht um Steuern. Deine Unterschrift fehlt noch.",
     "category": "politik",
+    "deck_name": "Aufstieg I",
     "weight": 11,
     "choices": [
       {
@@ -77,6 +81,7 @@
     "title": "Ein Lobbyist lädt zum Essen",
     "description": "Sehr teures Restaurant. Sehr unauffällige Ecke.",
     "category": "politik",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -96,6 +101,7 @@
     "title": "Ein alter Freund meldet sich",
     "description": "Lange nichts gehört. Jetzt klingt er nervös.",
     "category": "social",
+    "deck_name": "Aufstieg I",
     "weight": 12,
     "choices": [
       {
@@ -114,6 +120,7 @@
     "title": "Charity-Gala",
     "description": "Smoking, Champagner, sehr ernst dreinschauende Reiche.",
     "category": "social",
+    "deck_name": "Aufstieg I",
     "weight": 11,
     "choices": [
       {
@@ -132,6 +139,7 @@
     "title": "Eine Nachricht aus dem Nichts",
     "description": "Eine Bekanntschaft schreibt: 'Bist du noch wach?'",
     "category": "social",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -150,6 +158,7 @@
     "title": "Familienfeier",
     "description": "Tante Renate hat Fragen. Viele Fragen.",
     "category": "social",
+    "deck_name": "Aufstieg I",
     "weight": 9,
     "choices": [
       {
@@ -168,6 +177,7 @@
     "title": "Streit in der Nachbarschaft",
     "description": "Jemand parkt seit Tagen vor deinem Tor. Die Stimmung kippt.",
     "category": "social",
+    "deck_name": "Aufstieg I",
     "weight": 8,
     "choices": [
       {
@@ -186,6 +196,7 @@
     "title": "Steuerprüfung",
     "description": "Ein freundlicher Brief mit sehr unfreundlichen Implikationen.",
     "category": "economy",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -205,6 +216,7 @@
     "title": "Ein Krypto-Pitch",
     "description": "Ein junger Mann mit gewagter Frisur erklärt dir die Zukunft des Geldes.",
     "category": "economy",
+    "deck_name": "Aufstieg I",
     "weight": 11,
     "choices": [
       {
@@ -224,6 +236,7 @@
     "title": "Gehaltsverhandlung mit dem Vorstand",
     "description": "Sie warten auf eine Zahl. Du auch.",
     "category": "economy",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -242,6 +255,7 @@
     "title": "Ein Penthouse zum Schnäppchenpreis",
     "description": "Der Makler lächelt zu viel. Das Angebot läuft heute Nacht ab.",
     "category": "economy",
+    "deck_name": "Aufstieg I",
     "weight": 9,
     "choices": [
       {
@@ -261,6 +275,7 @@
     "title": "Deine Belegschaft streikt",
     "description": "Sie wollen mehr. Du hast genau zwei Optionen, wie immer.",
     "category": "economy",
+    "deck_name": "Aufstieg I",
     "weight": 8,
     "choices": [
       {
@@ -279,6 +294,7 @@
     "title": "Großflächiger Stromausfall",
     "description": "Halbe Stadt im Dunkeln. Niemand weiß, warum.",
     "category": "chaos",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -298,6 +314,7 @@
     "title": "Ein seltsamer Brief",
     "description": "Kein Absender. Nur ein Wort: 'Bald.'",
     "category": "chaos",
+    "deck_name": "Aufstieg I",
     "weight": 8,
     "choices": [
       {
@@ -317,6 +334,7 @@
     "title": "Eine KI-Panne",
     "description": "Ein Algorithmus hat irgendwo etwas Dummes entschieden. Die Schlagzeilen sind schon da.",
     "category": "chaos",
+    "deck_name": "Aufstieg I",
     "weight": 9,
     "choices": [
       {
@@ -335,6 +353,7 @@
     "title": "Du bist ein Meme",
     "description": "Ein 0,7-Sekunden-Clip von dir geht durch die Decke. Niemand weiß genau, warum.",
     "category": "chaos",
+    "deck_name": "Aufstieg I",
     "weight": 10,
     "choices": [
       {
@@ -353,6 +372,7 @@
     "title": "Komet am Nachthimmel",
     "description": "Astronom*innen sind aufgeregt. Verschwörungstheoretiker*innen auch.",
     "category": "chaos",
+    "deck_name": "Aufstieg I",
     "weight": 7,
     "choices": [
       {
