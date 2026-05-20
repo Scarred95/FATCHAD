@@ -1,0 +1,88 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.box {
+  position: relative;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  cursor: text;
+}
+
+.box:focus-within {
+  border-color: var(--color-text-dim);
+}
+
+.chipRemove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-dim);
+  padding: 0 4px;
+  margin-right: -4px;
+  font-size: var(--fs-body-sm);
+  line-height: 1;
+}
+
+.chipRemove:hover {
+  color: var(--color-text);
+}
+
+.inputWrap {
+  position: relative;
+  flex: 1;
+  min-width: 140px;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+  outline: none;
+  border: none;
+  padding: 2px 4px;
+  font-family: var(--font-body);
+}
+
+.input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-dim);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  max-height: 192px;
+  overflow: auto;
+}
+
+.option {
+  padding: 4px 8px;
+  font-size: var(--fs-body-sm);
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.optionActive {
+  composes: option;
+  background: var(--color-bg-overlay);
+  color: #fff;
+}

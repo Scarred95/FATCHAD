@@ -77,6 +77,9 @@ class PatchCardRequest(BaseModel):
     image_url:   str | None = None
     requires:    Requirements | None = None
     choices:     list[Choice] | None = Field(default=None, min_length=2, max_length=3)
+    enabled:     bool | None = None
+    important:   bool | None = None
+    deck_name:   str | None = None
 
 
 @router.patch("/{card_id}", response_model=Event)
@@ -103,3 +106,33 @@ async def delete_card(
     deleted = await events.delete(card_id)
     if not deleted:
         raise HTTPException(404, "Card not found")
+
+
+# =============================================================================
+# Bulk deck toggle — enable/disable every card in a deck in one call
+# =============================================================================
+
+class DeckToggleRequest(BaseModel):
+    """Bulk-toggle the `enabled` flag on every card in a deck."""
+    enabled: bool
+
+
+class DeckToggleResponse(BaseModel):
+    """Result of a bulk deck toggle — how many cards were touched."""
+    matched: int
+    modified: int
+
+
+@router.post("/decks/{deck_name}/toggle", response_model=DeckToggleResponse)
+async def toggle_deck(
+    deck_name: str,
+    payload: DeckToggleRequest,
+    events: EventRepo = Depends(get_event_repo),
+):
+    """Set `enabled` on every card belonging to a given deck.
+
+    Pass `deck_name="__orphans__"` to target cards with no deck_name
+    (matches how the admin UI labels the orphan bucket).
+    """
+    matched, modified = await events.set_enabled_for_deck(deck_name, payload.enabled)
+    return DeckToggleResponse(matched=matched, modified=modified)

@@ -7,7 +7,15 @@ from app.schemas import Event, GameState, StatRange
 
 
 def is_eligible(event: Event, state: GameState) -> bool:
-    """True if the card's requirements are satisfied by the current state."""
+    """True if the card's requirements are satisfied by the current state.
+
+    Disabled cards (`enabled=False`) are never eligible — they're soft-removed
+    from the live game without being deleted from the database. Existing
+    documents that don't have the field read as enabled by default (handled
+    in the Pydantic schema, not here).
+    """
+    if not event.enabled:
+        return False
     return (
         _flags_all_satisfied(event, state)
         and _flags_none_satisfied(event, state)

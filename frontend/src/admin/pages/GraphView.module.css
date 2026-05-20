@@ -1,0 +1,239 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.crumbLink {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  text-decoration: none;
+}
+
+.crumbLink:hover { color: var(--color-text); }
+
+.heading {
+  font-size: var(--fs-display-sm);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.stats {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-body-xs);
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr 280px;
+  }
+}
+
+.canvas {
+  height: 78vh;
+  overflow: hidden;
+}
+
+.empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: var(--fs-body-sm);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 78vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.box {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deckRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-body-xs);
+}
+
+.deckRowHidden {
+  composes: deckRow;
+  opacity: 0.45;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.deckName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.deckCount {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.deckBulkBtn {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--color-text-faint);
+  background: transparent;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.deckBulkBtn:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.deckBulkBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.deckHideBtn {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-dim);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.deckHideBtn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-faint);
+}
+
+.flagsEmpty {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+}
+
+.flagRow {
+  font-size: var(--fs-body-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+
+.flagRow:hover {
+  background: var(--color-bg-overlay);
+  border-color: var(--color-text-faint);
+}
+
+.flagRowActive {
+  composes: flagRow;
+  background: var(--color-bg-overlay);
+  border-color: var(--color-text-faint);
+}
+
+.flagName {
+  font-family: 'Menlo', 'Monaco', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flagCounts {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.legend {
+  font-size: var(--fs-body-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legendHint {
+  color: var(--color-text-faint);
+  padding-top: 4px;
+}
