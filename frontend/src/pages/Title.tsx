@@ -3,12 +3,25 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listRuns, getHealth } from '../api/client';
 import { getUserId } from '../stores/userStore';
+import { useAdminStore } from '../stores/adminStore';
+import { useToastStore } from '../stores/toastStore';
 import styles from './Title.module.css';
 
 export default function Title() {
   const nav = useNavigate();
   const [hasRuns, setHasRuns] = useState<boolean | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
+  const isAdmin = useAdminStore((s) => s.isAdmin);
+  const enableAdmin = useAdminStore((s) => s.enable);
+  const disableAdmin = useAdminStore((s) => s.disable);
+  const pushToast = useToastStore((s) => s.push);
+
+  // Inline token entry state. Checking the box opens the input row;
+  // unchecking (or pressing Esc / Cancel) collapses it again.
+  const [tokenOpen, setTokenOpen] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     listRuns(getUserId())
@@ -19,6 +32,42 @@ export default function Title() {
       .then((h) => setOnline(h.status === 'ok'))
       .catch(() => setOnline(false));
   }, []);
+
+  // Checkbox handler. Checking opens the inline input; unchecking
+  // disables admin mode (or just closes the not-yet-submitted input).
+  function onAdminToggle(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.checked) {
+      setTokenOpen(true);
+      setTokenError(null);
+    } else {
+      setTokenOpen(false);
+      setTokenInput('');
+      setTokenError(null);
+      if (isAdmin) disableAdmin();
+    }
+  }
+
+  async function onTokenSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setTokenError(null);
+    const ok = await enableAdmin(tokenInput);
+    setSubmitting(false);
+    if (ok) {
+      setTokenOpen(false);
+      setTokenInput('');
+      pushToast('Admin-Modus aktiv', 'info');
+    } else {
+      setTokenError('Token ungültig');
+    }
+  }
+
+  function onTokenCancel() {
+    setTokenOpen(false);
+    setTokenInput('');
+    setTokenError(null);
+  }
 
   return (
     <main className={`page ${styles.page}`}>
@@ -62,6 +111,60 @@ export default function Title() {
           Über FATCHAD
         </Link>
       </motion.div>
+
+      <div className={styles.adminBlock}>
+        <div className={styles.adminRow}>
+          <label className={styles.adminToggle}>
+            <input
+              type="checkbox"
+              checked={isAdmin || tokenOpen}
+              onChange={onAdminToggle}
+            />
+            <span>Admin-Modus</span>
+          </label>
+          {isAdmin && (
+            <Link to="/admin" className={styles.adminLink}>
+              Öffnen
+            </Link>
+          )}
+        </div>
+
+        {tokenOpen && !isAdmin && (
+          <form className={styles.tokenForm} onSubmit={onTokenSubmit}>
+            <input
+              type="password"
+              className={styles.tokenInput}
+              placeholder="Admin-Token"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') onTokenCancel();
+              }}
+              autoFocus
+              disabled={submitting}
+            />
+            <button
+              type="submit"
+              className={styles.tokenSubmit}
+              disabled={submitting || !tokenInput.trim()}
+            >
+              {submitting ? '…' : 'OK'}
+            </button>
+            <button
+              type="button"
+              className={styles.tokenCancel}
+              onClick={onTokenCancel}
+              disabled={submitting}
+            >
+              Abbrechen
+            </button>
+          </form>
+        )}
+
+        {tokenError && (
+          <div className={styles.tokenError}>{tokenError}</div>
+        )}
+      </div>
 
       {online === false && (
         <div className={styles.statusPill}>

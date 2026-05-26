@@ -126,6 +126,122 @@
   color: var(--color-accent);
 }
 
+.adminBlock {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.adminRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+}
+
+.tokenForm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 22rem;
+}
+
+.tokenInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--fs-body-sm);
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+  transition: border-color var(--dur-quick);
+}
+
+.tokenInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.tokenInput:disabled {
+  opacity: 0.6;
+}
+
+.tokenSubmit,
+.tokenCancel {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  transition: background var(--dur-quick), color var(--dur-quick);
+}
+
+.tokenSubmit {
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+}
+
+.tokenSubmit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tokenCancel {
+  background: transparent;
+  color: var(--color-text-faint);
+  border: var(--border-thin);
+}
+
+.tokenCancel:hover {
+  color: var(--color-text-dim);
+}
+
+.tokenError {
+  font-size: var(--fs-body-xs);
+  color: var(--color-stat-respekt, #ef4444);
+}
+
+.adminToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  transition: color var(--dur-quick);
+}
+
+.adminToggle:hover {
+  color: var(--color-text-dim);
+}
+
+.adminToggle input {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.adminLink {
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  border-bottom: 1px dashed var(--color-accent);
+}
+
+.adminLink:hover {
+  opacity: 0.85;
+}
+
 .statusPill {
   position: absolute;
   bottom: var(--space-4);

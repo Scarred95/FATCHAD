@@ -1,0 +1,143 @@
+.node {
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-text-faint);
+  border-radius: var(--radius-md);
+  width: 240px;
+  font-size: 11px;
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+.head {
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weight {
+  font-size: 9px;
+  color: var(--color-text-dim);
+}
+
+.star {
+  font-size: 9px;
+  color: #fcd34d;
+}
+
+.body {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.id {
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 9px;
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.rowLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+.token {
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-family: 'Menlo', 'Monaco', monospace;
+}
+
+.openLink {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  text-decoration: underline;
+  margin-top: 4px;
+}
+
+.openLink:hover { color: var(--color-text); }
+
+.enableSwitch {
+  position: relative;
+  display: inline-block;
+  width: 26px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.enableSwitch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.enableTrack {
+  position: absolute;
+  inset: 0;
+  background: rgba(80, 80, 92, 0.7);
+  border-radius: 999px;
+  transition: background 120ms ease;
+}
+
+.enableTrack::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-text);
+  border-radius: 50%;
+  transition: transform 120ms ease;
+}
+
+.enableSwitch input:checked + .enableTrack {
+  background: #4ade80;
+}
+
+.enableSwitch input:checked + .enableTrack::before {
+  transform: translateX(12px);
+}
+
+.offBadge {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-faint);
+  border: 1px solid var(--color-text-faint);
+}

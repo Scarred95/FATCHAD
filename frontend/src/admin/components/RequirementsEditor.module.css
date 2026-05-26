@@ -1,0 +1,23 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.statsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: 5rem 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-body-xs);
+}
+
+.statKey {
+  color: var(--color-text-dim);
+}

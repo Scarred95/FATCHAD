@@ -85,6 +85,28 @@ class EventRepo:
         result = await self.coll.delete_one({"_id": event_id})
         return result.deleted_count > 0
 
+    async def set_enabled_for_deck(
+        self, deck_name: str, enabled: bool
+    ) -> tuple[int, int]:
+        """Bulk-update `enabled` on every card in a deck.
+
+        `deck_name="__orphans__"` is the sentinel for cards with no deck_name
+        set (or null). Matches the orphan bucket convention used in the admin UI.
+
+        Returns (matched_count, modified_count). Modified can be less than
+        matched if cards were already at the target enabled value.
+        """
+        if deck_name == "__orphans__":
+            query: dict = {"$or": [
+                {"deck_name": None},
+                {"deck_name": {"$exists": False}},
+            ]}
+        else:
+            query = {"deck_name": deck_name}
+
+        result = await self.coll.update_many(query, {"$set": {"enabled": enabled}})
+        return result.matched_count, result.modified_count
+
 
 class GameStateRepo:
     """Read-write access to the game_states collection."""

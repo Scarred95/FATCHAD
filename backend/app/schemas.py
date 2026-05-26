@@ -97,6 +97,12 @@ class Event(BaseModel):
     # cards that should still get a chance to play once their requirements
     # eventually unlock.
     important: bool = False
+    # Soft-toggle published state. Disabled cards are skipped by the
+    # gameplay deck loop (never refilled, dropped if surfaced) but stay in
+    # the database so they remain editable / re-enabled via the admin UI.
+    # Defaults True so pre-existing documents (no `enabled` field in
+    # Mongo) read as enabled.
+    enabled: bool = True
     requires: Requirements = Field(default_factory=Requirements)
     choices: list[Choice] = Field(min_length=2, max_length=3)
     image_url: Optional[str] = None

@@ -97,15 +97,17 @@ async def consume_top_card(state: GameState, events: EventRepo) -> tuple[GameSta
 
     # Walk the cards above the drawn one: drop non-important ineligibles and
     # stales; collect important ineligibles to re-shuffle back into the deck.
+    # Disabled cards are always dropped — `enabled=False` overrides `important`,
+    # so admins can soft-decommission a questline card without surgery.
     to_reshuffle: list[str] = []
     for j in range(drawn_index):
         cid = top_ids[j]
         card = by_id.get(cid)
         if card is None:
             continue  # stale → dropped
-        if card.important:
+        if card.important and card.enabled:
             to_reshuffle.append(cid)
-        # else: ineligible non-important → dropped
+        # else: ineligible non-important OR disabled → dropped
 
     # Keep everything from drawn_index+1 onward (untouched portion of deck).
     new_deck = new_state.deck[drawn_index + 1:]

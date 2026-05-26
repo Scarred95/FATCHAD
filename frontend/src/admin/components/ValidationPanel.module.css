@@ -1,0 +1,69 @@
+.wrap {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ok {
+  padding: var(--space-3);
+  font-size: var(--fs-body-sm);
+  color: var(--color-success);
+}
+
+.errLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-danger);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.warnLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-warning);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.errItem {
+  font-size: var(--fs-body-xs);
+  color: #ffd0d0;
+}
+
+.warnItem {
+  font-size: var(--fs-body-xs);
+  color: #ffe9b0;
+}
+
+.bullet {
+  margin-right: 4px;
+}
+
+.bulletErr {
+  composes: bullet;
+  color: var(--color-danger);
+}
+
+.bulletWarn {
+  composes: bullet;
+  color: var(--color-warning);
+}
+
+.path {
+  color: var(--color-text-faint);
+  margin-left: 4px;
+  font-family: 'Menlo', 'Monaco', monospace;
+}
