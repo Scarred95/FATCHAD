@@ -38,8 +38,6 @@ class ChoiceHints(BaseModel):
     rizz: Optional[StatHint] = None
     chaos: Optional[StatHint] = None
 
-
-
 class StatRange(BaseModel):
     """Min/max constraint on a single stat."""
     min: Optional[int] = None
@@ -48,12 +46,18 @@ class StatRange(BaseModel):
 
 class Stats(BaseModel):
     """The four player stats plus the global Chaos value.
-    Stats are 0-100, Chaos is -100 to +100."""
-    moneten: int = Field(ge=0, le=100)
-    aura: int = Field(ge=0, le=100)
-    respekt: int = Field(ge=0, le=100)
-    rizz: int = Field(ge=0, le=100)
-    chaos: int = Field(ge=-100, le=100)
+
+    Nominal ranges are 0-100 for the main stats and -100..+100 for Chaos, but
+    values are NOT clamped — quests/endings handle out-of-band behavior. The
+    nominal ranges only matter for UI display and as the default ending
+    thresholds (see seed endings). A quest can remove the corresponding
+    ending and let a stat climb past 100 (or below 0).
+    """
+    moneten: int
+    aura: int
+    respekt: int
+    rizz: int
+    chaos: int
 
 # =============================================================================
 # Event schema (events collection)
@@ -80,7 +84,15 @@ class Choice(BaseModel):
     sets_flags: list[str] = Field(default_factory=list)
     clears_flags: list[str] = Field(default_factory=list)
     adds_to_deck: list[DeckAddition] = Field(default_factory=list)
+    # If set, attempts to force this ending on play. Only fires if the id is
+    # in state.active_endings — otherwise silently no-ops, by design (a quest
+    # that removed the ending wins over a card that tries to invoke it).
     triggers_ending: Optional[str] = None
+    # Quest mechanics: mutate state.active_endings AFTER ending evaluation.
+    # Removes win over unlocks if the same id appears in both. Effects land
+    # next turn (won't insta-kill on the same play that unlocks).
+    unlocks_endings: list[str] = Field(default_factory=list)
+    removes_endings: list[str] = Field(default_factory=list)
 
 class Event(BaseModel):
     """An immutable event/card definition stored in the events collection."""
@@ -112,6 +124,32 @@ class Event(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 # =============================================================================
+# Ending state schema 
+# =============================================================================
+
+class EndingRequirements(BaseModel):
+    """Same shape as Event.requires — reused so predicate logic stays DRY."""
+    flags_all:  list[str] = []
+    flags_none: list[str] = []
+    flags_any:  list[str] = []
+    stats: dict[str, StatRange] = {}   # e.g. {"moneten": {"min": 100}}
+
+
+class Ending(BaseModel):
+    """Immutable ending definition stored in the endings collection."""
+    id: str = Field(alias="_id")
+    title: str
+    description: str
+    priority: int = 100                # lower = checked first when multiple match
+    requires: EndingRequirements = Field(default_factory=EndingRequirements)
+    default: bool = False              # auto-added to new runs' active_endings
+    enabled: bool = True               # soft-disable, mirrors Event.enabled
+    image_url: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+# =============================================================================
 # Game state schema (game_states collection)
 # =============================================================================
 
@@ -125,7 +163,7 @@ class HistoryEntry(BaseModel):
     choice: int = Field(ge=0)
     turn: int = Field(ge=0)
 
-GameStatus = Literal["active", "won", "lost", "abandoned"]
+GameStatus = Literal["active", "ended", "abandoned"]
 
 class GameState(BaseModel):
     """Per-run save data stored in the game_states collection."""
@@ -133,6 +171,7 @@ class GameState(BaseModel):
     user_id: str
     deck: list[str] = Field(default_factory=list)
     scheduled: list[ScheduledCard] = Field(default_factory=list)
+    active_endings: list[str] = Field(default_factory=list)
     stats: Stats
     flags: list[str] = Field(default_factory=list)
     history: list[HistoryEntry] = Field(default_factory=list)
@@ -158,13 +197,16 @@ class GameState(BaseModel):
         rng_seed: int,
         starting_stats: Stats | None = None,
         starting_deck: list[str] | None = None,
+        starting_endings: list[str] | None = None,
     ) -> "GameState":
-        """Factory for a fresh run with sensible defaults."""
+        """Factory for a fresh run with sensible defaults.
+        """
         now = datetime.now(timezone.utc)
         return cls(
             _id=run_id,
             user_id=user_id,
             deck=starting_deck or [],
+            active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
             created_at=now,
