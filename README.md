@@ -36,13 +36,13 @@ pay-per-request.
       │  (statische Assets)
       ▼
 ┌──────────────┐        ┌──────────────────┐
-│ CloudFront   │  ───▶ │ S3 Bucket        │  ◀── Build-Output (Vite)
+│ CloudFront   │  ───▶  │ S3 Bucket        │  ◀── Build-Output (Vite)
 │ (CDN + TLS)  │        │ (SPA: HTML/JS)   │
 └──────────────┘        └──────────────────┘
       │  (REST-Aufrufe)
       ▼
 ┌──────────────┐        ┌──────────────────┐        ┌──────────────────┐
-│ API Gateway  │  ───▶  │ AWS Lambda       │  ───▶│ DynamoDB         │
+│ API Gateway  │  ───▶  │ AWS Lambda       │  ───▶  │ DynamoDB         │
 │ (HTTPS)      │        │ (Game-Endpoints) │        │ (Cards, Runs)    │
 └──────────────┘        └──────────────────┘        └──────────────────┘
                                 │
