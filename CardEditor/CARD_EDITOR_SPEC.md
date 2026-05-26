@@ -232,9 +232,8 @@ nothing enforces them.
 | `X_resolved` / `X_dead` | Arc blocker / NPC death          | `journalist_resolved`, `minister_dead`   |
 | `tutorial_*`    | Tutorial progression                     | `tutorial_started`, `tutorial_done`      |
 
-Flags are binary; setting an already-set flag is a no-op. There are also
-`flag_timers` (set in code, not by cards) for flags that auto-expire — the
-card schema can't directly create a timer.
+Flags are binary; setting an already-set flag is a no-op. A flag stays set
+until a choice's `clears_flags` removes it.
 
 ---
 

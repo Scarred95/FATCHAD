@@ -104,7 +104,6 @@ Used to resume after a page reload.
   "scheduled":    [{ "card_id": "evt_z", "play_on_turn": 14 }],
   "stats":        { "moneten": 50, "aura": 50, "respekt": 50, "rizz": 50, "chaos": 0 },
   "flags":        ["tutorial_done", "path_money"],
-  "flag_timers":  { "armed": 3 },
   "history":      [{ "event_id": "evt_x", "choice": 0, "turn": 0 }],
   "turn":         12,
   "rng_seed":     1234567890,
@@ -225,10 +224,10 @@ new state plus the next card.
    - stale (deleted)    → dropped
 2. Apply stat effects (each clamped to its valid range).
 3. Apply flag mutations (`sets_flags`, `clears_flags`).
-4. Tick down `flag_timers`; flags whose timer hits 0 are cleared.
-5. Apply this choice's `adds_to_deck` (immediate or scheduled).
-6. Append a `HistoryEntry`; increment `turn`.
-7. Promote any scheduled cards whose `play_on_turn` is now ≤ current turn.
+4. Apply this choice's `adds_to_deck` (immediate or scheduled).
+5. Append a `HistoryEntry`; increment `turn`.
+6. Promote any scheduled cards whose `play_on_turn` is now ≤ current turn.
+7. Strip leftover tutorial cards once `tutorial_done` is set.
 8. Refill the deck if it dropped below `DECK_REFILL_THRESHOLD` (5), capped at
    `DECK_TARGET_SIZE` (12), drawing from `GENERIC_CATEGORIES`.
 9. Evaluate end conditions (priority order):

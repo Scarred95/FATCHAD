@@ -52,7 +52,6 @@ export interface GameState {
   scheduled: ScheduledCard[];
   stats: Stats;
   flags: string[];
-  flag_timers: Record<string, number>;
   history: HistoryEntry[];
   turn: number;
   rng_seed: number;

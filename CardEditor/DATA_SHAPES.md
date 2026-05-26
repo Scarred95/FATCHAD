@@ -121,7 +121,6 @@ Mutable. Replaced on every turn via `replace_one(upsert=True)`.
 | `scheduled`    | `list[ScheduledCard]`      | Cards waiting for a future turn                        |
 | `stats`        | `Stats`                    | Player stats                                           |
 | `flags`        | `list[str]`                | Sorted set of active flags                             |
-| `flag_timers`  | `dict[str, int]`           | Flag → turns remaining; 0 = clear flag                 |
 | `history`      | `list[HistoryEntry]`       | Append-only log of choices                             |
 | `turn`         | `int ≥ 0`                  | Increments after every applied choice                  |
 | `rng_seed`     | `int`                      | Seed for per-turn RNG (`Random(seed + turn)`)          |

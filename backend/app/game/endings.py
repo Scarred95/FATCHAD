@@ -12,18 +12,8 @@ Priority order inside check_endings:
 Wins happen only via card-triggered endings (triggers_ending) or chaos extremes.
 There is no time-based or stat-hold win condition.
 """
+from app.game.constants import CHAOS_MAX, CHAOS_MIN, STAT_MAX, STAT_MIN
 from app.schemas import Choice, GameState, Stats
-
-
-# =============================================================================
-# Tunables
-# =============================================================================
-
-# Stat boundaries — also imported by effects.py for clamping
-STAT_MIN   =    0
-STAT_MAX   =  100
-CHAOS_MIN  = -100
-CHAOS_MAX  =  100
 
 
 # =============================================================================

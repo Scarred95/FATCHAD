@@ -21,10 +21,10 @@ class CreateRunRequest(BaseModel):
 
 
 class ChoiceRequest(BaseModel):
-    choice_index: int
-    # Include the current turn to guard against double-processing on client retries.
-    # If provided and mismatched, the request is rejected as stale (see gameplay.py).
-    expected_turn: int | None = None
+    choice_index: int = Field(ge=0)
+    # Current turn the client thinks the run is on. Required — guards against
+    # double-applying the same choice when a client retries. Mismatch → 409.
+    expected_turn: int = Field(ge=0)
 
 
 # =============================================================================
@@ -90,7 +90,7 @@ class TurnResponse(BaseModel):
 class RunSummary(BaseModel):
     """Lightweight run entry for list/lobby views.
 
-    Omits deck, history, flags, flag_timers, rng_seed — none of which are
+    Omits deck, history, flags, rng_seed — none of which are
     needed to render a run list. Backed by a projected DB query.
     """
     id: str = Field(alias="_id")

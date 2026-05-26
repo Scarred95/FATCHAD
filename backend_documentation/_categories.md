@@ -84,8 +84,8 @@ The seeder uses them for bulk queries; the eligibility system uses them for filt
 - Event flags: `did_X`, `met_X` — e.g. `met_journalist`, `did_bribe_minister`
 - Path flags: `path_X` — e.g. `path_money`, `path_violence`
 - Arc blockers: `X_resolved`, `X_dead` — e.g. `journalist_resolved`, `minister_dead`
-- Flags are one-time binary state; setting an already-set flag is a no-op. Use
-  `flag_timers` (set in code) for flags that auto-expire after N turns.
+- Flags are one-time binary state; setting an already-set flag is a no-op.
+  A flag stays set until a choice's `clears_flags` removes it.
 
 **Weight guidelines:**
 | Weight | Meaning |

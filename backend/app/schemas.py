@@ -1,6 +1,8 @@
 # app/schemas.py
 from datetime import datetime, timezone
 from typing import Literal, Optional
+from uuid import uuid4
+
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -133,7 +135,6 @@ class GameState(BaseModel):
     scheduled: list[ScheduledCard] = Field(default_factory=list)
     stats: Stats
     flags: list[str] = Field(default_factory=list)
-    flag_timers: dict[str, int] = Field(default_factory=dict)
     history: list[HistoryEntry] = Field(default_factory=list)
     turn: int = Field(default=0, ge=0)
     rng_seed: int
@@ -143,6 +144,11 @@ class GameState(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @staticmethod
+    def generate_id() -> str:
+        """Mint a new run id. Single source of truth for the run_<hex> format."""
+        return f"run_{uuid4().hex[:12]}"
 
     @classmethod
     def new_run(

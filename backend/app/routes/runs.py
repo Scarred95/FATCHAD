@@ -6,28 +6,22 @@ These routes manage the run record itself. The active game loop
 """
 import random
 from datetime import datetime, timezone
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from app.db.repositories import EventRepo, GameStateRepo
 from app.schemas import GameState
 from app.game.deck import draw_eligible_card
+from app.routes._deps import get_event_repo, get_state_repo
 from app.routes._schemas import CardResponse, CreateRunRequest, RunSummary, TurnResponse
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
+# Tutorial chains itself via adds_to_deck — seeding the whole list would
+# duplicate every card and clog the deck. One entry is enough.
+_STARTER_DECK = ["evt_tut_01_awakening"]
 
-# --- Dependency injectors ---
-
-def get_state_repo(request: Request) -> GameStateRepo:
-    return GameStateRepo(request.app.state.mongo.db)
-
-def get_event_repo(request: Request) -> EventRepo:
-    return EventRepo(request.app.state.mongo.db)
-
-
-# --- Routes ---
 
 @router.post("", response_model=TurnResponse, status_code=201)
 async def create_run(
@@ -36,32 +30,26 @@ async def create_run(
     events: EventRepo = Depends(get_event_repo),
 ):
     """Start a new run. Returns state + first card so the client needs only one request."""
-    run_id   = f"run_{uuid4().hex[:12]}"
-    rng_seed = random.randint(0, 2**31 - 1)
-
-    # Seed the deck with only the first tutorial card; every tutorial card chains
-    # the next via `adds_to_deck` (position="top"), so they enter as they're earned.
-    # Seeding the whole tutorial here would duplicate every card (once from the
-    # starter, once from the chain) — the duplicates become ineligible the moment
-    # they're played and clog the deck.
-    starter_deck = ["evt_tut_01_awakening"]
-
     state = GameState.new_run(
-        run_id=run_id,
+        run_id=GameState.generate_id(),
         user_id=payload.user_id,
-        rng_seed=rng_seed,
-        starting_deck=starter_deck,
+        rng_seed=random.randint(0, 2**31 - 1),
+        starting_deck=list(_STARTER_DECK),
     )
-    
 
-    # Peek at the first card BEFORE saving — if there's nothing playable
-    # (no tutorial cards seeded), record the run as already-lost in a single write.
+    # Peek at the first card before saving — if nothing is playable, mark the
+    # run lost up-front so we write the final state in a single Mongo round-trip.
     first_card = await draw_eligible_card(state, events)
     if first_card is None:
         state.status = "lost"
         state.ending = "softlock_no_cards"
 
-    await states.save(state)
+    try:
+        await states.insert(state)
+    except DuplicateKeyError:
+        # generate_id() collided with an existing run — astronomically rare,
+        # but treat as a real conflict rather than silently overwriting.
+        raise HTTPException(409, "Run id collision — retry")
 
     return TurnResponse(
         state=state,
@@ -103,7 +91,9 @@ async def abandon_run(
         raise HTTPException(409, f"Run is already {state.status}")
     state.status    = "abandoned"
     state.updated_at = datetime.now(timezone.utc)
-    await states.save(state)
+    if not await states.update(state):
+        # Deleted between load and write — race condition.
+        raise HTTPException(404, "Run not found")
     return state
 
 

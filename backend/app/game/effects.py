@@ -14,16 +14,15 @@ import random
 from datetime import datetime, timezone
 
 from app.db.repositories import EventRepo
+from app.game.constants import CHAOS_MAX, CHAOS_MIN, STAT_MAX, STAT_MIN
 from app.game.deck import (
     apply_deck_additions,
+    cleanup_zombie_tutorial_cards,
     consume_top_card,
     promote_due_scheduled,
     refill_deck_if_needed,
 )
-from app.game.endings import (
-    CHAOS_MAX, CHAOS_MIN, STAT_MAX, STAT_MIN,
-    check_endings,
-)
+from app.game.endings import check_endings
 from app.schemas import Choice, Effects, Event, GameState, HistoryEntry, Stats
 
 
@@ -43,12 +42,20 @@ async def apply_choice(
       1. Remove the played card from the deck (consume_top_card handles the deep copy)
       2. Apply stat effects (clamped to valid ranges)
       3. Apply flag mutations (sets/clears)
-      4. Tick down flag timers (and clear any that expired)
-      5. Add cards to deck/scheduled from this choice's adds_to_deck
-      6. Append history entry, increment turn counter
-      7. Promote scheduled cards whose turn has arrived
+      4. Add cards to deck/scheduled from this choice's adds_to_deck
+      5. Append history entry, increment turn counter
+      6. Promote scheduled cards whose turn has arrived
+      7. Strip leftover tutorial cards if the tutorial just ended
       8. Refill deck if running low
       9. Evaluate win/loss/ending conditions
+
+    Raises:
+        ValueError: if `choice_index` is out of range. This is a
+        programmer-error contract — the HTTP layer is expected to have
+        already validated the index against the current card and returned a
+        clean 400 to the user. The guard here protects non-HTTP callers
+        (admin/debug tools, tests) and catches refactor regressions before
+        they corrupt state with an IndexError.
     """
     if not (0 <= choice_index < len(card.choices)):
         raise ValueError(f"choice_index {choice_index} out of range for card {card.id}")
@@ -65,21 +72,24 @@ async def apply_choice(
     # 2. Stats — returns a new Stats object
     new_state.stats = _apply_effects(new_state.stats, choice.effects)
 
-    # 3–4. Flags and timers — mutate new_state in-place (safe: it's already a deep copy)
-    new_state = _apply_flag_mutations(new_state, choice)
-    new_state = _tick_flag_timers(new_state)
+    # 3. Flags — returns a new flag list
+    new_state.flags = _apply_flag_mutations(new_state.flags, choice)
 
-    # 5. Deck additions
+    # 4. Deck additions
     new_state = apply_deck_additions(new_state, choice.adds_to_deck, rng)
 
-    # 6. History + turn counter
+    # 5. History + turn counter
     new_state.history.append(
         HistoryEntry(event_id=card.id, choice=choice_index, turn=new_state.turn)
     )
     new_state.turn += 1
 
-    # 7. Promote scheduled cards whose turn has arrived
-    new_state = promote_due_scheduled(new_state, rng)
+    # 6. Promote scheduled cards whose turn has arrived
+    new_state = promote_due_scheduled(new_state)
+
+    # 7. Tutorial zombie cleanup — must run before refill so it doesn't waste
+    #    candidate slots on cards that are about to be stripped.
+    new_state = cleanup_zombie_tutorial_cards(new_state)
 
     # 8. Refill deck if running low (async — needs DB access)
     new_state = await refill_deck_if_needed(new_state, events)
@@ -111,47 +121,20 @@ def _clamp(value: int, lo: int, hi: int) -> int:
 
 
 # =============================================================================
-# Flag mutations and timers
+# Flag mutations
 # =============================================================================
 
-def _apply_flag_mutations(state: GameState, choice: Choice) -> GameState:
-    """Set and clear flags as the choice dictates.
+def _apply_flag_mutations(flags: list[str], choice: Choice) -> list[str]:
+    """Return a new flag list with the choice's sets/clears applied.
 
     Flags are one-time, binary state — setting a flag that's already set is a
     no-op (sets are idempotent). There are no flag counters; if you need
     "how many times" semantics, model it via stats or a stand-alone counter.
+
+    Clears win over sets within a single choice — if a choice both sets and
+    clears the same flag (authoring bug), the flag ends up cleared.
     """
-    flags = set(state.flags)
-
-    for flag in choice.sets_flags:
-        flags.add(flag)
-
-    for flag in choice.clears_flags:
-        flags.discard(flag)
-        # Also clear the timer so it can't ghost-expire if the flag is re-set later.
-        state.flag_timers.pop(flag, None)
-
-    state.flags = sorted(flags)  # sorted for stable serialization, easier diffs
-    return state
-
-
-def _tick_flag_timers(state: GameState) -> GameState:
-    """Decrement all active flag timers; remove flags whose timers reach zero."""
-    expired: list[str] = []
-    new_timers: dict[str, int] = {}
-
-    for flag, turns_left in state.flag_timers.items():
-        remaining = turns_left - 1
-        if remaining <= 0:
-            expired.append(flag)
-        else:
-            new_timers[flag] = remaining
-
-    state.flag_timers = new_timers
-    if expired:
-        flags = set(state.flags)
-        for flag in expired:
-            flags.discard(flag)
-        state.flags = sorted(flags)
-
-    return state
+    new_flags = set(flags)
+    new_flags.update(choice.sets_flags)
+    new_flags.difference_update(choice.clears_flags)
+    return sorted(new_flags)  # sorted for stable serialization, easier diffs

@@ -127,18 +127,20 @@ flowchart LR
 2. **Apply stat effects** — add each `effects.<stat>` delta, clamp main stats
    to `0..100` and chaos to `-100..100`.
 3. **Apply flag mutations** — `sets_flags` adds (idempotent — set semantics),
-   `clears_flags` removes the flag and its timer.
-4. **Tick flag timers** — decrement every entry in `flag_timers`; drop the
-   flag when its timer reaches zero.
-5. **Apply deck additions** — for each entry in `choice.adds_to_deck`:
+   `clears_flags` removes the flag. Within a single choice, clears win over
+   sets if the same flag appears in both lists.
+4. **Apply deck additions** — for each entry in `choice.adds_to_deck`:
    - `in_turns` set → goes to `state.scheduled` with `play_on_turn = turn + N`
    - else `position`-based insert into `state.deck` (`top` / `bottom` /
      seeded random for `shuffle`)
-6. **History + turn** — append `HistoryEntry`, increment `state.turn`.
-7. **Promote scheduled** — any `ScheduledCard` whose `play_on_turn ≤ turn`
+5. **History + turn** — append `HistoryEntry`, increment `state.turn`.
+6. **Promote scheduled** — any `ScheduledCard` whose `play_on_turn ≤ turn`
    gets inserted at deck position 0 (consequence lands now). Multiple cards
    due the same turn insert in LIFO order — the most recently-scheduled one
    plays first (intentional).
+7. **Tutorial cleanup** — once `tutorial_done` is set, any leftover `evt_tut_*`
+   cards in the deck or scheduled list are stripped (they'd be permanently
+   ineligible after the tutorial-flag clear in the finale).
 8. **Refill** — if `len(deck) < 5`, top up by drawing from
    `GENERIC_CATEGORIES = ["politik", "social", "economy", "chaos"]` until
    the deck reaches `DECK_TARGET_SIZE = 12`. Already-in-deck and already-
