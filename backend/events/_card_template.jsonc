@@ -4,24 +4,28 @@
 // Copy one of the examples below into a *.json file inside events/.
 // The seeder (scripts/seed_events.py) only reads *.json, so this file is safe.
 //
-// STATS (all 0–100 except chaos which is -100 to +100):
-//   moneten  — money / resources
-//   aura     — public image / brand
-//   respekt  — political/social standing
-//   rizz     — personal magnetism / charm
-//   chaos    — systemic instability (negative = grey eminence, positive = chaos agent)
+// STATS (nominal ranges — values are NOT clamped):
+//   moneten  — money / resources                    (nominal 0–100)
+//   aura     — public image / brand                 (nominal 0–100)
+//   respekt  — political/social standing            (nominal 0–100)
+//   rizz     — personal magnetism / charm           (nominal 0–100)
+//   chaos    — systemic instability                 (nominal -100 to +100)
 //
-// DEATH CONDITIONS (triggered when stat hits the boundary):
-//   moneten  0  → death_bankrupt      moneten  100 → death_revolution
-//   aura     0  → death_irrelevant    aura     100 → death_jumped_shark
-//   respekt  0  → death_couped        respekt  100 → death_conspiracy
-//   rizz     0  → death_frozen_out    rizz     100 → death_drowned_in_drama
-//   chaos  -100 → win: grey_eminence  chaos   +100 → win: chaos_agent
+// Stats can overshoot freely. Whether overshooting kills you is decided by
+// the ENDINGS collection, not the engine. The default seed endings encode
+// "moneten <= 0 → death_bankrupt", etc. — a quest can `removes_endings`
+// that ending and let moneten go below 0 without triggering it.
 //
-// WIN CONDITIONS:
-//   chaos -100 → grey_eminence    chaos +100 → chaos_agent
-//   triggers_ending on a choice → custom win (currently always "won" — see TODO in endings.py)
-//   (No time-based or stat-hold wins — survival alone is not a victory.)
+// ENDINGS:
+//   Endings live in their own JSON files (events/*_endings.json) and are
+//   seeded into a separate `endings` collection. Each run carries a list
+//   of "active" ending ids in state.active_endings. Each turn the engine
+//   evaluates every active ending against the new state; the lowest
+//   `priority` match fires and the run ends with status="ended".
+//
+//   A choice can mutate that list via `unlocks_endings` / `removes_endings`,
+//   and force a specific ending via `triggers_ending` — but `triggers_ending`
+//   only fires if the named id is in state.active_endings.
 //
 // IMPORTANT FLAG (top-level "important": true):
 //   When the engine walks past an ineligible card looking for a drawable one,
@@ -126,7 +130,7 @@
         "text": "Ablehnen.",
         "effects": { "respekt": 10 },
         "sets_flags": ["refused_crime"],
-        "clears_flags": ["criminal_contact"]  // also clears that flag's timer if one exists
+        "clears_flags": ["criminal_contact"]
       }
     ]
   },
@@ -174,35 +178,76 @@
   },
 
 
-  // ── 5. ENDING CARD ───────────────────────────────────────────────────────
-  // A card that concludes a questline. weight: 0 so it's never drawn by refill —
-  // it should only appear via adds_to_deck from another card.
-  // important: true so if the player isn't quite at the chaos threshold when
-  // the card surfaces, it gets re-shuffled instead of dropped — the finale
-  // waits patiently for the right moment.
+  // ── 5. FINALE CARD (ends the run via an Ending) ──────────────────────────
+  // This is still a normal event/card — the ending CONTENT (title, description,
+  // priority, requires) lives in events/*_endings.json and is seeded into the
+  // `endings` collection. This card just chooses which ending to invoke.
+  //
+  // weight: 0 so it's never refill-drawn; appears only via adds_to_deck.
+  // important: true so if requirements aren't quite met when it surfaces, it's
+  // re-shuffled instead of dropped — the finale waits patiently.
+  //
+  // Active-ending mechanics:
+  //   - triggers_ending: forces a specific ending id. Only fires if that id
+  //     is in state.active_endings — otherwise the choice plays its effects
+  //     but the run continues. This is how quests stay authoritative: if a
+  //     quest removed `end_money_god`, a stray card can't bring it back.
+  //   - unlocks_endings: add ending ids to state.active_endings (next turn).
+  //   - removes_endings: remove ending ids from state.active_endings (next turn).
+  //     Removes win over unlocks if the same id appears in both.
   {
-    "_id": "evt_example_ending",
+    "_id": "evt_example_finale",
     "title": "Das Ende einer Ära",
     "description": "Es ist soweit. Alles hat zu diesem Moment geführt.",
-    "category": "ending",
-    "weight": 0,                            // 0 = never refill-drawn; only via adds_to_deck
-    "important": true,                      // re-shuffle if requirements aren't met yet
+    "category": "questline",
+    "weight": 0,
+    "important": true,
     "requires": {
       "flags_all": ["questline_finale_unlocked"],
-      "stats": { "chaos": { "min": 30 } }   // extra gate for safety
+      "stats": { "chaos": { "min": 30 } }
     },
     "choices": [
       {
         "text": "Den Thron beanspruchen.",
         "effects": {},
         "hints": { "aura": "unknown", "respekt": "unknown" },
-        "triggers_ending": "my_custom_ending"   // ends the game immediately as "won"
-                                                 // TODO: backend needs win/loss field per ending
+        "triggers_ending": "end_throne_claimed"   // must exist as an Ending doc AND be in state.active_endings
       },
       {
         "text": "Zurücktreten.",
         "effects": { "chaos": -20, "respekt": -30 },
         "clears_flags": ["questline_finale_unlocked"]
+      }
+    ]
+  },
+
+
+  // ── 5b. QUEST CHOICE THAT MUTATES ACTIVE ENDINGS ─────────────────────────
+  // Example: a "go-for-broke money quest" choice that disarms the bankruptcy
+  // ending (so moneten can dip below 0 safely) and unlocks a high-stakes
+  // finale ending that only triggers above moneten 200.
+  {
+    "_id": "evt_example_quest_step",
+    "title": "Alles auf eine Karte",
+    "description": "Du gehst all-in. Verlieren ist keine Option mehr — also schaff sie ab.",
+    "category": "economy",
+    "weight": 0,
+    "important": true,
+    "requires": {
+      "flags_all": ["money_quest_accepted"]
+    },
+    "choices": [
+      {
+        "text": "Risiko maximieren.",
+        "effects": { "moneten": -30, "chaos": 10 },
+        "removes_endings": ["end_bankrupt"],        // bankruptcy can no longer end this run
+        "unlocks_endings": ["end_money_god"],       // new ending becomes reachable
+        "sets_flags": ["money_quest_in_progress"]
+      },
+      {
+        "text": "Doch lieber sichern.",
+        "effects": { "moneten": 10 },
+        "clears_flags": ["money_quest_accepted"]
       }
     ]
   },

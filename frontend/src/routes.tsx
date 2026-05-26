@@ -30,6 +30,12 @@ const GraphView = lazy(() =>
 const CardEditorPage = lazy(() =>
   import('./admin').then((m) => ({ default: m.CardEditorPage })),
 );
+const EndingsIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.EndingsIndex })),
+);
+const EndingEditorPage = lazy(() =>
+  import('./admin').then((m) => ({ default: m.EndingEditorPage })),
+);
 
 const adminFallback = (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-faint)' }}>
@@ -63,6 +69,9 @@ export const router = createBrowserRouter([
           { path: 'graph', element: <Suspense fallback={adminFallback}><GraphView /></Suspense> },
           { path: 'cards/new', element: <Suspense fallback={adminFallback}><CardEditorPage mode="new" /></Suspense> },
           { path: 'cards/:id', element: <Suspense fallback={adminFallback}><CardEditorPage mode="edit" /></Suspense> },
+          { path: 'endings', element: <Suspense fallback={adminFallback}><EndingsIndex /></Suspense> },
+          { path: 'endings/new', element: <Suspense fallback={adminFallback}><EndingEditorPage mode="new" /></Suspense> },
+          { path: 'endings/:id', element: <Suspense fallback={adminFallback}><EndingEditorPage mode="edit" /></Suspense> },
         ],
       },
     ],

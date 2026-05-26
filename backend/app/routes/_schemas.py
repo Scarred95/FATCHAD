@@ -105,8 +105,16 @@ class RunSummary(BaseModel):
 
 
 class EndSummary(BaseModel):
-    """End-of-run stats shown on the results / game-over screen."""
+    """End-of-run stats shown on the results / game-over screen.
+
+    `ending_title` / `ending_description` are denormalised from the Ending doc
+    at summary time so the frontend can render the recap without a second
+    fetch. Both are None when the run ended without firing an ending (e.g.
+    `abandoned`), or when the ending id no longer resolves (stale snapshot).
+    """
     ending: str | None
+    ending_title: str | None
+    ending_description: str | None
     status: GameStatus
     turns_survived: int
     final_stats: Stats

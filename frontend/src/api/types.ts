@@ -8,7 +8,7 @@ export type MainStatName = 'moneten' | 'aura' | 'respekt' | 'rizz';
 
 export type StatHint = 'up' | 'down' | 'unknown' | 'hidden';
 
-export type GameStatus = 'active' | 'won' | 'lost' | 'abandoned';
+export type GameStatus = 'active' | 'ended' | 'abandoned';
 
 export interface Stats {
   moneten: number;
@@ -57,6 +57,9 @@ export interface GameState {
   rng_seed: number;
   status: GameStatus;
   ending: string | null;
+  /** Ending ids currently eligible to fire — snapshotted at run creation,
+   *  mutated by choices that unlock/remove endings. */
+  active_endings: string[];
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +81,10 @@ export interface RunSummary {
 
 export interface EndSummary {
   ending: string | null;
+  /** Title from the Ending doc, denormalised at summary time. Null when
+   *  the run ended without an ending (e.g. abandoned) or the id is stale. */
+  ending_title: string | null;
+  ending_description: string | null;
   status: GameStatus;
   turns_survived: number;
   final_stats: Stats;

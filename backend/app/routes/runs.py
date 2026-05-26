@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.errors import DuplicateKeyError
 
-from app.db.repositories import EventRepo, GameStateRepo
+from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
 from app.schemas import GameState
 from app.game.deck import draw_eligible_card
-from app.routes._deps import get_event_repo, get_state_repo
+from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
 from app.routes._schemas import CardResponse, CreateRunRequest, RunSummary, TurnResponse
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -28,20 +28,29 @@ async def create_run(
     payload: CreateRunRequest,
     states: GameStateRepo = Depends(get_state_repo),
     events: EventRepo = Depends(get_event_repo),
+    endings: EndingRepo = Depends(get_ending_repo),
 ):
     """Start a new run. Returns state + first card so the client needs only one request."""
+    # Snapshot the current default ending ids into the run. From here on the
+    # set lives in the savestate and is mutated only by quest choices; admin
+    # edits to default endings won't retroactively change in-flight runs.
+    default_ending_ids = await endings.list_default_ids()
+
     state = GameState.new_run(
         run_id=GameState.generate_id(),
         user_id=payload.user_id,
         rng_seed=random.randint(0, 2**31 - 1),
         starting_deck=list(_STARTER_DECK),
+        starting_endings=default_ending_ids,
     )
 
-    # Peek at the first card before saving — if nothing is playable, mark the
-    # run lost up-front so we write the final state in a single Mongo round-trip.
+    # Peek at the first card before saving — if nothing is playable, end the
+    # run up-front so we write the final state in a single Mongo round-trip.
     first_card = await draw_eligible_card(state, events)
     if first_card is None:
-        state.status = "lost"
+        # Engine-level sentinel — not backed by an Ending doc. The run never
+        # really started, so there are no active endings to evaluate against.
+        state.status = "ended"
         state.ending = "softlock_no_cards"
 
     try:

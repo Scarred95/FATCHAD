@@ -1,15 +1,27 @@
-import type { Requirements, StatKey } from '../types';
-import { STAT_DOMAIN, STAT_KEYS, STAT_LABELS } from '../types';
+/**
+ * Stat + flag predicate editor for Ending docs.
+ *
+ * Forked from RequirementsEditor (cards) deliberately: the two predicate
+ * shapes are byte-identical today, but cards' stat ranges are clamped to
+ * STAT_DOMAIN while endings' thresholds are intentionally unbounded
+ * (an ending may fire at moneten >= 200, for example). Keeping the editors
+ * separate gives endings the freedom to diverge without dragging card
+ * validation along.
+ */
+import type { EndingRequirements, StatKey } from '../types';
+import { STAT_KEYS, STAT_LABELS } from '../types';
 import { TagInput } from './TagInput';
+import admin from '../admin.module.css';
+import styles from './RequirementsEditor.module.css';
 
 interface Props {
-  value: Requirements;
-  onChange: (next: Requirements) => void;
+  value: EndingRequirements;
+  onChange: (next: EndingRequirements) => void;
   flagSuggestions: string[];
 }
 
-export function RequirementsEditor({ value, onChange, flagSuggestions }: Props) {
-  const patch = (p: Partial<Requirements>) => onChange({ ...value, ...p });
+export function EndingRequirementsEditor({ value, onChange, flagSuggestions }: Props) {
+  const patch = (p: Partial<EndingRequirements>) => onChange({ ...value, ...p });
 
   const setStat = (k: StatKey, side: 'min' | 'max', raw: string) => {
     const num = raw === '' ? null : Number(raw);
@@ -20,7 +32,7 @@ export function RequirementsEditor({ value, onChange, flagSuggestions }: Props) 
   };
 
   return (
-    <div className="space-y-3">
+    <div className={styles.wrap}>
       <TagInput
         label="flags_all (must all be set)"
         value={value.flags_all ?? []}
@@ -40,29 +52,30 @@ export function RequirementsEditor({ value, onChange, flagSuggestions }: Props) 
         suggestions={flagSuggestions}
       />
       <div>
-        <div className="field-label mb-1.5">Stat ranges</div>
-        <div className="space-y-1.5">
+        <div className={admin.fieldLabel} style={{ marginBottom: '6px' }}>
+          Stat-Schwellen <span style={{ opacity: 0.6 }}>(unbegrenzt — z.B. min: 200)</span>
+        </div>
+        <div className={styles.statsList}>
           {STAT_KEYS.map((k) => {
-            const dom = STAT_DOMAIN[k];
             const range = value.stats?.[k];
             return (
-              <div key={k} className="grid grid-cols-[5rem_1fr_1fr] items-center gap-2 text-xs">
-                <span className="text-zinc-400">{STAT_LABELS[k]}</span>
+              <div key={k} className={styles.statRow}>
+                <span className={styles.statKey}>{STAT_LABELS[k]}</span>
                 <input
                   type="number"
                   step={1}
-                  placeholder={`min (${dom.min})`}
+                  placeholder="min (≥)"
                   value={range?.min ?? ''}
                   onChange={(e) => setStat(k, 'min', e.target.value)}
-                  className="field-input"
+                  className={admin.fieldInput}
                 />
                 <input
                   type="number"
                   step={1}
-                  placeholder={`max (${dom.max})`}
+                  placeholder="max (≤)"
                   value={range?.max ?? ''}
                   onChange={(e) => setStat(k, 'max', e.target.value)}
-                  className="field-input"
+                  className={admin.fieldInput}
                 />
               </div>
             );

@@ -13,8 +13,7 @@ deck operations that need EventRepo to fetch card content from the DB.
 import random
 from datetime import datetime, timezone
 
-from app.db.repositories import EventRepo
-from app.game.constants import CHAOS_MAX, CHAOS_MIN, STAT_MAX, STAT_MIN
+from app.db.repositories import EndingRepo, EventRepo
 from app.game.deck import (
     apply_deck_additions,
     cleanup_zombie_tutorial_cards,
@@ -35,19 +34,21 @@ async def apply_choice(
     card: Event,
     choice_index: int,
     events: EventRepo,
+    endings_repo: EndingRepo,
 ) -> GameState:
     """Apply a choice and return the fully updated state.
 
     Steps:
       1. Remove the played card from the deck (consume_top_card handles the deep copy)
-      2. Apply stat effects (clamped to valid ranges)
+      2. Apply stat effects (no clamping)
       3. Apply flag mutations (sets/clears)
       4. Add cards to deck/scheduled from this choice's adds_to_deck
       5. Append history entry, increment turn counter
       6. Promote scheduled cards whose turn has arrived
       7. Strip leftover tutorial cards if the tutorial just ended
       8. Refill deck if running low
-      9. Evaluate win/loss/ending conditions
+      9. Evaluate endings (data-driven) and apply this choice's
+         unlocks_endings / removes_endings to state.active_endings
 
     Raises:
         ValueError: if `choice_index` is out of range. This is a
@@ -94,8 +95,9 @@ async def apply_choice(
     # 8. Refill deck if running low (async — needs DB access)
     new_state = await refill_deck_if_needed(new_state, events)
 
-    # 9. Evaluate win/loss/ending conditions (see endings.py for priority order)
-    new_state = check_endings(new_state, choice)
+    # 9. Evaluate ending conditions; also applies this choice's
+    #    unlocks_endings/removes_endings to active_endings (see endings.py).
+    new_state = await check_endings(new_state, choice, endings_repo)
 
     new_state.updated_at = datetime.now(timezone.utc)
     return new_state
@@ -106,18 +108,16 @@ async def apply_choice(
 # =============================================================================
 
 def _apply_effects(stats: Stats, effects: Effects) -> Stats:
-    """Apply effect deltas, clamping each stat to its valid range."""
+    """Apply effect deltas. No clamping — endings (not the engine) gate
+    out-of-band values. A quest can remove the relevant ending to let a
+    stat climb past its nominal range."""
     return Stats(
-        moneten=_clamp(stats.moneten + effects.moneten, STAT_MIN, STAT_MAX),
-        aura=   _clamp(stats.aura    + effects.aura,    STAT_MIN, STAT_MAX),
-        respekt=_clamp(stats.respekt + effects.respekt, STAT_MIN, STAT_MAX),
-        rizz=   _clamp(stats.rizz    + effects.rizz,    STAT_MIN, STAT_MAX),
-        chaos=  _clamp(stats.chaos   + effects.chaos,   CHAOS_MIN, CHAOS_MAX),
+        moneten=stats.moneten + effects.moneten,
+        aura=   stats.aura    + effects.aura,
+        respekt=stats.respekt + effects.respekt,
+        rizz=   stats.rizz    + effects.rizz,
+        chaos=  stats.chaos   + effects.chaos,
     )
-
-
-def _clamp(value: int, lo: int, hi: int) -> int:
-    return max(lo, min(hi, value))
 
 
 # =============================================================================

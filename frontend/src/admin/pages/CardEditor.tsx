@@ -9,6 +9,7 @@ import Modal from '../../components/Modal/Modal';
 import {
   categoryNamesOf, deckNamesOf, flagInventoryOf, referrersOf, useAdminCardStore,
 } from '../store';
+import { useAdminEndingStore } from '../endingStore';
 import {
   ALL_CATEGORIES, type Card, type Requirements,
 } from '../types';
@@ -61,7 +62,12 @@ export function CardEditorPage({ mode }: Props) {
     return [...others, card];
   }, [cards, card, initial._id]);
 
-  const issues = useMemo(() => validateCard(card, datasetForValidation), [card, datasetForValidation]);
+  const endings = useAdminEndingStore((s) => s.endings);
+  const endingIds = useMemo(() => new Set(endings.map((e) => e._id)), [endings]);
+  const issues = useMemo(
+    () => validateCard(card, datasetForValidation, endingIds),
+    [card, datasetForValidation, endingIds],
+  );
   const errors = issues.filter((i) => i.level === 'error');
   const blockSave = errors.length > 0 || busy;
   const isLocked = mode === 'edit' && !!saved[card._id];

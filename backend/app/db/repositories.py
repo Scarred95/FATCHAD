@@ -5,7 +5,7 @@ from typing import Type, TypeVar
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, ValidationError
 
-from app.schemas import Event, GameState
+from app.schemas import Ending, Event, GameState
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,9 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
     """Create the indexes the app relies on. Idempotent — safe at every startup."""
     await db["events"].create_index("category")
     await db["game_states"].create_index("user_id")
+    # `default` is queried at run creation to seed active_endings.
+    # `enabled` is filtered in every read, so a compound index helps both paths.
+    await db["endings"].create_index([("default", 1), ("enabled", 1)])
 
 
 class EventRepo:
@@ -177,3 +180,74 @@ class GameStateRepo:
         }
         cursor = self.coll.find({"user_id": user_id}, projection)
         return [doc async for doc in cursor]
+
+
+class EndingRepo:
+    """Read/write access to the endings collection.
+
+    Reads at runtime: each new run seeds its active_endings from default
+    endings; each turn loads the full bodies for the active set to evaluate.
+    Writes happen via admin endpoints and the seed script.
+    """
+
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.coll = db["endings"]
+
+    # --- single-document reads ---
+
+    async def get_by_id(self, ending_id: str) -> Ending | None:
+        """Return the ending, or None if missing OR malformed (logged)."""
+        doc = await self.coll.find_one({"_id": ending_id})
+        if doc is None:
+            return None
+        return _parse_or_skip(Ending, doc, "endings")
+
+    # --- batch reads ---
+
+    async def get_many(self, ids: list[str]) -> list[Ending]:
+        """Fetch the full ending docs for a list of ids. Bad docs skipped.
+
+        Used every turn to materialise state.active_endings into Ending objects
+        for the evaluator. Disabled endings ARE returned here — the engine
+        filters on `enabled` so admin toggles take effect mid-run.
+        """
+        if not ids:
+            return []
+        cursor = self.coll.find({"_id": {"$in": ids}})
+        return [e async for doc in cursor if (e := _parse_or_skip(Ending, doc, "endings"))]
+
+    async def list_default_ids(self) -> list[str]:
+        """Return ids of endings flagged `default: true` AND `enabled: true`.
+
+        Used by run creation to seed state.active_endings. Disabled defaults
+        are excluded — admins can soft-disable a default without seeing it
+        leak into new runs.
+        """
+        cursor = self.coll.find(
+            {"default": True, "enabled": True},
+            {"_id": 1},
+        )
+        return [doc["_id"] async for doc in cursor]
+
+    async def list_paginated(
+        self, limit: int = 100, skip: int = 0
+    ) -> list[Ending]:
+        """Admin listing — full documents, paginated. Bad docs skipped (logged)."""
+        cursor = self.coll.find({}).skip(skip).limit(limit)
+        return [e async for doc in cursor if (e := _parse_or_skip(Ending, doc, "endings"))]
+
+    # --- writes (admin) ---
+
+    async def insert(self, ending: Ending) -> None:
+        await self.coll.insert_one(ending.model_dump(by_alias=True))
+
+    async def upsert(self, ending: Ending) -> None:
+        await self.coll.replace_one(
+            {"_id": ending.id},
+            ending.model_dump(by_alias=True),
+            upsert=True,
+        )
+
+    async def delete(self, ending_id: str) -> bool:
+        result = await self.coll.delete_one({"_id": ending_id})
+        return result.deleted_count > 0

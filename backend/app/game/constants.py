@@ -1,15 +1,11 @@
 # app/game/constants.py
 """Tunable constants for the game engine.
 
-Centralised so deck sizes, stat bounds, and card pools live in one place
-rather than being duplicated across modules.
+Centralised so deck sizes and card pools live in one place rather than being
+duplicated across modules. Stat bounds are not engine constants anymore —
+they live in the `endings` collection as the threshold values on the default
+ending docs.
 """
-
-# ----- Stat bounds (used by effects.py for clamping and endings.py for death checks) -----
-STAT_MIN  =    0
-STAT_MAX  =  100
-CHAOS_MIN = -100
-CHAOS_MAX =  100
 
 # ----- Deck sizing -----
 DECK_TARGET_SIZE      = 12

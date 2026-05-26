@@ -9,10 +9,10 @@ Run lifecycle (create / list / get / abandon / delete) lives in runs.py.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.db.repositories import EventRepo, GameStateRepo
+from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
 from app.game.deck import draw_eligible_card, draw_with_refill_retry
 from app.game.effects import apply_choice
-from app.routes._deps import get_event_repo, get_state_repo
+from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
 from app.routes._schemas import (
     CardResponse,
     ChoiceRequest,
@@ -41,7 +41,7 @@ async def get_current_card(
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status != "active":
-        raise HTTPException(409, f"Run is {state.status}, no current card")
+        raise HTTPException(409, f"Run is no longer active (status={state.status}); no current card")
 
     card = await draw_eligible_card(state, events)
     return CardResponse.from_event(card) if card else None
@@ -53,6 +53,7 @@ async def submit_choice(
     payload: ChoiceRequest,
     states: GameStateRepo = Depends(get_state_repo),
     events: EventRepo = Depends(get_event_repo),
+    endings: EndingRepo = Depends(get_ending_repo),
 ):
     """Submit a choice for the current card.
 
@@ -87,7 +88,7 @@ async def submit_choice(
 
     # apply_choice handles: card consumption, stat effects, flags, deck
     # additions, scheduled promotion, tutorial cleanup, refill, and ending checks.
-    new_state = await apply_choice(state, current_card, payload.choice_index, events)
+    new_state = await apply_choice(state, current_card, payload.choice_index, events, endings)
 
     # Ending hit — save and return without a next card.
     if new_state.status != "active":
@@ -111,10 +112,12 @@ async def submit_choice(
 async def get_summary(
     run_id: str,
     states: GameStateRepo = Depends(get_state_repo),
+    endings: EndingRepo = Depends(get_ending_repo),
 ):
-    """End-screen data: ending label, final stats, turn count, card count.
+    """End-screen data: ending label + body, final stats, turn count, card count.
 
-    Only callable once the run has ended (status != active).
+    Only callable once the run has ended (status != active). The ending body
+    is denormalised in so the frontend renders the recap from one fetch.
     """
     state = await states.get(run_id)
     if state is None:
@@ -122,8 +125,12 @@ async def get_summary(
     if state.status == "active":
         raise HTTPException(409, "Run is still active")
 
+    ending_doc = await endings.get_by_id(state.ending) if state.ending else None
+
     return EndSummary(
         ending=state.ending,
+        ending_title=ending_doc.title if ending_doc else None,
+        ending_description=ending_doc.description if ending_doc else None,
         status=state.status,
         turns_survived=state.turn,
         final_stats=state.stats,
