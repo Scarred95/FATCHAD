@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.game.hints import derive_hints_from_effects
-from app.schemas import Choice, Event, GameState, GameStatus, StatHint, Stats
+from app.schemas import Choice, Effects, Event, GameState, GameStatus, StatHint, Stats
 
 
 # =============================================================================
@@ -102,6 +102,28 @@ class RunSummary(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class HistoryDetailEntry(BaseModel):
+    """One past turn, enriched with the card and chosen-option payload.
+
+    Joined server-side from `GameState.history` + the events collection so
+    the client can render a timeline without leaking the rest of the deck.
+    Missing events (e.g. a card was deleted after being played) keep the
+    entry but set `title` to a placeholder and `effects` to zeros.
+    """
+    turn: int
+    event_id: str
+    title: str
+    description: str | None = None
+    category: str | None = None
+    deck_name: str | None = None
+    choice_index: int
+    choice_text: str
+    effects: Effects
+    sets_flags: list[str] = []
+    clears_flags: list[str] = []
+    triggered_ending: str | None = None
 
 
 class EndSummary(BaseModel):

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Card from '../components/Card/Card';
 import Header, { BackArrow, IconButton, MenuDots } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
+import HistoryModal from '../components/HistoryModal/HistoryModal';
 import OptionGutter from '../components/OptionGutter/OptionGutter';
 import ScreenGlow from '../components/ScreenGlow/ScreenGlow';
 import StatRow from '../components/StatBar/StatRow';
@@ -30,6 +31,7 @@ export default function Game() {
 
   const [confirmExit, setConfirmExit] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Bubbled up from the Card's swipe hook so the option gutters can light
   // the side the user is pulling toward. Resets to 0 each time a new Card
   // mounts. 'down' is only ever set when the current card has a 3rd choice.
@@ -201,6 +203,14 @@ export default function Game() {
         title="Menü"
         actions={[
           {
+            label: 'Verlauf ansehen',
+            variant: 'ghost',
+            onClick: () => {
+              setMenuOpen(false);
+              setHistoryOpen(true);
+            },
+          },
+          {
             label: 'Lauf aufgeben',
             variant: 'danger',
             onClick: async () => {
@@ -211,6 +221,12 @@ export default function Game() {
           { label: 'Schließen', variant: 'ghost', onClick: () => setMenuOpen(false) },
         ]}
         onClose={() => setMenuOpen(false)}
+      />
+
+      <HistoryModal
+        open={historyOpen}
+        runId={runId ?? null}
+        onClose={() => setHistoryOpen(false)}
       />
     </main>
   );

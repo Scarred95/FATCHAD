@@ -14,7 +14,10 @@ from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
 from app.schemas import GameState
 from app.game.deck import draw_eligible_card
 from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
-from app.routes._schemas import CardResponse, CreateRunRequest, RunSummary, TurnResponse
+from app.routes._schemas import (
+    CardResponse, CreateRunRequest, HistoryDetailEntry, RunSummary, TurnResponse,
+)
+from app.schemas import Effects
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -85,6 +88,61 @@ async def get_run(
     if state is None:
         raise HTTPException(404, "Run not found")
     return state
+
+
+@router.get("/{run_id}/history", response_model=list[HistoryDetailEntry])
+async def get_history(
+    run_id: str,
+    states: GameStateRepo = Depends(get_state_repo),
+    events: EventRepo = Depends(get_event_repo),
+):
+    """Return the run's play history with card + chosen-option data joined.
+
+    Oldest first. One Mongo round-trip for the events (batched via $in).
+    Entries whose event was deleted since play keep their turn/choice_index
+    but get a placeholder title and zeroed effects.
+    """
+    state = await states.get(run_id)
+    if state is None:
+        raise HTTPException(404, "Run not found")
+
+    if not state.history:
+        return []
+
+    # De-dupe ids before the find; a card can be played multiple times.
+    ids = list({h.event_id for h in state.history})
+    by_id = {e.id: e for e in await events.get_many(ids)}
+
+    result: list[HistoryDetailEntry] = []
+    for h in state.history:
+        event = by_id.get(h.event_id)
+        if event is None or h.choice >= len(event.choices):
+            # Card deleted, or choice index now out of range after an edit.
+            result.append(HistoryDetailEntry(
+                turn=h.turn,
+                event_id=h.event_id,
+                title="(gelöscht)",
+                choice_index=h.choice,
+                choice_text="(unbekannt)",
+                effects=Effects(),
+            ))
+            continue
+        choice = event.choices[h.choice]
+        result.append(HistoryDetailEntry(
+            turn=h.turn,
+            event_id=h.event_id,
+            title=event.title,
+            description=event.description,
+            category=event.category,
+            deck_name=event.deck_name,
+            choice_index=h.choice,
+            choice_text=choice.text,
+            effects=choice.effects,
+            sets_flags=list(choice.sets_flags),
+            clears_flags=list(choice.clears_flags),
+            triggered_ending=choice.triggers_ending,
+        ))
+    return result
 
 
 @router.post("/{run_id}/abandon", response_model=GameState)

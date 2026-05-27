@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getEndSummary } from '../api/client';
 import type { EndSummary, MainStatName, Stats } from '../api/types';
 import StatIcon from '../components/StatIcon/StatIcon';
+import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './EndScreen.module.css';
@@ -16,6 +17,7 @@ export default function EndScreen() {
   const createRun = useRunStore((s) => s.createRun);
   const [summary, setSummary] = useState<EndSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
@@ -119,9 +121,16 @@ export default function EndScreen() {
         transition={{ duration: 0.5, delay: 1.4 }}
       >
         <button className={styles.primary} onClick={newRun}>Neue Runde</button>
+        <button className={styles.secondary} onClick={() => setHistoryOpen(true)}>Verlauf</button>
         <button className={styles.secondary} onClick={share}>Teilen</button>
         <Link to="/runs" className={styles.tertiary}>Zurück zur Übersicht</Link>
       </motion.div>
+
+      <HistoryModal
+        open={historyOpen}
+        runId={runId ?? null}
+        onClose={() => setHistoryOpen(false)}
+      />
     </main>
   );
 }
