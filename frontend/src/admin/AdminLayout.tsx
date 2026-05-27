@@ -62,8 +62,6 @@ export function AdminLayout() {
         <nav className={styles.nav} aria-label="Admin-Navigation">
           <NavLink to="/admin" end className={navItem}>Decks</NavLink>
           <NavLink to="/admin/endings" className={navItem}>Endings</NavLink>
-          <NavLink to="/admin/suggestions" className={navItem}>User suggested</NavLink>
-          <NavLink to="/admin/categories" className={navItem}>Categories</NavLink>
         </nav>
         <div className={styles.spacer} />
         <button

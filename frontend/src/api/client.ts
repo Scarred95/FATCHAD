@@ -9,6 +9,7 @@ import type {
   EndSummary,
   GameState,
   HealthResponse,
+  HistoryDetailEntry,
   RunSummary,
   TurnResponse,
 } from './types';
@@ -102,5 +103,8 @@ export const submitChoice = (
 
 export const getEndSummary = (runId: string) =>
   request<EndSummary>(`/runs/${runId}/summary`);
+
+export const getHistory = (runId: string) =>
+  request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
 
 export { ApiError };

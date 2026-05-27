@@ -1,0 +1,322 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 640px;
+  max-height: min(80vh, 720px);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+}
+
+.sub {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+}
+
+.adminBadge {
+  font-size: var(--fs-body-xs);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent, #ec4899);
+  color: var(--color-accent, #ec4899);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn {
+  padding: 6px 12px;
+  font-size: var(--fs-body-sm);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.btnClose {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.btnClose:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.placeholder {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+}
+
+.error {
+  padding: var(--space-3) var(--space-4);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  color: #ef4444;
+  font-size: var(--fs-body-sm);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-base);
+}
+
+.rowHead {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border: none;
+}
+
+.rowHead:hover {
+  background: var(--color-bg-elevated);
+}
+
+.turn {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardTitle {
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.chevron {
+  color: var(--color-text-faint);
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+}
+
+.rowBody {
+  overflow: hidden;
+}
+
+.rowBodyInner {
+  padding: 4px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px dashed var(--color-border);
+  margin-top: 0;
+}
+
+.desc {
+  margin: 8px 0 0;
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+  line-height: 1.5;
+}
+
+.choiceRow {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.choiceLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.choiceText {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+}
+
+.deltas {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stat-color);
+  color: var(--stat-color);
+  font-size: var(--fs-body-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.delta[data-sign='neg'] {
+  background: color-mix(in srgb, var(--stat-color) 8%, transparent);
+}
+
+.delta[data-sign='pos'] {
+  background: color-mix(in srgb, var(--stat-color) 12%, transparent);
+}
+
+.deltaStat {
+  letter-spacing: 0.02em;
+}
+
+.deltaAmount {
+  font-weight: 600;
+}
+
+.noDeltas {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.adminBlock {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.flagsRow,
+.endingRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.flagsLabel,
+.endingLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.flagSet {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-body-xs);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+}
+
+.flagClear {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-body-xs);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
+
+.endingId {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-body-xs);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent, #ec4899);
+  color: var(--color-accent, #ec4899);
+}

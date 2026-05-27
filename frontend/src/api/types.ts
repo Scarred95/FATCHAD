@@ -91,6 +91,24 @@ export interface EndSummary {
   cards_played: number;
 }
 
+/** Server-joined history row — `GameState.history` enriched with card data.
+ *  Returned oldest-first by GET /runs/{id}/history. Cards deleted after
+ *  being played get a placeholder title and zeroed effects. */
+export interface HistoryDetailEntry {
+  turn: number;
+  event_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  deck_name: string | null;
+  choice_index: number;
+  choice_text: string;
+  effects: Stats;
+  sets_flags: string[];
+  clears_flags: string[];
+  triggered_ending: string | null;
+}
+
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: boolean;
