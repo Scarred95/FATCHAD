@@ -53,8 +53,7 @@
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 
-.statusDot[data-status='won'] { background: var(--color-success); }
-.statusDot[data-status='lost'] { background: var(--color-danger); }
+.statusDot[data-status='ended'] { background: var(--color-success); }
 .statusDot[data-status='abandoned'] { background: var(--color-text-faint); }
 
 .runMeta {

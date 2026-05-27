@@ -152,8 +152,7 @@ function dominantStat(r: RunSummary): string {
 
 function statusLabel(r: RunSummary): string {
   if (r.status === 'active') return 'aktiv';
-  if (r.status === 'won') return 'gewonnen';
-  if (r.status === 'lost') return 'verloren';
+  if (r.status === 'ended') return 'beendet';
   return 'aufgegeben';
 }
 

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Card, Choice, DeckAddition, StatHint } from '../types';
-import { KNOWN_ENDINGS, STAT_DOMAIN, STAT_KEYS, STAT_LABELS } from '../types';
+import { STAT_DOMAIN, STAT_KEYS, STAT_LABELS } from '../types';
+import { useAdminEndingStore } from '../endingStore';
 import { TagInput } from './TagInput';
 import { CardPicker } from './CardPicker';
 import admin from '../admin.module.css';
@@ -18,6 +19,13 @@ const HINT_OPTIONS: (StatHint | '')[] = ['', 'up', 'down', 'unknown', 'hidden'];
 
 export function ChoicesEditor({ value, onChange, allCards, flagSuggestions }: Props) {
   const [active, setActive] = useState(0);
+  // Autocomplete source for triggers_ending — live from the endings store.
+  // Select the raw array (stable identity) and derive ids via useMemo;
+  // returning `s.endings.map(...)` from the selector creates a fresh array
+  // every render and trips useSyncExternalStore's snapshot check, causing
+  // an infinite re-render loop.
+  const endings = useAdminEndingStore((s) => s.endings);
+  const endingIds = useMemo(() => endings.map((e) => e._id), [endings]);
 
   const patchChoice = (i: number, patch: Partial<Choice>) => {
     const next = value.slice();
@@ -160,7 +168,7 @@ export function ChoicesEditor({ value, onChange, allCards, flagSuggestions }: Pr
               placeholder="Ending ID (optional)"
             />
             <datalist id="known-endings">
-              {KNOWN_ENDINGS.map((e) => <option key={e} value={e} />)}
+              {endingIds.map((e) => <option key={e} value={e} />)}
             </datalist>
           </div>
         </div>

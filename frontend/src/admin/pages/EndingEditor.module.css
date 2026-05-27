@@ -1,0 +1,134 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.heading {
+  font-size: var(--fs-display-md);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.panelTitle {
+  font-size: var(--fs-body-sm);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text-dim);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkboxRow {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.priorityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.hint {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+.refList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.refItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  background: var(--color-bg-base);
+  text-decoration: none;
+}
+
+.refItem:hover {
+  color: var(--color-text);
+}
+
+.refKind {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+}
+
+.refsEmpty {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.error {
+  color: var(--color-danger, #ef4444);
+  font-size: var(--fs-body-sm);
+}

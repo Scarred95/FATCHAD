@@ -16,19 +16,12 @@
   overflow: hidden;
 }
 
-.banner[data-status='won'] {
+.banner[data-status='ended'] {
   background:
-    linear-gradient(180deg, rgba(255, 200, 80, 0.12), transparent 70%),
+    linear-gradient(180deg, rgba(255, 200, 80, 0.10), transparent 70%),
     var(--color-bg-elevated);
-  border-color: rgba(255, 200, 80, 0.4);
-  box-shadow: 0 0 64px rgba(255, 200, 80, 0.15);
-}
-
-.banner[data-status='lost'] {
-  background:
-    linear-gradient(180deg, rgba(255, 68, 68, 0.12), transparent 70%),
-    var(--color-bg-elevated);
-  border-color: rgba(255, 68, 68, 0.35);
+  border-color: rgba(255, 200, 80, 0.32);
+  box-shadow: 0 0 64px rgba(255, 200, 80, 0.12);
 }
 
 .banner[data-status='abandoned'] {
@@ -50,13 +43,9 @@
   color: var(--color-text);
 }
 
-.banner[data-status='won'] .bannerTitle {
+.banner[data-status='ended'] .bannerTitle {
   color: var(--color-stat-moneten);
-  text-shadow: 0 0 24px rgba(240, 192, 64, 0.4);
-}
-
-.banner[data-status='lost'] .bannerTitle {
-  color: var(--color-danger);
+  text-shadow: 0 0 24px rgba(240, 192, 64, 0.3);
 }
 
 .flavor {

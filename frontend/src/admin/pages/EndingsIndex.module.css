@@ -1,0 +1,250 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.heading {
+  font-size: var(--fs-display-md);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-body-xs);
+  font-family: var(--font-body);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.chipActive {
+  composes: chip;
+  background: var(--color-text);
+  color: var(--color-bg-base);
+  border-color: var(--color-text);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1200px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-quick), background var(--dur-quick);
+}
+
+.card:hover {
+  border-color: var(--color-text-dim);
+}
+
+.cardDisabled {
+  opacity: 0.55;
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardTitle {
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardId {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardBadges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.badge {
+  font-size: var(--fs-body-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+}
+
+.badgeDefault {
+  composes: badge;
+  border-color: var(--color-accent, #ec4899);
+  color: var(--color-accent, #ec4899);
+}
+
+.badgeOff {
+  composes: badge;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.cardDesc {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.reqs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reqSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reqLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-faint);
+}
+
+.chipRow {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.statChip {
+  font-size: var(--fs-body-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.flagAll {
+  font-size: var(--fs-body-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+  font-family: var(--font-mono, monospace);
+}
+
+.flagAny {
+  font-size: var(--fs-body-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #f59e0b;
+  color: #f59e0b;
+  font-family: var(--font-mono, monospace);
+}
+
+.flagNone {
+  font-size: var(--fs-body-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  font-family: var(--font-mono, monospace);
+}
+
+.reqsEmpty {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.cardFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px dashed var(--color-border);
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}

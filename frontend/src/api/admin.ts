@@ -58,6 +58,10 @@ export interface Choice {
   clears_flags?: string[];
   adds_to_deck?: DeckAddition[];
   triggers_ending?: string | null;
+  /** Ending ids added to the run's active set after this choice (next-turn semantics). */
+  unlocks_endings?: string[];
+  /** Ending ids removed from the run's active set after this choice. */
+  removes_endings?: string[];
 }
 
 export interface AdminCard {
@@ -89,6 +93,42 @@ export interface DeckToggleResult {
   matched: number;
   modified: number;
 }
+
+/* ─── Ending shapes ────────────────────────────────────────────── */
+
+/**
+ * Same shape as `Requirements`, but kept as a distinct type because the
+ * backend models them separately (`Requirements` vs `EndingRequirements`).
+ * If they ever diverge, this is the seam.
+ */
+export interface EndingRequirements {
+  flags_all?: string[];
+  flags_none?: string[];
+  flags_any?: string[];
+  stats?: Partial<Record<StatKey, StatRange>>;
+}
+
+export interface AdminEnding {
+  _id: string;
+  title: string;
+  description: string;
+  /** Lower = checked first when multiple endings match. */
+  priority?: number;
+  requires?: EndingRequirements;
+  /** Auto-added to new runs' `active_endings`. */
+  default?: boolean;
+  /** Soft-disable, mirrors AdminCard.enabled. */
+  enabled?: boolean;
+  image_url?: string | null;
+}
+
+/** Fields PATCH accepts — same as backend's PatchEndingRequest. */
+export type PatchEndingPayload = Partial<
+  Pick<AdminEnding,
+    'title' | 'description' | 'priority' | 'requires'
+    | 'default' | 'enabled' | 'image_url'
+  >
+>;
 
 /* ─── Error type ───────────────────────────────────────────────── */
 
@@ -196,3 +236,39 @@ export const toggleDeck = (deckName: string, enabled: boolean) =>
 
 /** Quick re-validation against the same endpoint adminStore uses. */
 export const adminPing = () => request<{ ok: boolean }>('/auth/ping');
+
+/* ─── Ending endpoints ─────────────────────────────────────────── */
+
+export const listEndings = (opts: { limit?: number; skip?: number } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+  if (opts.skip !== undefined) q.set('skip', String(opts.skip));
+  const qs = q.toString();
+  return request<AdminEnding[]>(`/endings${qs ? `?${qs}` : ''}`);
+};
+
+export const getEnding = (endingId: string) =>
+  request<AdminEnding>(`/endings/${encodeURIComponent(endingId)}`);
+
+export const createEnding = (ending: AdminEnding) =>
+  request<AdminEnding>('/endings', {
+    method: 'POST',
+    body: JSON.stringify(ending),
+  });
+
+export const replaceEnding = (endingId: string, ending: AdminEnding) =>
+  request<AdminEnding>(`/endings/${encodeURIComponent(endingId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(ending),
+  });
+
+export const patchEnding = (endingId: string, payload: PatchEndingPayload) =>
+  request<AdminEnding>(`/endings/${encodeURIComponent(endingId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteEnding = (endingId: string) =>
+  request<void>(`/endings/${encodeURIComponent(endingId)}`, {
+    method: 'DELETE',
+  });

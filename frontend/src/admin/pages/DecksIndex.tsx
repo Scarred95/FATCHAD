@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { decksOf, useAdminCardStore } from '../store';
+import { useAdminEndingStore } from '../endingStore';
 import { ImportExportBar } from '../components/ImportExportBar';
 import { validateCard } from '../utils/validate';
 import { dropRecent, loadRecents, timeAgo, type RecentEntry } from '../utils/recents';
@@ -27,11 +28,11 @@ function categoryBreakdown(cards: Card[]) {
 interface DeckHealth { errors: number; warnings: number }
 
 /** Count cards in a deck that have at least one error / warning. */
-function deckHealth(deckCards: Card[], allCards: Card[]): DeckHealth {
+function deckHealth(deckCards: Card[], allCards: Card[], endingIds: Set<string>): DeckHealth {
   let errors = 0;
   let warnings = 0;
   for (const c of deckCards) {
-    const issues = validateCard(c, allCards);
+    const issues = validateCard(c, allCards, endingIds);
     if (issues.some((i) => i.level === 'error')) errors++;
     else if (issues.some((i) => i.level === 'warning')) warnings++;
   }
@@ -40,6 +41,8 @@ function deckHealth(deckCards: Card[], allCards: Card[]): DeckHealth {
 
 export function DecksIndex() {
   const cards = useAdminCardStore((s) => s.cards);
+  const endings = useAdminEndingStore((s) => s.endings);
+  const endingIds = useMemo(() => new Set(endings.map((e) => e._id)), [endings]);
   const decks = decksOf(cards);
 
   // Recently-edited rail: read from localStorage once + after each save.
@@ -61,16 +64,16 @@ export function DecksIndex() {
     setRecents(loadRecents());
   };
 
-  // Health map: deck key → counts. Recomputed when the card set changes.
+  // Health map: deck key → counts. Recomputed when cards or endings change.
   const healthByDeck = useMemo(() => {
     const out = new Map<string, DeckHealth>();
     for (const [name, list] of decks.entries()) {
-      out.set(name, deckHealth(list, cards));
+      out.set(name, deckHealth(list, cards, endingIds));
     }
     return out;
-    // decks is derived from cards; only re-run on cards changes.
+    // decks is derived from cards; only re-run on cards/endings changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards]);
+  }, [cards, endingIds]);
 
   const totalErrors = useMemo(
     () => [...healthByDeck.values()].reduce((n, h) => n + h.errors, 0),
