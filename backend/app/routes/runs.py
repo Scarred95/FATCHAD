@@ -44,8 +44,8 @@ async def create_run(
         starting_endings=default_ending_ids,
     )
 
-    # Peek at the first card before saving — if nothing is playable, mark the
-    # run lost up-front so we write the final state in a single Mongo round-trip.
+    # Peek at the first card before saving — if nothing is playable, end the
+    # run up-front so we write the final state in a single Mongo round-trip.
     first_card = await draw_eligible_card(state, events)
     if first_card is None:
         # Engine-level sentinel — not backed by an Ending doc. The run never

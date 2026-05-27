@@ -13,7 +13,7 @@ how. Adding a new admin sub-router here means it's protected by default
 """
 from fastapi import APIRouter, Depends
 
-from app.routes.admin import auth, cards, debug
+from app.routes.admin import auth, cards, debug, endings
 
 router = APIRouter(
     prefix="/admin",
@@ -26,5 +26,6 @@ router = APIRouter(
 )
 
 router.include_router(cards.router, prefix="/cards")
+router.include_router(endings.router, prefix="/endings")
 router.include_router(debug.router)
 router.include_router(auth.router, prefix="/auth")

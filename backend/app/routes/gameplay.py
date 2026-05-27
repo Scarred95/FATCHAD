@@ -112,10 +112,12 @@ async def submit_choice(
 async def get_summary(
     run_id: str,
     states: GameStateRepo = Depends(get_state_repo),
+    endings: EndingRepo = Depends(get_ending_repo),
 ):
-    """End-screen data: ending label, final stats, turn count, card count.
+    """End-screen data: ending label + body, final stats, turn count, card count.
 
-    Only callable once the run has ended (status != active).
+    Only callable once the run has ended (status != active). The ending body
+    is denormalised in so the frontend renders the recap from one fetch.
     """
     state = await states.get(run_id)
     if state is None:
@@ -123,8 +125,12 @@ async def get_summary(
     if state.status == "active":
         raise HTTPException(409, "Run is still active")
 
+    ending_doc = await endings.get_by_id(state.ending) if state.ending else None
+
     return EndSummary(
         ending=state.ending,
+        ending_title=ending_doc.title if ending_doc else None,
+        ending_description=ending_doc.description if ending_doc else None,
         status=state.status,
         turns_survived=state.turn,
         final_stats=state.stats,
