@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { FatchadBootstrapStack } from '../lib/bootstrap-stack';
-import { FatchadAppStack } from '../lib/app-stack';
+import { FatchadFrontendStack } from '../lib/frontend-stack';
 
 const app = new cdk.App();
 
@@ -15,12 +15,12 @@ const githubRepo = app.node.tryGetContext('githubRepo') as string;
 
 new FatchadBootstrapStack(app, 'FatchadBootstrapStack', {
   env,
-  description: 'One-time bootstrap: GitHub OIDC provider + deploy role. Deploy locally.',
+  description: 'One-time bootstrap: GitHub OIDC provider + deploy roles. Deploy locally.',
   githubOwner,
   githubRepo,
 });
 
-new FatchadAppStack(app, 'FatchadAppStack', {
+new FatchadFrontendStack(app, 'FatchadFrontendStack', {
   env,
-  description: 'FATCHAD test stack: S3 static site + hello-world Lambda.',
+  description: 'FATCHAD frontend: S3 website bucket for the React SPA.',
 });

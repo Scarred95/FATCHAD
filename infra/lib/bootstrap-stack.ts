@@ -82,5 +82,71 @@ export class FatchadBootstrapStack extends cdk.Stack {
       value: deployRole.roleArn,
       description: 'Put this in the GitHub Actions workflow as role-to-assume.',
     });
+
+    // ------------------------------------------------------------------
+    // FatchadFrontendUploadRole — scoped to frontend bucket sync only.
+    //
+    // Trust: only the deploy-frontend.yml workflow can assume this, and only
+    // when running on a `frontend-v*` tag or a `workflow_dispatch` from main
+    // or the active dev branch. Branch pushes / PRs cannot assume it.
+    //
+    // Permissions: list/get/put/delete on `fatchad-frontend` bucket + its
+    // objects. Nothing else.
+    // ------------------------------------------------------------------
+    const frontendUploadRole = new iam.Role(this, 'FatchadFrontendUploadRole', {
+      roleName: 'FatchadFrontendUploadRole',
+      assumedBy: new iam.FederatedPrincipal(
+        provider.openIdConnectProviderArn,
+        {
+          StringEquals: {
+            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          },
+          // GitHub's OIDC `sub` for tags: repo:OWNER/REPO:ref:refs/tags/<tag>
+          // For workflow_dispatch:        repo:OWNER/REPO:ref:refs/heads/<branch>
+          // We allow either, but only for frontend-v* tags / specific branches.
+          StringLike: {
+            'token.actions.githubusercontent.com:sub': [
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/frontend-v*`,
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/main`,
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/aurendev-CICD_AWS_TEST`,
+            ],
+          },
+        },
+        'sts:AssumeRoleWithWebIdentity',
+      ),
+      description: 'Assumed by deploy-frontend workflow to sync dist/ to S3.',
+      maxSessionDuration: cdk.Duration.hours(1),
+    });
+
+    // Hardcoded bucket ARN — the name is fixed by the frontend stack and S3
+    // bucket names are globally unique, so this is stable. Avoids a cross-
+    // stack import that would force deploy ordering.
+    const frontendBucketArn = `arn:aws:s3:::fatchad-frontend`;
+
+    frontendUploadRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'ListFrontendBucket',
+        actions: ['s3:ListBucket', 's3:GetBucketLocation'],
+        resources: [frontendBucketArn],
+      }),
+    );
+
+    frontendUploadRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'WriteFrontendObjects',
+        actions: [
+          's3:GetObject',
+          's3:PutObject',
+          's3:PutObjectAcl',
+          's3:DeleteObject',
+        ],
+        resources: [`${frontendBucketArn}/*`],
+      }),
+    );
+
+    new cdk.CfnOutput(this, 'FrontendUploadRoleArn', {
+      value: frontendUploadRole.roleArn,
+      description: 'Put this in deploy-frontend.yml as AWS_FRONTEND_UPLOAD_ROLE_ARN secret.',
+    });
   }
 }
