@@ -120,7 +120,6 @@ class Event(BaseModel):
     requires: Requirements = Field(default_factory=Requirements)
     choices: list[Choice] = Field(min_length=2, max_length=3)
     image_url: Optional[str] = None
-
     model_config = ConfigDict(populate_by_name=True)
 
 # =============================================================================
