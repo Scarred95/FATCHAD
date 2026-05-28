@@ -11,11 +11,14 @@ def handler(event, context):
         "region": os.environ.get("AWS_REGION", "unknown"),
         "function": os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown"),
     }
+    # CORS headers are handled by the Function URL config in CDK
+    # (see app-stack.ts → addFunctionUrl → cors). Setting them again here
+    # would produce a duplicated Access-Control-Allow-Origin header that
+    # browsers reject.
     return {
         "statusCode": 200,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
         },
         "body": json.dumps(body),
     }
