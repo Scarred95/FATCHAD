@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FATCHAD — Cloud Skeleton</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 30% 20%, #1d2540, #0a0d18 70%);
+        color: #e6ecff;
+      }
+      main {
+        text-align: center;
+        padding: 2rem;
+        max-width: 36rem;
+      }
+      h1 { font-size: 2.4rem; margin: 0 0 0.5rem; letter-spacing: -0.02em; }
+      p { opacity: 0.78; line-height: 1.5; }
+      .badge {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.4rem 0.9rem;
+        border-radius: 999px;
+        background: #2a3866;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.6rem 1.2rem;
+        font: inherit;
+        border: 1px solid #3a4a7d;
+        border-radius: 8px;
+        background: #1a2243;
+        color: inherit;
+        cursor: pointer;
+      }
+      button:hover { background: #243068; }
+      pre {
+        margin-top: 1rem;
+        padding: 0.8rem;
+        background: #0d1226;
+        border: 1px solid #1f2a52;
+        border-radius: 8px;
+        text-align: left;
+        font-size: 0.85rem;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="badge">Step 1 · Skeleton</span>
+      <h1>FATCHAD is on AWS.</h1>
+      <p>
+        This page is served from S3. The button below pings a Lambda.
+        Edit <code>infra/web/index.html</code> and push to redeploy.
+      </p>
+      <button id="ping">Ping Lambda</button>
+      <pre id="out">(not pinged yet)</pre>
+    </main>
+    <script>
+      // Replace this once the Lambda URL is known. After first deploy, grab
+      // the `HelloLambdaUrl` CloudFormation output and paste it here.
+      const LAMBDA_URL = "REPLACE_WITH_LAMBDA_URL";
+      const btn = document.getElementById("ping");
+      const out = document.getElementById("out");
+      btn.addEventListener("click", async () => {
+        out.textContent = "pinging...";
+        try {
+          if (LAMBDA_URL.startsWith("REPLACE")) {
+            out.textContent = "Set LAMBDA_URL in index.html first.";
+            return;
+          }
+          const res = await fetch(LAMBDA_URL);
+          const json = await res.json();
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "error: " + e.message;
+        }
+      });
+    </script>
+  </body>
+</html>

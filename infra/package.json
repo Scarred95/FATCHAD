@@ -1,0 +1,25 @@
+{
+  "name": "fatchad-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "fatchad": "bin/fatchad.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy:bootstrap": "cdk deploy FatchadBootstrapStack",
+    "deploy:app": "cdk deploy FatchadAppStack"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "aws-cdk": "^2.165.0",
+    "typescript": "~5.4.5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.165.0",
+    "constructs": "^10.3.0"
+  }
+}
