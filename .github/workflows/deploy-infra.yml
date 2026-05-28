@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: cdk deploy FatchadAppStack
+    name: cdk deploy FatchadFrontendStack
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,11 +46,18 @@ jobs:
           aws-region: eu-central-1
           role-session-name: GitHubActions-FatchadDeploy
 
+      # The bootstrap stack is intentionally excluded from CI — it manages the
+      # very role this workflow is using, and changing it from inside its own
+      # session is asking for trouble. Deploy it manually with `cdk deploy
+      # FatchadBootstrapStack` from a laptop when IAM trust changes.
       - name: CDK synth
-        run: npx cdk synth FatchadAppStack
+        run: npx cdk synth FatchadFrontendStack
+
+      - name: CDK diff
+        run: npx cdk diff FatchadFrontendStack || true
 
       - name: CDK deploy
-        run: npx cdk deploy FatchadAppStack --require-approval never --outputs-file cdk-outputs.json
+        run: npx cdk deploy FatchadFrontendStack --require-approval never --outputs-file cdk-outputs.json
 
       - name: Show stack outputs
         run: cat cdk-outputs.json
