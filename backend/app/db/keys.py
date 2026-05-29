@@ -33,44 +33,56 @@ class DdbKey(TypedDict):
 
 
 # =============================================================================
-# fatchad_catalog (PK = "CATALOG", SK = <entity-prefix>#<id> or "current")
+# fatchad_catalog — one partition per entity type
 # =============================================================================
+#
+# Catalog uses per-type PKs (DECK, EVENT, ENDING, ACH, META) instead of a
+# single PK="CATALOG". Reasoning:
+#   - The catalog table only holds catalog items, so the classic single-table
+#     trick of "one Query returns parent + children" buys nothing here.
+#   - Per-type PKs make every admin listing a clean Query (PK=EVENT) instead
+#     of a prefix scan (PK=CATALOG AND begins_with(SK, "EVENT#")).
+#   - Spreads load across partitions naturally, no hot-partition smell.
+#   - Reading the whole catalog for publish becomes a few Queries (or a Scan
+#     — catalog is small) instead of one mega-Query. No real cost difference.
+#
+# META is a catch-all PK for catalog-wide singletons (currently just the
+# `current` publish pointer; later: schema version, publish history, etc.).
 
-CATALOG_PK = "CATALOG"
+class CatalogPk:
+    DECK = "DECK"
+    CARD = "EVENT"        # cards are called Events in the codebase
+    ENDING = "ENDING"
+    ACH = "ACH"
+    META = "META"         # singletons: pointer, schema_version, ...
 
 
 class CatalogSk:
-    """Sort-key prefixes for the catalog table.
-
-    Use the *_PREFIX constants in `begins_with` Query expressions when listing.
-    The `_key` helpers below build full keys for GetItem / PutItem / DeleteItem.
-    """
-    DECK_PREFIX = "DECK#"
-    CARD_PREFIX = "EVENT#"      # cards are called Events in the codebase
-    ENDING_PREFIX = "ENDING#"
-    ACH_PREFIX = "ACH#"
+    """SK values for META-partition singletons. Per-type partitions use the
+    entity id directly as the SK (deck_name, card id, etc.) — no prefix
+    needed since the PK already names the type."""
     POINTER = "current"
 
 
 def catalog_deck_key(deck_name: str) -> DdbKey:
-    return {"PK": CATALOG_PK, "SK": f"{CatalogSk.DECK_PREFIX}{deck_name}"}
+    return {"PK": CatalogPk.DECK, "SK": deck_name}
 
 
 def catalog_card_key(card_id: str) -> DdbKey:
-    return {"PK": CATALOG_PK, "SK": f"{CatalogSk.CARD_PREFIX}{card_id}"}
+    return {"PK": CatalogPk.CARD, "SK": card_id}
 
 
 def catalog_ending_key(ending_id: str) -> DdbKey:
-    return {"PK": CATALOG_PK, "SK": f"{CatalogSk.ENDING_PREFIX}{ending_id}"}
+    return {"PK": CatalogPk.ENDING, "SK": ending_id}
 
 
 def catalog_achievement_key(ach_id: str) -> DdbKey:
-    return {"PK": CATALOG_PK, "SK": f"{CatalogSk.ACH_PREFIX}{ach_id}"}
+    return {"PK": CatalogPk.ACH, "SK": ach_id}
 
 
 def catalog_pointer_key() -> DdbKey:
     """The singleton 'currently published version' item."""
-    return {"PK": CATALOG_PK, "SK": CatalogSk.POINTER}
+    return {"PK": CatalogPk.META, "SK": CatalogSk.POINTER}
 
 
 # =============================================================================

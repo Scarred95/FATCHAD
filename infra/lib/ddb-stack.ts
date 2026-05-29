@@ -17,22 +17,31 @@ import { Construct } from 'constructs';
  *  fatchad_catalog — admin-managed content (this is "the game")
  * ============================================================
  *
- *  PK         SK                       Item
- *  --------   ----------------------   --------------------------------
- *  CATALOG    DECK#<deck_name>         Deck { name, description, enabled,
- *                                             unlock_rule, ... }
- *  CATALOG    EVENT#<event_id>         Card { id, deck_name, title, choices[],
- *                                             effects[], requires, sets_flags,
- *                                             clears_flags, triggers_ending,
- *                                             weight, enabled, ... }
- *  CATALOG    ENDING#<ending_id>       Ending { id, deck_name, title,
- *                                               description, trigger_conditions,
+ *  PK         SK                  Item
+ *  --------   -----------------   --------------------------------
+ *  DECK       <deck_name>         Deck { name, description, enabled,
+ *                                        unlock_rule, ... }
+ *  EVENT      <card_id>           Card { id, deck_name, title, choices[],
+ *                                        effects[], requires, sets_flags,
+ *                                        clears_flags, triggers_ending,
+ *                                        weight, enabled, ... }
+ *  ENDING     <ending_id>         Ending { id, deck_name, title,
+ *                                          description, trigger_conditions,
+ *                                          enabled, ... }
+ *  ACH        <ach_id>            Achievement { id, name, criteria,
+ *                                               points, unlocks_deck,
  *                                               enabled, ... }
- *  CATALOG    ACH#<ach_id>             Achievement { id, name, criteria,
- *                                                    points, unlocks_deck,
- *                                                    enabled, ... }
- *  CATALOG    current                  Pointer { version, public_url, full_url,
- *                                                published_at }
+ *  META       current             Pointer { version, public_url, full_url,
+ *                                           published_at }
+ *
+ *  One PK per entity type, not a single PK="CATALOG". The classic single-
+ *  table trick (one Query returns parent + children together) buys nothing
+ *  here because catalog has no parent/child fetches at runtime — gameplay
+ *  reads from a cached snapshot, not DDB. Per-type PKs make admin listings
+ *  trivial (Query pk=EVENT) and spread load across partitions.
+ *
+ *  META is a catch-all PK for catalog-wide singletons. Today: just the
+ *  publish pointer. Later: schema version, publish history, feature flags.
  *
  *  Note: Deck, Card, Ending, AND Achievement all carry an `enabled` boolean.
  *  Publishing strips disabled items from the public bundle, so an admin can
@@ -46,11 +55,12 @@ import { Construct } from 'constructs';
  *  needing to touch the individual items.
  *
  *  Common queries:
- *    List all decks    →  Query pk=CATALOG, sk begins_with "DECK#"
- *    List all cards    →  Query pk=CATALOG, sk begins_with "EVENT#"
- *    List all endings  →  Query pk=CATALOG, sk begins_with "ENDING#"
- *    Get one card      →  GetItem pk=CATALOG, sk=EVENT#<id>
- *    Get pointer       →  GetItem pk=CATALOG, sk=current
+ *    List all decks    →  Query pk=DECK
+ *    List all cards    →  Query pk=EVENT
+ *    List all endings  →  Query pk=ENDING
+ *    Get one card      →  GetItem pk=EVENT, sk=<id>
+ *    Get pointer       →  GetItem pk=META,  sk=current
+ *    Whole catalog     →  Scan (table is small — a few hundred items max)
  *
  * ============================================================
  *  fatchad_user_data — per-user state + leaderboards

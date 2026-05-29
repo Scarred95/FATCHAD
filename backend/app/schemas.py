@@ -139,6 +139,13 @@ class Ending(BaseModel):
     id: str = Field(alias="_id")
     title: str
     description: str
+    # Optional parent deck. None = global ending (always available regardless
+    # of which decks the player has unlocked). When set, the ending is only
+    # added to runs that include the named deck — same string as the parent
+    # Deck.name, mirroring how Event.deck_name links cards to their deck.
+    # Effective enabled-ness becomes: ending.enabled AND parent_deck.enabled,
+    # with deck-less endings only gated by their own `enabled`.
+    deck_name: Optional[str] = None
     priority: int = 100                # lower = checked first when multiple match
     requires: EndingRequirements = Field(default_factory=EndingRequirements)
     default: bool = False              # auto-added to new runs' active_endings

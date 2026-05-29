@@ -69,12 +69,17 @@ After this, all further deploys ride on GitHub Actions.
 
 ### `FatchadDataStack`
 
-Two DynamoDB tables, single-table design per table, no GSIs in v1.
+Two DynamoDB tables, no GSIs in v1.
 
 | Table | Holds | Streams to (later) |
 |---|---|---|
 | `fatchad_catalog` | Decks, Cards, Endings, Achievements, current-version pointer. Every entity has an `enabled` flag — disabled items stay in the editor but get stripped from the published bundle. | Optional cache-invalidation / audit Lambda. |
 | `fatchad_user_data` | Profiles, deck unlocks, achievements, runs (active/ended/abandoned), leaderboards. | Leaderboard aggregator Lambda. |
+
+Different PK strategies on purpose:
+
+- **`fatchad_catalog`** uses one PK per entity type (`DECK`, `EVENT`, `ENDING`, `ACH`, `META`). No parent/child fetches happen at runtime — gameplay reads from a cached snapshot, so the single-table "Query returns parent + children" trick is wasted here. Per-type PKs make admin listings a clean `Query pk=EVENT` and spread load across partitions.
+- **`fatchad_user_data`** uses `PK=USER#<uid>` for everything user-scoped, plus `PK=LB#<scope>` for leaderboards. This is real single-table design — loading a user's full state (profile + unlocks + achievements + active run) is one Query. Leaderboards live in their own partitions because they're never joined with user items.
 
 See header comments in [`lib/ddb-stack.ts`](lib/ddb-stack.ts) for the full PK/SK conventions per entity.
 
