@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.game.hints import derive_hints_from_effects
-from app.schemas import Choice, Event, GameState, GameStatus, StatHint, Stats
+from app.schemas import Choice, Effects, Event, GameState, GameStatus, StatHint, Stats
 
 
 # =============================================================================
@@ -21,10 +21,10 @@ class CreateRunRequest(BaseModel):
 
 
 class ChoiceRequest(BaseModel):
-    choice_index: int
-    # Include the current turn to guard against double-processing on client retries.
-    # If provided and mismatched, the request is rejected as stale (see gameplay.py).
-    expected_turn: int | None = None
+    choice_index: int = Field(ge=0)
+    # Current turn the client thinks the run is on. Required — guards against
+    # double-applying the same choice when a client retries. Mismatch → 409.
+    expected_turn: int = Field(ge=0)
 
 
 # =============================================================================
@@ -90,7 +90,7 @@ class TurnResponse(BaseModel):
 class RunSummary(BaseModel):
     """Lightweight run entry for list/lobby views.
 
-    Omits deck, history, flags, flag_timers, rng_seed — none of which are
+    Omits deck, history, flags, rng_seed — none of which are
     needed to render a run list. Backed by a projected DB query.
     """
     id: str = Field(alias="_id")
@@ -104,9 +104,39 @@ class RunSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class HistoryDetailEntry(BaseModel):
+    """One past turn, enriched with the card and chosen-option payload.
+
+    Joined server-side from `GameState.history` + the events collection so
+    the client can render a timeline without leaking the rest of the deck.
+    Missing events (e.g. a card was deleted after being played) keep the
+    entry but set `title` to a placeholder and `effects` to zeros.
+    """
+    turn: int
+    event_id: str
+    title: str
+    description: str | None = None
+    category: str | None = None
+    deck_name: str | None = None
+    choice_index: int
+    choice_text: str
+    effects: Effects
+    sets_flags: list[str] = []
+    clears_flags: list[str] = []
+    triggered_ending: str | None = None
+
+
 class EndSummary(BaseModel):
-    """End-of-run stats shown on the results / game-over screen."""
+    """End-of-run stats shown on the results / game-over screen.
+
+    `ending_title` / `ending_description` are denormalised from the Ending doc
+    at summary time so the frontend can render the recap without a second
+    fetch. Both are None when the run ended without firing an ending (e.g.
+    `abandoned`), or when the ending id no longer resolves (stale snapshot).
+    """
     ending: str | None
+    ending_title: str | None
+    ending_description: str | None
     status: GameStatus
     turns_survived: int
     final_stats: Stats

@@ -1,20 +1,16 @@
 # app/routes/admin/cards.py
 """Card CRUD — create, read, update, replace, delete card documents.
 
-All routes are prefixed /admin/cards by the parent router in __init__.py.
-TODO: Add authentication/authorization — these endpoints are currently open to anyone.
+Mounted under /admin/cards. Auth is enforced at the parent admin router.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.db.repositories import EventRepo
+from app.routes._deps import get_event_repo
 from app.schemas import Choice, Event, Requirements
 
 router = APIRouter()
-
-
-def get_event_repo(request: Request) -> EventRepo:
-    return EventRepo(request.app.state.mongo.db)
 
 
 @router.get("", response_model=list[Event])

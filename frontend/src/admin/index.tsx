@@ -26,6 +26,7 @@ import { DeckDetail } from './pages/DeckDetail';
 import { GraphView } from './pages/GraphView';
 import { CardEditorPage } from './pages/CardEditor';
 import { EndingsIndex } from './pages/EndingsIndex';
+import { EndingEditorPage } from './pages/EndingEditor';
 import { CategoriesIndex } from './pages/CategoriesIndex';
 import { SuggestionsIndex } from './pages/SuggestionsIndex';
 
@@ -35,6 +36,7 @@ export { DeckDetail } from './pages/DeckDetail';
 export { GraphView } from './pages/GraphView';
 export { CardEditorPage } from './pages/CardEditor';
 export { EndingsIndex } from './pages/EndingsIndex';
+export { EndingEditorPage } from './pages/EndingEditor';
 export { CategoriesIndex } from './pages/CategoriesIndex';
 export { SuggestionsIndex } from './pages/SuggestionsIndex';
 
@@ -49,6 +51,8 @@ export const adminChildRoutes: RouteObject[] = [
   { path: 'cards/new', element: <CardEditorPage mode="new" /> },
   { path: 'cards/:id', element: <CardEditorPage mode="edit" /> },
   { path: 'endings', element: <EndingsIndex /> },
+  { path: 'endings/new', element: <EndingEditorPage mode="new" /> },
+  { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
   { path: 'categories', element: <CategoriesIndex /> },
   { path: 'suggestions', element: <SuggestionsIndex /> },
 ];

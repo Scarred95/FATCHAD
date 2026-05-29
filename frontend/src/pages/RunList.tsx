@@ -5,6 +5,7 @@ import { deleteRun, listRuns } from '../api/client';
 import type { RunSummary } from '../api/types';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
+import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useToastStore } from '../stores/toastStore';
 import { getUserId } from '../stores/userStore';
 import styles from './RunList.module.css';
@@ -15,6 +16,7 @@ export default function RunList() {
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<RunSummary | null>(null);
+  const [historyRunId, setHistoryRunId] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -108,6 +110,18 @@ export default function RunList() {
               </div>
               <span className={styles.runStatus}>{statusLabel(r)}</span>
               <span
+                className={styles.historyBtn}
+                role="button"
+                aria-label="Verlauf"
+                title="Verlauf"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHistoryRunId(r._id);
+                }}
+              >
+                ⌚
+              </span>
+              <span
                 className={styles.deleteBtn}
                 role="button"
                 aria-label="Löschen"
@@ -139,6 +153,12 @@ export default function RunList() {
         ]}
         onClose={() => setConfirmDelete(null)}
       />
+
+      <HistoryModal
+        open={!!historyRunId}
+        runId={historyRunId}
+        onClose={() => setHistoryRunId(null)}
+      />
     </main>
   );
 }
@@ -152,8 +172,7 @@ function dominantStat(r: RunSummary): string {
 
 function statusLabel(r: RunSummary): string {
   if (r.status === 'active') return 'aktiv';
-  if (r.status === 'won') return 'gewonnen';
-  if (r.status === 'lost') return 'verloren';
+  if (r.status === 'ended') return 'beendet';
   return 'aufgegeben';
 }
 

@@ -122,7 +122,6 @@
         scheduled: [],
         stats: { moneten: 50, aura: 50, respekt: 50, rizz: 50, chaos: 0 },
         flags: [],
-        flag_timers: {},
         history: [],
         turn: 0,
         rng_seed: Math.floor(Math.random() * 2 ** 31),

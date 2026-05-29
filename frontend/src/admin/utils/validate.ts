@@ -1,5 +1,5 @@
 import type { Card } from '../types';
-import { ALL_CATEGORIES, KNOWN_ENDINGS, STAT_DOMAIN, STAT_KEYS } from '../types';
+import { ALL_CATEGORIES, STAT_DOMAIN, STAT_KEYS } from '../types';
 
 export interface ValidationIssue {
   level: 'error' | 'warning';
@@ -7,7 +7,15 @@ export interface ValidationIssue {
   path?: string;
 }
 
-export function validateCard(card: Card, all: Card[]): ValidationIssue[] {
+/**
+ * Validate a card against the rest of the dataset.
+ *
+ * `knownEndingIds` is the canonical set of ending ids (from
+ * `useAdminEndingStore`). Pass an empty set if the endings store hasn't
+ * loaded yet — ending checks will be skipped silently rather than spamming
+ * false warnings.
+ */
+export function validateCard(card: Card, all: Card[], knownEndingIds?: Set<string>): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const err = (message: string, path?: string) =>
     issues.push({ level: 'error', message, path });
@@ -59,9 +67,23 @@ export function validateCard(card: Card, all: Card[]): ValidationIssue[] {
         }
       }
     }
-    if (ch.triggers_ending && !KNOWN_ENDINGS.includes(ch.triggers_ending)) {
-      warn(`choice ${ci + 1}: ending "${ch.triggers_ending}" is not in the canonical catalogue`,
-        `choices.${ci}.triggers_ending`);
+    if (knownEndingIds && knownEndingIds.size > 0) {
+      if (ch.triggers_ending && !knownEndingIds.has(ch.triggers_ending)) {
+        warn(`choice ${ci + 1}: ending "${ch.triggers_ending}" ist nicht im Endings-Katalog`,
+          `choices.${ci}.triggers_ending`);
+      }
+      ch.unlocks_endings?.forEach((eid, ei) => {
+        if (!knownEndingIds.has(eid)) {
+          warn(`choice ${ci + 1}: unlocks_endings[${ei}] "${eid}" ist nicht im Endings-Katalog`,
+            `choices.${ci}.unlocks_endings.${ei}`);
+        }
+      });
+      ch.removes_endings?.forEach((eid, ei) => {
+        if (!knownEndingIds.has(eid)) {
+          warn(`choice ${ci + 1}: removes_endings[${ei}] "${eid}" ist nicht im Endings-Katalog`,
+            `choices.${ci}.removes_endings.${ei}`);
+        }
+      });
     }
   });
 

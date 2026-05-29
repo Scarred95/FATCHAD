@@ -8,6 +8,7 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminCardStore } from './store';
+import { useAdminEndingStore } from './endingStore';
 import { useAdminStore } from '../stores/adminStore';
 import { useToastStore } from '../stores/toastStore';
 import admin from './admin.module.css';
@@ -17,6 +18,9 @@ export function AdminLayout() {
   const loaded = useAdminCardStore((s) => s.loaded);
   const loadFromServer = useAdminCardStore((s) => s.loadFromServer);
   const clearLocal = useAdminCardStore((s) => s.clearLocal);
+  const endingsLoaded = useAdminEndingStore((s) => s.loaded);
+  const loadEndings = useAdminEndingStore((s) => s.loadFromServer);
+  const clearEndingsLocal = useAdminEndingStore((s) => s.clearLocal);
   const disableAdmin = useAdminStore((s) => s.disable);
   const pushToast = useToastStore((s) => s.push);
   const nav = useNavigate();
@@ -25,16 +29,20 @@ export function AdminLayout() {
     if (!loaded) {
       void loadFromServer();
     }
+    if (!endingsLoaded) {
+      void loadEndings();
+    }
     // Intentionally only on mount — explicit Reload re-runs it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Logout: drop the cached cards (server-side data, not local edits)
-  // and clear the bearer token. RequireAdmin will redirect us out of
-  // /admin once isAdmin flips false — but we navigate explicitly so
-  // the title screen is reached even if React Router lags behind.
+  // Logout: drop both caches (server-side data, not local edits) and clear
+  // the bearer token. RequireAdmin will redirect us out of /admin once
+  // isAdmin flips false — but we navigate explicitly so the title screen
+  // is reached even if React Router lags behind.
   function onLogout() {
     clearLocal();
+    clearEndingsLocal();
     disableAdmin();
     pushToast('Abgemeldet', 'info');
     nav('/');
@@ -54,14 +62,12 @@ export function AdminLayout() {
         <nav className={styles.nav} aria-label="Admin-Navigation">
           <NavLink to="/admin" end className={navItem}>Decks</NavLink>
           <NavLink to="/admin/endings" className={navItem}>Endings</NavLink>
-          <NavLink to="/admin/suggestions" className={navItem}>User suggested</NavLink>
-          <NavLink to="/admin/categories" className={navItem}>Categories</NavLink>
         </nav>
         <div className={styles.spacer} />
         <button
           type="button"
           className={admin.btnSecondary}
-          onClick={() => void loadFromServer()}
+          onClick={() => { void loadFromServer(); void loadEndings(); }}
         >Reload</button>
         <button
           type="button"

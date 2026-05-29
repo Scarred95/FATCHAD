@@ -9,11 +9,19 @@ import type {
   EndSummary,
   GameState,
   HealthResponse,
+  HistoryDetailEntry,
   RunSummary,
   TurnResponse,
 } from './types';
 
 const BASE = '/api';
+
+// VITE_WIP_MODE is set to "true" at build time by the deploy-frontend workflow
+// for the S3 preview deploy, where the backend is not yet reachable. In that
+// mode every API call short-circuits before the network and surfaces a toast.
+const WIP_MODE = import.meta.env.VITE_WIP_MODE === 'true';
+const WIP_TOAST_THROTTLE_MS = 1500;
+let lastWipToastAt = 0;
 
 class ApiError extends Error {
   status: number;
@@ -25,7 +33,26 @@ class ApiError extends Error {
   }
 }
 
+function notifyWip() {
+  const now = Date.now();
+  if (now - lastWipToastAt < WIP_TOAST_THROTTLE_MS) return;
+  lastWipToastAt = now;
+  // Dynamic import to avoid a static cycle (toastStore -> api -> toastStore).
+  void import('../stores/toastStore').then(({ useToastStore }) => {
+    useToastStore.getState().push(
+      'Backend nicht verfügbar — Preview-Build.',
+      'warning',
+      2400,
+    );
+  });
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (WIP_MODE) {
+    notifyWip();
+    throw new ApiError(0, 'WIP — Backend nicht verfügbar');
+  }
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
@@ -102,5 +129,8 @@ export const submitChoice = (
 
 export const getEndSummary = (runId: string) =>
   request<EndSummary>(`/runs/${runId}/summary`);
+
+export const getHistory = (runId: string) =>
+  request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
 
 export { ApiError };

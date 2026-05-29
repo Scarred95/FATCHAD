@@ -15,7 +15,7 @@
 
 .runCard {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -53,8 +53,7 @@
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 
-.statusDot[data-status='won'] { background: var(--color-success); }
-.statusDot[data-status='lost'] { background: var(--color-danger); }
+.statusDot[data-status='ended'] { background: var(--color-success); }
 .statusDot[data-status='abandoned'] { background: var(--color-text-faint); }
 
 .runMeta {
@@ -100,6 +99,24 @@
 .deleteBtn:hover {
   color: var(--color-danger);
   background: rgba(255, 68, 68, 0.08);
+}
+
+.historyBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-quick), background var(--dur-quick);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.historyBtn:hover {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .empty {

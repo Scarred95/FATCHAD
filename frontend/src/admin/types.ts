@@ -58,6 +58,10 @@ export interface Choice {
   clears_flags?: string[];
   adds_to_deck?: DeckAddition[];
   triggers_ending?: string | null;
+  /** Ending ids added to the run's active set after this choice. */
+  unlocks_endings?: string[];
+  /** Ending ids removed from the run's active set after this choice. */
+  removes_endings?: string[];
 }
 
 export interface Card {
@@ -93,13 +97,30 @@ export const ALL_CATEGORIES = [
   ...PROPOSED_CATEGORIES,
 ];
 
-// §5 endings
-export const WIN_ENDINGS = ['chaos_agent', 'grey_eminence'];
-export const LOSS_ENDINGS = [
-  'death_bankrupt', 'death_revolution', 'death_irrelevant', 'death_jumped_shark',
-  'death_couped', 'death_conspiracy', 'death_frozen_out', 'death_drowned_in_drama',
-];
-export const KNOWN_ENDINGS = [...WIN_ENDINGS, ...LOSS_ENDINGS];
+/**
+ * Endings are server-driven — loaded from /admin/endings into
+ * `useAdminEndingStore`. Validators and autocomplete read the live id set
+ * from that store instead of a hardcoded catalogue.
+ *
+ * Same shape as the backend Ending document — see schemas.py.
+ */
+export interface EndingRequirements {
+  flags_all?: string[];
+  flags_none?: string[];
+  flags_any?: string[];
+  stats?: Partial<Record<StatKey, StatRange>>;
+}
+
+export interface Ending {
+  _id: string;
+  title: string;
+  description: string;
+  priority?: number;
+  requires?: EndingRequirements;
+  default?: boolean;
+  enabled?: boolean;
+  image_url?: string | null;
+}
 
 export const STAT_DOMAIN: Record<StatKey, { min: number; max: number }> = {
   moneten: { min: 0, max: 100 },

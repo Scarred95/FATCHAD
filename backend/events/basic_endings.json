@@ -1,0 +1,132 @@
+[
+  {
+    "_id": "end_bankrupt",
+    "title": "Bankrott",
+    "description": "Die Moneten sind alle. Karten werden zugedreht, das Konto ist tiefrot, und niemand nimmt mehr deine Anrufe an. Game over.",
+    "priority": 100,
+    "requires": {
+      "stats": { "moneten": { "max": 0 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_revolution",
+    "title": "Die Revolution kommt",
+    "description": "So viel Geld, dass die Straße sich erhebt. Die Massen kommen mit Mistgabeln und Twitter-Threads — und du sitzt am Ende der Tafel.",
+    "priority": 100,
+    "requires": {
+      "stats": { "moneten": { "min": 100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_irrelevant",
+    "title": "Komplett irrelevant",
+    "description": "Niemand kennt deinen Namen. Niemand teilt deine Posts. Du bist nicht mal mehr ein Witz — du bist einfach weg.",
+    "priority": 100,
+    "requires": {
+      "stats": { "aura": { "max": 0 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_jumped_shark",
+    "title": "Über den Hai gesprungen",
+    "description": "Zu viel Aura, zu lange. Jeder Move wirkt jetzt verzweifelt, jede Aussage cringe. Du bist zur eigenen Parodie geworden.",
+    "priority": 100,
+    "requires": {
+      "stats": { "aura": { "min": 100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_couped",
+    "title": "Geputscht",
+    "description": "Kein Respekt mehr, keine Loyalität. Die eigenen Leute öffnen dem nächsten Möchtegern die Tür — und schließen sie hinter dir.",
+    "priority": 100,
+    "requires": {
+      "stats": { "respekt": { "max": 0 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_conspiracy",
+    "title": "Die Verschwörung schlägt zurück",
+    "description": "Zu mächtig, zu unantastbar. Jeder Geheimbund, jeder Hinterzimmer-Deal richtet sich gegen dich. Niemand überlebt diesen Status lange.",
+    "priority": 100,
+    "requires": {
+      "stats": { "respekt": { "min": 100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_frozen_out",
+    "title": "Eiskalt rausgeworfen",
+    "description": "Kein Rizz, keine Einladungen, kein Spot mehr in irgendeinem Chat. Die Welt zieht weiter ohne dich.",
+    "priority": 100,
+    "requires": {
+      "stats": { "rizz": { "max": 0 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "end_drowned_in_drama",
+    "title": "Im Drama ertrunken",
+    "description": "Zu viel Charme, zu viele Affären, zu viele Storylines. Jede DM ein Skandal, jeder Auftritt ein Subtweet. Es endet, wie es enden musste.",
+    "priority": 100,
+    "requires": {
+      "stats": { "rizz": { "min": 100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "chaos_agent",
+    "title": "Chaos Agent",
+    "description": "Du hast das System nicht reformiert — du hast es zertrümmert und tanzt auf den Resten. Maximales Chaos, maximaler Sieg.",
+    "priority": 200,
+    "requires": {
+      "stats": { "chaos": { "min": 100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "grey_eminence",
+    "title": "Graue Eminenz",
+    "description": "Niemand sieht dich, niemand benennt dich, und doch zieht jeder Faden bei dir zusammen. Vollkommene Kontrolle durch vollkommene Ordnung.",
+    "priority": 200,
+    "requires": {
+      "stats": { "chaos": { "max": -100 } }
+    },
+    "default": true,
+    "enabled": true,
+    "image_url": null
+  },
+  {
+    "_id": "softlock_no_cards",
+    "title": "Vor dem ersten Zug verloren",
+    "description": "Der Stapel war leer, bevor du auch nur eine Karte ziehen konntest. Manchmal endet die Geschichte, bevor sie beginnt — der Tag stoppt, niemand spricht, und die Welt zieht weiter ohne dich.",
+    "priority": 999,
+    "requires": {},
+    "default": false,
+    "enabled": true,
+    "image_url": null
+  }
+]

@@ -1,0 +1,38 @@
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(90deg, #5a3a00 0%, #7a4f00 50%, #5a3a00 100%);
+  color: #ffe8b3;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid #3a2400;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.banner strong {
+  color: #ffd166;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.version {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}

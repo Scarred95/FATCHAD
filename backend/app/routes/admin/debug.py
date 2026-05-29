@@ -1,25 +1,19 @@
 # app/routes/admin/debug.py
-"""Dev-only deck manipulation tools.
+"""Dev-only deck manipulation — inject or remove cards from a live run's deck
+without replaying a full run.
 
-These routes let you manually inject or remove cards from a live run's deck,
-which is useful for testing specific card sequences without replaying a full run.
-
-All routes are prefixed /admin by the parent router in __init__.py.
-TODO: Add authentication/authorization — these endpoints are currently open to anyone.
+Mounted under /admin. Auth is enforced at the parent admin router.
 """
 import random
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.db.repositories import GameStateRepo
+from app.db.repositories import EventRepo, GameStateRepo
+from app.routes._deps import get_event_repo, get_state_repo
 
 router = APIRouter()
-
-
-def get_state_repo(request: Request) -> GameStateRepo:
-    return GameStateRepo(request.app.state.mongo.db)
 
 
 class InsertCardRequest(BaseModel):
@@ -32,11 +26,17 @@ async def insert_card_into_deck(
     run_id: str,
     payload: InsertCardRequest,
     states: GameStateRepo = Depends(get_state_repo),
+    events: EventRepo = Depends(get_event_repo),
 ):
     """Dev-only: manually inject a card into a run's deck. For testing."""
     state = await states.get(run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
+
+    # Reject unknown card ids early — otherwise the inserted id quietly gets
+    # dropped by _scan_top later, producing confusing "nothing happens" bugs.
+    if await events.get_by_id(payload.card_id) is None:
+        raise HTTPException(404, f"Card '{payload.card_id}' not found")
 
     if payload.position == "top":
         state.deck.insert(0, payload.card_id)
@@ -47,7 +47,8 @@ async def insert_card_into_deck(
         idx = random.randrange(len(state.deck) + 1) if state.deck else 0
         state.deck.insert(idx, payload.card_id)
 
-    await states.save(state)
+    if not await states.update(state):
+        raise HTTPException(404, "Run not found")
 
 
 @router.delete("/runs/{run_id}/deck/{index}", status_code=204)
@@ -63,4 +64,5 @@ async def remove_card_from_deck(
     if not (0 <= index < len(state.deck)):
         raise HTTPException(400, f"Index {index} out of range")
     state.deck.pop(index)
-    await states.save(state)
+    if not await states.update(state):
+        raise HTTPException(404, "Run not found")

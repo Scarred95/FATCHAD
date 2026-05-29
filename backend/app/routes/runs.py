@@ -6,62 +6,62 @@ These routes manage the run record itself. The active game loop
 """
 import random
 from datetime import datetime, timezone
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
+from pymongo.errors import DuplicateKeyError
 
-from app.db.repositories import EventRepo, GameStateRepo
+from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
 from app.schemas import GameState
 from app.game.deck import draw_eligible_card
-from app.routes._schemas import CardResponse, CreateRunRequest, RunSummary, TurnResponse
+from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
+from app.routes._schemas import (
+    CardResponse, CreateRunRequest, HistoryDetailEntry, RunSummary, TurnResponse,
+)
+from app.schemas import Effects
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
+# Tutorial chains itself via adds_to_deck — seeding the whole list would
+# duplicate every card and clog the deck. One entry is enough.
+_STARTER_DECK = ["evt_tut_01_awakening"]
 
-# --- Dependency injectors ---
-
-def get_state_repo(request: Request) -> GameStateRepo:
-    return GameStateRepo(request.app.state.mongo.db)
-
-def get_event_repo(request: Request) -> EventRepo:
-    return EventRepo(request.app.state.mongo.db)
-
-
-# --- Routes ---
 
 @router.post("", response_model=TurnResponse, status_code=201)
 async def create_run(
     payload: CreateRunRequest,
     states: GameStateRepo = Depends(get_state_repo),
     events: EventRepo = Depends(get_event_repo),
+    endings: EndingRepo = Depends(get_ending_repo),
 ):
     """Start a new run. Returns state + first card so the client needs only one request."""
-    run_id   = f"run_{uuid4().hex[:12]}"
-    rng_seed = random.randint(0, 2**31 - 1)
-
-    # Seed the deck with only the first tutorial card; every tutorial card chains
-    # the next via `adds_to_deck` (position="top"), so they enter as they're earned.
-    # Seeding the whole tutorial here would duplicate every card (once from the
-    # starter, once from the chain) — the duplicates become ineligible the moment
-    # they're played and clog the deck.
-    starter_deck = ["evt_tut_01_awakening"]
+    # Snapshot the current default ending ids into the run. From here on the
+    # set lives in the savestate and is mutated only by quest choices; admin
+    # edits to default endings won't retroactively change in-flight runs.
+    default_ending_ids = await endings.list_default_ids()
 
     state = GameState.new_run(
-        run_id=run_id,
+        run_id=GameState.generate_id(),
         user_id=payload.user_id,
-        rng_seed=rng_seed,
-        starting_deck=starter_deck,
+        rng_seed=random.randint(0, 2**31 - 1),
+        starting_deck=list(_STARTER_DECK),
+        starting_endings=default_ending_ids,
     )
-    
 
-    # Peek at the first card BEFORE saving — if there's nothing playable
-    # (no tutorial cards seeded), record the run as already-lost in a single write.
+    # Peek at the first card before saving — if nothing is playable, end the
+    # run up-front so we write the final state in a single Mongo round-trip.
     first_card = await draw_eligible_card(state, events)
     if first_card is None:
-        state.status = "lost"
+        # Engine-level sentinel — not backed by an Ending doc. The run never
+        # really started, so there are no active endings to evaluate against.
+        state.status = "ended"
         state.ending = "softlock_no_cards"
 
-    await states.save(state)
+    try:
+        await states.insert(state)
+    except DuplicateKeyError:
+        # generate_id() collided with an existing run — astronomically rare,
+        # but treat as a real conflict rather than silently overwriting.
+        raise HTTPException(409, "Run id collision — retry")
 
     return TurnResponse(
         state=state,
@@ -90,6 +90,61 @@ async def get_run(
     return state
 
 
+@router.get("/{run_id}/history", response_model=list[HistoryDetailEntry])
+async def get_history(
+    run_id: str,
+    states: GameStateRepo = Depends(get_state_repo),
+    events: EventRepo = Depends(get_event_repo),
+):
+    """Return the run's play history with card + chosen-option data joined.
+
+    Oldest first. One Mongo round-trip for the events (batched via $in).
+    Entries whose event was deleted since play keep their turn/choice_index
+    but get a placeholder title and zeroed effects.
+    """
+    state = await states.get(run_id)
+    if state is None:
+        raise HTTPException(404, "Run not found")
+
+    if not state.history:
+        return []
+
+    # De-dupe ids before the find; a card can be played multiple times.
+    ids = list({h.event_id for h in state.history})
+    by_id = {e.id: e for e in await events.get_many(ids)}
+
+    result: list[HistoryDetailEntry] = []
+    for h in state.history:
+        event = by_id.get(h.event_id)
+        if event is None or h.choice >= len(event.choices):
+            # Card deleted, or choice index now out of range after an edit.
+            result.append(HistoryDetailEntry(
+                turn=h.turn,
+                event_id=h.event_id,
+                title="(gelöscht)",
+                choice_index=h.choice,
+                choice_text="(unbekannt)",
+                effects=Effects(),
+            ))
+            continue
+        choice = event.choices[h.choice]
+        result.append(HistoryDetailEntry(
+            turn=h.turn,
+            event_id=h.event_id,
+            title=event.title,
+            description=event.description,
+            category=event.category,
+            deck_name=event.deck_name,
+            choice_index=h.choice,
+            choice_text=choice.text,
+            effects=choice.effects,
+            sets_flags=list(choice.sets_flags),
+            clears_flags=list(choice.clears_flags),
+            triggered_ending=choice.triggers_ending,
+        ))
+    return result
+
+
 @router.post("/{run_id}/abandon", response_model=GameState)
 async def abandon_run(
     run_id: str,
@@ -103,7 +158,9 @@ async def abandon_run(
         raise HTTPException(409, f"Run is already {state.status}")
     state.status    = "abandoned"
     state.updated_at = datetime.now(timezone.utc)
-    await states.save(state)
+    if not await states.update(state):
+        # Deleted between load and write — race condition.
+        raise HTTPException(404, "Run not found")
     return state
 
 

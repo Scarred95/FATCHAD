@@ -8,57 +8,92 @@ content. The mutations themselves are pure.
 import random
 
 from app.db.repositories import EventRepo
+from app.game.constants import (
+    DECK_DRAW_BATCH,
+    DECK_REFILL_THRESHOLD,
+    DECK_TARGET_SIZE,
+    GENERIC_CATEGORIES,
+    TUTORIAL_ID_PREFIX,
+)
 from app.game.eligibility import is_eligible
 from app.schemas import DeckAddition, Event, GameState, ScheduledCard
-
-
-# ----- tunable constants  -----
-
-DECK_TARGET_SIZE = 12
-DECK_REFILL_THRESHOLD = 5
-
-# How many top-of-deck cards to fetch in one batch when looking for an eligible card.
-# Bigger value = fewer round-trips at the cost of fetching cards we may not use.
-DECK_DRAW_BATCH = 5
-
-# Categories considered "filler" — used to top up the deck when running low
-GENERIC_CATEGORIES = ["politik", "social", "economy", "chaos"]
-
-# Tutorial cards share this ID prefix (evt_tut_01_*..evt_tut_10_*). While any
-# tutorial card is still sitting in the deck, refill is held off so the
-# scripted intro plays out without generic cards bleeding in between beats.
-TUTORIAL_ID_PREFIX = "evt_tut_"
 
 
 # =============================================================================
 # Drawing
 # =============================================================================
 
-async def draw_eligible_card(state: GameState, events: EventRepo) -> Event | None:
-    """Find the top-of-deck card that's eligible given current state.
+async def _scan_top(
+    state: GameState,
+    events: EventRepo,
+) -> tuple[list[str], dict[str, Event], int | None]:
+    """Fetch the top DECK_DRAW_BATCH cards and find the first eligible one.
 
-    Fetches the top DECK_DRAW_BATCH cards from the deck in a single Mongo call
-    and walks them top-down. Skips ineligible / stale cards without removing
-    them — consumption happens in consume_top_card when a choice is committed.
+    Single source of truth for the top-of-deck scan — used by both
+    draw_eligible_card (peek) and consume_top_card (pop).
 
-    Returns None if none of the top batch are eligible. Refill should keep the
-    deck large enough that the eligible card is almost always inside this window.
+    Returns:
+      - top_ids: the card IDs that were inspected (may be empty if deck is empty)
+      - by_id:   id → Event lookup for those IDs (stale IDs are absent)
+      - drawn_index: index into top_ids of the first eligible card, or None
+                     if the deck is empty / nothing in the batch is eligible
     """
     if not state.deck:
-        return None
+        return [], {}, None
 
     top_ids = state.deck[:DECK_DRAW_BATCH]
     cards = await events.get_many(top_ids)
     by_id = _by_id(cards)
 
-    for card_id in top_ids:
+    for i, card_id in enumerate(top_ids):
         card = by_id.get(card_id)
         if card is None:
             continue  # stale ID (card deleted from content) — skip
         if is_eligible(card, state):
-            return card
+            return top_ids, by_id, i
 
-    return None
+    return top_ids, by_id, None
+
+
+async def draw_eligible_card(state: GameState, events: EventRepo) -> Event | None:
+    """Find the top-of-deck card that's eligible given current state.
+
+    Peeks the top DECK_DRAW_BATCH cards in one Mongo call without mutating
+    the deck — consumption happens in consume_top_card when a choice is
+    committed.
+
+    Returns None if the deck is empty or none of the top batch are eligible.
+    Refill should keep the deck large enough that the eligible card is
+    almost always inside this window.
+    """
+    top_ids, by_id, drawn_index = await _scan_top(state, events)
+    if drawn_index is None:
+        return None
+    return by_id[top_ids[drawn_index]]
+
+
+async def draw_with_refill_retry(
+    state: GameState,
+    events: EventRepo,
+) -> tuple[GameState, Event | None]:
+    """Draw, force-refill once if nothing eligible, retry the draw.
+
+    Use this when the caller can't be sure the deck is healthy — primarily
+    POST /choice, where a rare combination of stat/flag mutations might
+    leave the top batch all ineligible despite apply_choice's standard refill.
+
+    In-memory only: no DB writes. The caller decides when to save the
+    (possibly refilled) state.
+
+    Returns (state, card) — state may be a new instance if refill ran.
+    """
+    card = await draw_eligible_card(state, events)
+    if card is not None:
+        return state, card
+
+    new_state = await refill_deck_if_needed(state, events, force=True)
+    card = await draw_eligible_card(new_state, events)
+    return new_state, card
 
 
 async def consume_top_card(state: GameState, events: EventRepo) -> tuple[GameState, Event | None]:
@@ -73,24 +108,10 @@ async def consume_top_card(state: GameState, events: EventRepo) -> tuple[GameSta
     the deck UNCHANGED so it can recover later if state changes.
     """
     new_state = _clone(state)
-    if not new_state.deck:
-        return new_state, None
-
-    top_ids = new_state.deck[:DECK_DRAW_BATCH]
-    cards = await events.get_many(top_ids)
-    by_id = {c.id: c for c in cards}
-
-    drawn_index: int | None = None
-    for i, card_id in enumerate(top_ids):
-        card = by_id.get(card_id)
-        if card is None:
-            continue
-        if is_eligible(card, new_state):
-            drawn_index = i
-            break
+    top_ids, by_id, drawn_index = await _scan_top(new_state, events)
 
     if drawn_index is None:
-        # Nothing eligible in the top batch — leave the deck untouched.
+        # Empty deck or nothing eligible in the top batch — leave the deck untouched.
         return new_state, None
 
     drawn_card = by_id[top_ids[drawn_index]]
@@ -170,7 +191,7 @@ def apply_deck_additions(
 # Scheduling — promote due scheduled cards into the deck
 # =============================================================================
 
-def promote_due_scheduled(state: GameState, rng: random.Random) -> GameState:
+def promote_due_scheduled(state: GameState) -> GameState:
     """Move scheduled cards whose play_on_turn has arrived into the deck.
 
     Called once per turn after stats/flags are updated.
@@ -192,6 +213,29 @@ def promote_due_scheduled(state: GameState, rng: random.Random) -> GameState:
 # Refill — keep the deck from drying up
 # =============================================================================
 
+def cleanup_zombie_tutorial_cards(state: GameState) -> GameState:
+    """Strip leftover tutorial cards once the tutorial is complete.
+
+    `evt_tut_10_finale` sets `tutorial_done` and clears the intermediate
+    tutorial flags. Any tut_* cards still sitting in the deck or scheduled
+    list are permanently ineligible after that — drop them so they can't
+    clog the top of the deck or get promoted into it later.
+
+    No-op while the tutorial is still running.
+    """
+    if "tutorial_done" not in state.flags:
+        return state
+
+    new_state = _clone(state)
+    new_state.deck = [
+        cid for cid in new_state.deck if not cid.startswith(TUTORIAL_ID_PREFIX)
+    ]
+    new_state.scheduled = [
+        s for s in new_state.scheduled if not s.card_id.startswith(TUTORIAL_ID_PREFIX)
+    ]
+    return new_state
+
+
 async def refill_deck_if_needed(
     state: GameState,
     events: EventRepo,
@@ -205,23 +249,18 @@ async def refill_deck_if_needed(
     `force=True` bypasses the threshold check (but not the tutorial gate),
     used by the read-side routes to recover from a "deck has cards but none
     eligible right now" state.
+
+    Assumes the caller has already run `cleanup_zombie_tutorial_cards`
+    (the orchestrator in effects.py does so).
     """
-    rng = random.Random(state.rng_seed + state.turn)  # per-turn seeded RNG
     if _tutorial_still_queued(state):
         return state
 
+    if not force and len(state.deck) >= DECK_REFILL_THRESHOLD:
+        return state
+
     new_state = _clone(state)
-
-    # Tutorial-done cleanup: tut_10_finale clears the intermediate tutorial
-    # flags, leaving any leftover tut_* cards in the deck permanently
-    # ineligible. Strip them so they can't clog the top of the deck.
-    if "tutorial_done" in new_state.flags:
-        new_state.deck = [cid for cid in new_state.deck if not cid.startswith(TUTORIAL_ID_PREFIX)]
-        new_state.scheduled = [s for s in new_state.scheduled if not s.card_id.startswith(TUTORIAL_ID_PREFIX)]
-
-    if not force and len(new_state.deck) >= DECK_REFILL_THRESHOLD:
-        return new_state
-
+    rng = random.Random(state.rng_seed + state.turn)  # per-turn seeded RNG
     needed = DECK_TARGET_SIZE - len(new_state.deck)
 
     candidates = await _gather_candidate_pool(new_state, events)

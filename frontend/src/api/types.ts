@@ -8,7 +8,7 @@ export type MainStatName = 'moneten' | 'aura' | 'respekt' | 'rizz';
 
 export type StatHint = 'up' | 'down' | 'unknown' | 'hidden';
 
-export type GameStatus = 'active' | 'won' | 'lost' | 'abandoned';
+export type GameStatus = 'active' | 'ended' | 'abandoned';
 
 export interface Stats {
   moneten: number;
@@ -52,12 +52,14 @@ export interface GameState {
   scheduled: ScheduledCard[];
   stats: Stats;
   flags: string[];
-  flag_timers: Record<string, number>;
   history: HistoryEntry[];
   turn: number;
   rng_seed: number;
   status: GameStatus;
   ending: string | null;
+  /** Ending ids currently eligible to fire — snapshotted at run creation,
+   *  mutated by choices that unlock/remove endings. */
+  active_endings: string[];
   created_at: string;
   updated_at: string;
 }
@@ -79,10 +81,32 @@ export interface RunSummary {
 
 export interface EndSummary {
   ending: string | null;
+  /** Title from the Ending doc, denormalised at summary time. Null when
+   *  the run ended without an ending (e.g. abandoned) or the id is stale. */
+  ending_title: string | null;
+  ending_description: string | null;
   status: GameStatus;
   turns_survived: number;
   final_stats: Stats;
   cards_played: number;
+}
+
+/** Server-joined history row — `GameState.history` enriched with card data.
+ *  Returned oldest-first by GET /runs/{id}/history. Cards deleted after
+ *  being played get a placeholder title and zeroed effects. */
+export interface HistoryDetailEntry {
+  turn: number;
+  event_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  deck_name: string | null;
+  choice_index: number;
+  choice_text: string;
+  effects: Stats;
+  sets_flags: string[];
+  clears_flags: string[];
+  triggered_ending: string | null;
 }
 
 export interface HealthResponse {

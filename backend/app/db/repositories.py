@@ -1,21 +1,41 @@
 # app/db/repositories.py
 import logging
+from typing import Type, TypeVar
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, ValidationError
 
-from app.schemas import Event, GameState
+from app.schemas import Ending, Event, GameState
 
 logger = logging.getLogger(__name__)
 
+M = TypeVar("M", bound=BaseModel)
+
+
+def _parse_or_skip(model_cls: Type[M], doc: dict, collection: str) -> M | None:
+    """Validate a Mongo doc against a Pydantic model.
+
+    On failure, log the doc's _id and return None so callers can skip the bad
+    record instead of poisoning the whole batch. A schema regression should
+    surface a few warnings, not a 500 on every read.
+    """
+    try:
+        return model_cls(**doc)
+    except ValidationError as exc:
+        logger.warning(
+            "Skipping malformed %s doc '%s': %s",
+            collection, doc.get("_id"), exc,
+        )
+        return None
+
 
 async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
-    """Create the indexes the app relies on. Idempotent — safe to call on every startup.
-
-    Without these, the category-filtered card queries and per-user run lookups
-    fall back to full collection scans.
-    """
+    """Create the indexes the app relies on. Idempotent — safe at every startup."""
     await db["events"].create_index("category")
     await db["game_states"].create_index("user_id")
+    # `default` is queried at run creation to seed active_endings.
+    # `enabled` is filtered in every read, so a compound index helps both paths.
+    await db["endings"].create_index([("default", 1), ("enabled", 1)])
 
 
 class EventRepo:
@@ -31,30 +51,27 @@ class EventRepo:
     # --- single-document reads ---
 
     async def get_by_id(self, event_id: str) -> Event | None:
+        """Return the event, or None if missing OR malformed (logged)."""
         doc = await self.coll.find_one({"_id": event_id})
         if doc is None:
             return None
-        try:
-            return Event(**doc)
-        except Exception as exc:
-            logger.error("Failed to deserialize Event '%s': %s", event_id, exc)
-            raise
+        return _parse_or_skip(Event, doc, "events")
 
     # --- batch reads ---
 
     async def get_many(self, ids: list[str]) -> list[Event]:
-        """Fetch multiple cards by id in one query. Order of results is not guaranteed."""
+        """Fetch multiple cards by id in one query. Bad docs skipped."""
         if not ids:
             return []
         cursor = self.coll.find({"_id": {"$in": ids}})
-        return [Event(**doc) async for doc in cursor]
+        return [e async for doc in cursor if (e := _parse_or_skip(Event, doc, "events"))]
 
     async def get_by_categories(self, categories: list[str]) -> list[Event]:
-        """Fetch every card whose category is in the given list — single $in query."""
+        """Fetch every card whose category is in the given list. Bad docs skipped."""
         if not categories:
             return []
         cursor = self.coll.find({"category": {"$in": categories}})
-        return [Event(**doc) async for doc in cursor]
+        return [e async for doc in cursor if (e := _parse_or_skip(Event, doc, "events"))]
 
     async def list_ids_by_category(self, category: str) -> list[str]:
         """Lightweight projection — id-only, used to seed starter decks."""
@@ -64,10 +81,11 @@ class EventRepo:
     async def list_paginated(
         self, category: str | None = None, limit: int = 100, skip: int = 0
     ) -> list[Event]:
-        """Admin listing — full documents, optional category filter, paginated."""
+        """Admin listing — full documents, optional category filter, paginated.
+        Bad docs skipped (logged) so one broken card can't break the admin list."""
         query = {"category": category} if category else {}
         cursor = self.coll.find(query).skip(skip).limit(limit)
-        return [Event(**doc) async for doc in cursor]
+        return [e async for doc in cursor if (e := _parse_or_skip(Event, doc, "events"))]
 
     # --- writes (admin) ---
 
@@ -115,31 +133,43 @@ class GameStateRepo:
         self.coll = db["game_states"]
 
     async def get(self, run_id: str) -> GameState | None:
+        """Return the run, or None if missing OR malformed (logged)."""
         doc = await self.coll.find_one({"_id": run_id})
         if doc is None:
             return None
-        try:
-            return GameState(**doc)
-        except Exception as exc:
-            logger.error("Failed to deserialize GameState '%s': %s", run_id, exc)
-            raise
+        return _parse_or_skip(GameState, doc, "game_states")
 
-    async def save(self, state: GameState) -> None:
-        """Upsert the full document. Replaces existing or inserts new."""
-        data = state.model_dump(by_alias=True)
-        await self.coll.replace_one(
+    async def insert(self, state: GameState) -> None:
+        """Insert a brand-new run document.
+
+        Raises pymongo.errors.DuplicateKeyError if a run with this _id already
+        exists — that's a real conflict (id collision or accidental re-insert),
+        not something to paper over with an upsert.
+        """
+        await self.coll.insert_one(state.model_dump(by_alias=True))
+
+    async def update(self, state: GameState) -> bool:
+        """Replace an existing run document. Returns True if a doc was matched.
+
+        Returns False if the run vanished between load and write (deleted by
+        another request) — caller decides how to surface that (typically 404).
+        Does NOT upsert: a missing _id stays missing, no zombie row gets created.
+        """
+        result = await self.coll.replace_one(
             {"_id": state.id},
-            data,
-            upsert=True,
+            state.model_dump(by_alias=True),
+            upsert=False,
         )
+        return result.matched_count == 1
 
     async def delete(self, run_id: str) -> bool:
         result = await self.coll.delete_one({"_id": run_id})
         return result.deleted_count > 0
 
     async def list_for_user(self, user_id: str) -> list[GameState]:
+        """Bad docs skipped (logged)."""
         cursor = self.coll.find({"user_id": user_id})
-        return [GameState(**doc) async for doc in cursor]
+        return [s async for doc in cursor if (s := _parse_or_skip(GameState, doc, "game_states"))]
 
     async def list_summaries_for_user(self, user_id: str) -> list[dict]:
         """Projected query — fetches only the fields needed for RunSummary list views.
@@ -150,3 +180,74 @@ class GameStateRepo:
         }
         cursor = self.coll.find({"user_id": user_id}, projection)
         return [doc async for doc in cursor]
+
+
+class EndingRepo:
+    """Read/write access to the endings collection.
+
+    Reads at runtime: each new run seeds its active_endings from default
+    endings; each turn loads the full bodies for the active set to evaluate.
+    Writes happen via admin endpoints and the seed script.
+    """
+
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.coll = db["endings"]
+
+    # --- single-document reads ---
+
+    async def get_by_id(self, ending_id: str) -> Ending | None:
+        """Return the ending, or None if missing OR malformed (logged)."""
+        doc = await self.coll.find_one({"_id": ending_id})
+        if doc is None:
+            return None
+        return _parse_or_skip(Ending, doc, "endings")
+
+    # --- batch reads ---
+
+    async def get_many(self, ids: list[str]) -> list[Ending]:
+        """Fetch the full ending docs for a list of ids. Bad docs skipped.
+
+        Used every turn to materialise state.active_endings into Ending objects
+        for the evaluator. Disabled endings ARE returned here — the engine
+        filters on `enabled` so admin toggles take effect mid-run.
+        """
+        if not ids:
+            return []
+        cursor = self.coll.find({"_id": {"$in": ids}})
+        return [e async for doc in cursor if (e := _parse_or_skip(Ending, doc, "endings"))]
+
+    async def list_default_ids(self) -> list[str]:
+        """Return ids of endings flagged `default: true` AND `enabled: true`.
+
+        Used by run creation to seed state.active_endings. Disabled defaults
+        are excluded — admins can soft-disable a default without seeing it
+        leak into new runs.
+        """
+        cursor = self.coll.find(
+            {"default": True, "enabled": True},
+            {"_id": 1},
+        )
+        return [doc["_id"] async for doc in cursor]
+
+    async def list_paginated(
+        self, limit: int = 100, skip: int = 0
+    ) -> list[Ending]:
+        """Admin listing — full documents, paginated. Bad docs skipped (logged)."""
+        cursor = self.coll.find({}).skip(skip).limit(limit)
+        return [e async for doc in cursor if (e := _parse_or_skip(Ending, doc, "endings"))]
+
+    # --- writes (admin) ---
+
+    async def insert(self, ending: Ending) -> None:
+        await self.coll.insert_one(ending.model_dump(by_alias=True))
+
+    async def upsert(self, ending: Ending) -> None:
+        await self.coll.replace_one(
+            {"_id": ending.id},
+            ending.model_dump(by_alias=True),
+            upsert=True,
+        )
+
+    async def delete(self, ending_id: str) -> bool:
+        result = await self.coll.delete_one({"_id": ending_id})
+        return result.deleted_count > 0
