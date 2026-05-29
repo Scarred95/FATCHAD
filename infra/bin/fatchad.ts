@@ -2,6 +2,9 @@
 import * as cdk from 'aws-cdk-lib';
 import { FatchadBootstrapStack } from '../lib/bootstrap-stack';
 import { FatchadFrontendStack } from '../lib/frontend-stack';
+import { FatchadDataStack } from '../lib/ddb-stack';
+
+
 
 const app = new cdk.App();
 
@@ -23,4 +26,9 @@ new FatchadBootstrapStack(app, 'FatchadBootstrapStack', {
 new FatchadFrontendStack(app, 'FatchadFrontendStack', {
   env,
   description: 'FATCHAD frontend: S3 website bucket for the React SPA.',
+});
+
+new FatchadDataStack(app, 'FatchadDataStack', {
+  env,
+  description: 'FATCHAD data: DynamoDB tables for catalog + user data.',
 });

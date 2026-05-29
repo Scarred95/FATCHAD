@@ -1,0 +1,90 @@
+name: Deploy data
+
+# Triggers:
+#   - Pushing a tag matching `database-v*` (e.g. database-v0.1.0).
+#   - Manual run via the Actions UI ("Run workflow").
+#
+# Branch pushes do NOT trigger this. Use a tag.
+#
+# Why tags instead of branch pushes?
+#   The DDB schema is shared mutable state. We want every deploy to correspond
+#   to a named, reviewable version (database-v0.1.0, database-v0.2.0, ...) so
+#   we can answer "what schema is live?" by reading `git tag`. Same pattern as
+#   deploy-frontend.yml.
+on:
+  push:
+    tags:
+      - 'database-v*'
+  workflow_dispatch:
+    inputs:
+      version_label:
+        description: 'Version string for the deploy session name (defaults to git short sha)'
+        required: false
+        default: ''
+
+# OIDC requires id-token: write. contents: read is the default minimum.
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-data
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: cdk deploy FatchadDataStack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: infra/package-lock.json
+
+      - name: Resolve version label
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            # Strip the `database-` prefix: "database-v0.1.0" -> "v0.1.0"
+            echo "label=${GITHUB_REF_NAME#database-}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.version_label }}" ]]; then
+            echo "label=${{ inputs.version_label }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+          role-session-name: GitHubActions-FatchadDataDeploy-${{ steps.ver.outputs.label }}
+
+      - name: CDK synth
+        run: npx cdk synth FatchadDataStack
+
+      - name: CDK diff
+        run: npx cdk diff FatchadDataStack || true
+
+      - name: CDK deploy
+        run: npx cdk deploy FatchadDataStack --require-approval never --outputs-file cdk-outputs.json
+
+      - name: Show stack outputs
+        run: cat cdk-outputs.json
+
+      - name: Summary
+        run: |
+          echo "### Deployed data ${{ steps.ver.outputs.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Stack: \`FatchadDataStack\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Tables: \`fatchad_catalog\`, \`fatchad_user_data\`" >> $GITHUB_STEP_SUMMARY

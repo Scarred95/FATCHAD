@@ -57,6 +57,7 @@ After this, all further deploys ride on GitHub Actions.
 |---|---|---|
 | `FatchadBootstrapStack` | OIDC provider, `FatchadGitHubDeployRole`, `FatchadFrontendUploadRole` | Manual from a laptop. Re-deploy only when IAM trust changes. |
 | `FatchadFrontendStack` | `fatchad-frontend` S3 bucket (versioned, public website hosting) | First time manual. After that, `deploy-infra.yml` redeploys it whenever `infra/**` changes. |
+| `FatchadDataStack` | `fatchad_catalog` + `fatchad_user_data` DynamoDB tables (pay-per-request, streams enabled) | Tag-driven via `deploy-data.yml`. Push a `database-v*` tag (e.g. `database-v0.1.0`) or run the workflow manually. Backend wiring lands in a later step. |
 
 ### `FatchadFrontendStack`
 
@@ -65,6 +66,19 @@ After this, all further deploys ride on GitHub Actions.
 | `fatchad-frontend` S3 bucket | Hosts the React SPA build. Public read for v1; private + CloudFront OAC in step 2. |
 | Object versioning + 90d retention | Every PUT keeps the prior version. Lets us roll back without rebuilding. |
 | Removal policy: RETAIN | `cdk destroy` keeps the bucket. The bucket name is globally unique — losing it is permanent. |
+
+### `FatchadDataStack`
+
+Two DynamoDB tables, single-table design per table, no GSIs in v1.
+
+| Table | Holds | Streams to (later) |
+|---|---|---|
+| `fatchad_catalog` | Decks, Cards, Endings, Achievements, current-version pointer. Every entity has an `enabled` flag — disabled items stay in the editor but get stripped from the published bundle. | Optional cache-invalidation / audit Lambda. |
+| `fatchad_user_data` | Profiles, deck unlocks, achievements, runs (active/ended/abandoned), leaderboards. | Leaderboard aggregator Lambda. |
+
+See header comments in [`lib/ddb-stack.ts`](lib/ddb-stack.ts) for the full PK/SK conventions per entity.
+
+**Removal policy is currently `DESTROY` on both tables.** That's deliberate for the development phase — schema can change, data is fixture-only. Flip both to `RETAIN` before any real user account is created; the day we forget is the day we accidentally `cdk destroy` and lose history.
 
 The bucket itself is provisioned by CDK; the actual SPA files are uploaded
 by `deploy-frontend.yml` with `aws s3 sync`, not by `cdk deploy`. This split
@@ -103,6 +117,27 @@ aws s3api copy-object \
 
 For a full multi-file rollback, just redeploy the previous tag via
 `workflow_dispatch` with `version_label=v0.0.9`.
+
+## Releasing the database schema
+
+```bash
+# From the repo root, on whatever branch:
+git tag database-v0.1.0
+git push origin database-v0.1.0
+```
+
+`deploy-data.yml` fires, synths + diffs + deploys `FatchadDataStack`. The
+tag is the source of truth for "what schema version is live" — `git tag -l
+'database-v*' --sort=-v:refname | head` answers that question.
+
+Manual deploys via `workflow_dispatch` also work, useful for redeploying
+the current tag after a CDK-only change (e.g. tweaking outputs) without
+bumping the version.
+
+CDK is declarative, so re-running the same tag is a no-op. Adding a GSI,
+flipping `removalPolicy`, or enabling/changing a stream are real diffs and
+will be applied. Renaming a table is a destroy+create — CDK will warn,
+and in DESTROY mode it'll happily delete the old one. Read the diff.
 
 ## Local development
 

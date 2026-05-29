@@ -49,6 +49,9 @@ export class FatchadFrontendStack extends cdk.Stack {
       // if you really want it gone.
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+    // --- Tags so the bill is legible later -------------------------------
+    cdk.Tags.of(this).add('Project', 'FATCHAD');
+    cdk.Tags.of(this).add('Component', 'frontend');
 
     new cdk.CfnOutput(this, 'FrontendSiteUrl', {
       value: `http://${this.bucket.bucketWebsiteDomainName}`,
