@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: cdk deploy FatchadFrontendStack
+    name: cdk deploy frontend stack
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,6 +50,9 @@ jobs:
       # very role this workflow is using, and changing it from inside its own
       # session is asking for trouble. Deploy it manually with `cdk deploy
       # FatchadBootstrapStack` from a laptop when IAM trust changes.
+      #
+      # FatchadDataStack is also excluded — it ships via deploy-data.yml on
+      # `database-v*` tags so every schema change has a named version.
       - name: CDK synth
         run: npx cdk synth FatchadFrontendStack
 
