@@ -42,9 +42,7 @@
   /* Wide gutters: option text sits near the screen edge while the card
      stays a comfortable phone-sized column in the middle. */
   grid-template-columns:
-    minmax(0, 1fr)
-    clamp(200px, 28vw, 280px)
-    minmax(0, 1fr);
+    minmax(0, 1fr) clamp(200px, 28vw, 280px) minmax(0, 1fr);
   align-items: center;
   gap: clamp(var(--space-4), 6vw, 96px);
   padding: 0 var(--space-5);
@@ -92,8 +90,18 @@
   pointer-events: none;
   transform-origin: top center;
 }
-.peek1 { transform: translateY(8px) scale(0.97); z-index: 1; opacity: 0.55; }
-.peek2 { transform: translateY(16px) scale(0.94); z-index: 0; opacity: 0.3; }
+
+.peek1 {
+  transform: translateY(8px) scale(0.97);
+  z-index: 1;
+  opacity: 0.55;
+}
+
+.peek2 {
+  transform: translateY(16px) scale(0.94);
+  z-index: 0;
+  opacity: 0.3;
+}
 
 /* Fallback page used for the loading / error skeleton. */
 .page {
@@ -124,7 +132,9 @@
   border-radius: var(--radius-md);
 }
 
-.dim { color: var(--color-text-dim); }
+.dim {
+  color: var(--color-text-dim);
+}
 
 .emptyCard {
   position: absolute;
@@ -162,7 +172,10 @@
   border-radius: var(--radius-md);
 }
 
-.retryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.retryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .endingOverlay {
   position: absolute;

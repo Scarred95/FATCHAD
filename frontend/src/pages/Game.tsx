@@ -53,6 +53,20 @@ export default function Game() {
 
   useChaosAmbient(state?.stats.chaos);
 
+  const chaosValue = state?.stats.chaos || 0;
+
+  let backgroundStyle = {};
+
+  if (chaosValue >= 10) {
+    backgroundStyle = {
+      // Keine Variablen, keine Punkte – einfach die direkte Web-Adresse:
+      backgroundImage: "linear-gradient(rgba(10, 10, 15, 0.75), rgba(10, 10, 15, 0.85)), url('/images/this_is_fine.gif')",
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      transition: 'background 0.8s ease-in-out'
+    };
+  }
+
   const hasDown = !!currentCard && currentCard.choices.length >= 3;
   // Swipe is enabled on every card. 2-choice cards commit on horizontal
   // swipes (index 0 / 1); 3-choice cards additionally commit on a down
@@ -90,9 +104,33 @@ export default function Game() {
 
   return (
     <main className={styles.gamePage}>
+      {/* Das perfekt proportionale obere Dreieck */}
+      {chaosValue >= 50 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            // Wir begrenzen die Höhe genau auf den oberen Bereich (ca. 45% des Schirms)
+            height: '45%',
+            backgroundImage: "linear-gradient(rgba(10, 10, 15, 0.4), rgba(10, 10, 15, 0.5)), url('/images/this_is_fine.gif')",
+
+            // 'contain' sorgt dafür, dass das Bild IMMER als Ganzes sichtbar bleibt und sich nicht verzerrt!
+            backgroundSize: 'contain',
+            backgroundPosition: 'center bottom', // Setzt das Bild direkt auf die untere Spitze des Keils
+            backgroundRepeat: 'no-repeat',
+
+            // Ein sauberer, symmetrischer Clip-Path für die obere Hälfte
+            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+            zIndex: .1,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
       <ScreenGlow intent={swipeIntent} chaos={state.stats.chaos} hasDown={hasDown} />
 
-      <div className={styles.gameTop}>
+      <div className={styles.gameTop} style={{ position: 'relative', zIndex: 10 }}>
         <Header
           left={
             <IconButton label="Zurück" onClick={() => setConfirmExit(true)}>
