@@ -1,4 +1,4 @@
-# app/routes/gameplay.py
+# gameplay_lambda/routes/gameplay.py
 """Active game loop — the endpoints a client calls while playing.
 
 GET  /runs/{run_id}/card      → peek at the current card (used on resume)
@@ -14,8 +14,8 @@ from shared.db.user_repo import UserRepo
 from shared.game.deck import draw_eligible_card, draw_with_refill_retry
 from shared.game.effects import apply_choice
 
-from app.routes._deps import get_catalog, get_user_repo
-from app.routes._schemas import (
+from gameplay_lambda.routes._deps import get_catalog, get_user_repo
+from gameplay_lambda.routes._schemas import (
     CardResponse,
     ChoiceRequest,
     EndSummary,

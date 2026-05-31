@@ -1,4 +1,4 @@
-# app/routes/runs.py
+# gameplay_lambda/routes/runs.py
 """Run lifecycle — create, list, load, abandon, delete.
 
 These routes manage the run record itself. The active game loop
@@ -18,8 +18,8 @@ from shared.db.user_repo import RunConflict, UserRepo
 from shared.game.deck import draw_eligible_card
 from shared.schemas import Effects, GameState
 
-from app.routes._deps import get_catalog, get_user_repo
-from app.routes._schemas import (
+from gameplay_lambda.routes._deps import get_catalog, get_user_repo
+from gameplay_lambda.routes._schemas import (
     CardResponse,
     CreateRunRequest,
     HistoryDetailEntry,

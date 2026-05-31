@@ -1,9 +1,8 @@
-# app/routes/_schemas.py
-"""Shared API-layer request / response models.
+"""Shared API-layer request / response models for the gameplay surface.
 
-These are the shapes the HTTP layer speaks — distinct from the DB-layer
-schemas in app/schemas.py. Kept here so both runs.py and gameplay.py can
-import them without creating circular dependencies.
+Distinct from the DB-layer schemas in shared/schemas.py — these are the
+shapes the HTTP layer speaks. Kept in one module so runs.py and
+gameplay.py can import them without circular imports.
 """
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field

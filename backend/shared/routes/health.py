@@ -1,4 +1,9 @@
-# app/routes/health.py
+"""GET /healthz — liveness + DDB reachability.
+
+Mounted by both Lambda apps so API Gateway / load-balancer health checks
+can target either one independently and drop a broken instance out of
+rotation without taking the other surface down with it.
+"""
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
@@ -10,14 +15,10 @@ router = APIRouter(tags=["meta"])
 
 @router.get("/healthz")
 def healthz():
-    """Liveness + DDB reachability check.
-
-    Returns 200 when the catalog table is reachable AND has a published
-    pointer; 503 otherwise — so load balancers / API Gateway health checks
-    drop the instance out of rotation correctly.
+    """200 when the catalog table is reachable AND has a published pointer.
 
     The pointer read doubles as a "catalog is published" check: a freshly
-    deployed stack with no publish yet will report degraded, which is the
+    deployed stack with no publish yet reports degraded, which is the
     correct signal (gameplay can't function without one).
     """
     try:

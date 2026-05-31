@@ -1,19 +1,12 @@
-# app/routes/admin/endings.py
-"""Ending CRUD — create, read, update, replace, delete ending documents.
-
-Mounted under /admin/endings. Auth is enforced at the parent admin router.
-
-Mirrors the shape of cards.py — the two collections need symmetric admin
-surfaces so the frontend can reuse the same patterns (optimistic update,
-rollback, toast) for both.
-"""
+# admin_lambda/routes/endings.py
+"""Ending CRUD — mirrors cards.py shape so the admin UI can reuse patterns."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from shared.db.catalog_repo import CatalogConflict, CatalogRepo
 from shared.schemas import Ending, EndingRequirements
 
-from app.routes._deps import get_catalog_repo
+from admin_lambda.routes._deps import get_catalog_repo
 
 router = APIRouter()
 
@@ -91,7 +84,6 @@ def patch_ending(
     existing = catalog.get_ending(ending_id)
     if existing is None:
         raise HTTPException(404, "Ending not found")
-    # exclude_unset so fields the caller didn't send don't overwrite existing values
     updated = existing.model_copy(update=payload.model_dump(exclude_unset=True))
     catalog.put_ending(updated)
     return updated

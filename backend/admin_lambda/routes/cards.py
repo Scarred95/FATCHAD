@@ -1,4 +1,4 @@
-# app/routes/admin/cards.py
+# admin_lambda/routes/cards.py
 """Card CRUD — create, read, update, replace, delete card documents.
 
 Mounted under /admin/cards. Auth is enforced at the parent admin router.
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from shared.db.catalog_repo import CatalogConflict, CatalogRepo
 from shared.schemas import Choice, Event, Requirements
 
-from app.routes._deps import get_catalog_repo
+from admin_lambda.routes._deps import get_catalog_repo
 
 router = APIRouter()
 
@@ -96,7 +96,6 @@ def patch_card(
     existing = catalog.get_card(card_id)
     if existing is None:
         raise HTTPException(404, "Card not found")
-    # exclude_unset so fields the caller didn't send don't overwrite existing values
     updated = existing.model_copy(update=payload.model_dump(exclude_unset=True))
     catalog.put_card(updated)
     return updated
