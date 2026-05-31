@@ -8,6 +8,12 @@ import './styles/globals.css';
 
 import { router } from './routes';
 import { useAdminStore } from './stores/adminStore';
+import { bootAuth } from './auth/bootAuth';
+
+// Pick the auth backend (demo vs Cognito) BEFORE any component renders, so
+// App.tsx can read useAuthStore + call getAuthBackend() synchronously.
+// Selection is driven by VITE_USE_DEMO_AUTH (see .env.development / .env.production).
+bootAuth();
 
 // Fire-and-forget: if we have a stored admin token, ping the backend
 // to confirm it's still valid before any admin UI tries to mount.

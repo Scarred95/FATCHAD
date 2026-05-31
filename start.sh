@@ -62,8 +62,12 @@ echo "==> Starting backend (uvicorn) in ./backend"
 ( cd "$ROOT_DIR/backend" && "${BACKEND_CMD[@]}" ) &
 BACKEND_PID=$!
 
-# 4) Frontend (Vite)
-echo "==> Starting frontend (npm run dev) in ./frontend"
+# 4) Frontend (Vite) — dev mode: Vite auto-loads .env.development which
+# sets VITE_USE_DEMO_AUTH=true, so the demo auth backend is selected
+# (login with AurenAdmin / test123, no Cognito calls). Exporting the var
+# here too as a fallback in case .env.development is missing.
+export VITE_USE_DEMO_AUTH=true
+echo "==> Starting frontend (npm run dev, demo auth: AurenAdmin / test123) in ./frontend"
 ( cd "$ROOT_DIR/frontend" && npm run dev ) &
 FRONTEND_PID=$!
 
