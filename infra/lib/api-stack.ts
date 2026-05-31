@@ -85,33 +85,49 @@ export class FatchadApiStack extends cdk.Stack {
     );
 
     // ------------------------------------------------------------------
-    // Shared Lambda code asset
+    // Per-Lambda code assets
     //
-    // Both functions ship the same bundle (whole `backend/` minus dev-only
-    // and test-only paths). pip installs requirements into the asset root
-    // so they land alongside the source on /var/task.
+    // Each function ships only its own handler package + `shared/` + the
+    // installed Python deps. The opposite surface's code is excluded so
+    // gameplay cannot accidentally `import admin_lambda...` (or vice
+    // versa) — making the IAM boundary mirrored by an import boundary.
+    //
+    // Cost: two Docker bundling runs per `cdk synth`, each doing its own
+    // `pip install` against the same requirements.txt. Acceptable; both
+    // assets are cached by content hash so unchanged deploys skip the
+    // rebuild.
     //
     // Docker bundling: requires Docker on whatever runs `cdk synth/deploy`.
     // GitHub Actions runners have it; locally, devs need it (or skip CDK
     // synth and let the workflow handle deploys).
     // ------------------------------------------------------------------
     const backendDir = path.join(__dirname, '..', '..', 'backend');
-    const sharedCode = lambda.Code.fromAsset(backendDir, {
-      bundling: {
-        image: lambda.Runtime.PYTHON_3_12.bundlingImage,
-        command: [
-          'bash', '-c', [
-            // Install runtime deps (uvicorn is dev-only; not pruned because
-            // requirements.txt is shared with the dev entrypoint — bundle
-            // bloat is a few MB and not worth a second requirements file
-            // yet).
-            'pip install --no-cache-dir -r requirements.txt -t /asset-output',
-            // Copy source. Excludes keep the asset small and deterministic.
-            'cp -r admin_lambda gameplay_lambda shared /asset-output/',
-          ].join(' && '),
-        ],
-      },
-    });
+
+    const buildAsset = (packageDir: string): lambda.Code =>
+      lambda.Code.fromAsset(backendDir, {
+        // Hash only the inputs that actually shape the bundle. Without
+        // this, edits to gameplay routes would invalidate the admin
+        // asset (and vice versa) because the default hash covers the
+        // whole `backendDir`.
+        assetHashType: cdk.AssetHashType.OUTPUT,
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+          command: [
+            'bash', '-c', [
+              // Runtime deps. uvicorn is dev-only but stays in
+              // requirements.txt since dev_app uses it; the bundle bloat
+              // is a few MB, not worth a second requirements file yet.
+              'pip install --no-cache-dir -r requirements.txt -t /asset-output',
+              // Only this Lambda's package + the shared layer it imports.
+              // The other Lambda's package is deliberately excluded.
+              `cp -r ${packageDir} shared /asset-output/`,
+            ].join(' && '),
+          ],
+        },
+      });
+
+    const adminCode = buildAsset('admin_lambda');
+    const gameplayCode = buildAsset('gameplay_lambda');
 
     // ------------------------------------------------------------------
     // Admin Lambda
@@ -134,7 +150,7 @@ export class FatchadApiStack extends cdk.Stack {
       functionName: 'fatchad-admin',
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'admin_lambda.handler.handler',
-      code: sharedCode,
+      code: adminCode,
       memorySize: 512,
       timeout: cdk.Duration.seconds(15),
       logGroup: adminLogGroup,
@@ -160,7 +176,7 @@ export class FatchadApiStack extends cdk.Stack {
       functionName: 'fatchad-gameplay',
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'gameplay_lambda.handler.handler',
-      code: sharedCode,
+      code: gameplayCode,
       memorySize: 512,
       timeout: cdk.Duration.seconds(10),
       logGroup: gameplayLogGroup,
