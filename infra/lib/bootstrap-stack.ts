@@ -148,5 +148,68 @@ export class FatchadBootstrapStack extends cdk.Stack {
       value: frontendUploadRole.roleArn,
       description: 'Put this in deploy-frontend.yml as AWS_FRONTEND_UPLOAD_ROLE_ARN secret.',
     });
+
+    // ------------------------------------------------------------------
+    // FatchadLambdaDeployRole — scoped to `cdk deploy FatchadApiStack`.
+    //
+    // Trust: only `lambdaV*` tag pushes or workflow_dispatch from main /
+    // the active dev branch. Mirrors the scoping pattern used by the
+    // frontend upload role so the blast radius of a leaked token is bounded
+    // to "the workflow that's allowed to deploy Lambdas".
+    //
+    // Permissions: same shape as FatchadGitHubDeployRole — assume the
+    // cdk-bootstrap roles + read the bootstrap version SSM parameter. The
+    // bootstrap roles hold the real create/update permissions, this role
+    // just unlocks them.
+    // ------------------------------------------------------------------
+    const lambdaDeployRole = new iam.Role(this, 'FatchadLambdaDeployRole', {
+      roleName: 'FatchadLambdaDeployRole',
+      assumedBy: new iam.FederatedPrincipal(
+        provider.openIdConnectProviderArn,
+        {
+          StringEquals: {
+            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          },
+          StringLike: {
+            'token.actions.githubusercontent.com:sub': [
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/lambdaV*`,
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/main`,
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/aurendev-CICD_AWS_TEST`,
+            ],
+          },
+        },
+        'sts:AssumeRoleWithWebIdentity',
+      ),
+      description: 'Assumed by deploy-lambdas workflow to cdk deploy FatchadApiStack.',
+      maxSessionDuration: cdk.Duration.hours(1),
+    });
+
+    lambdaDeployRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'AssumeCdkBootstrapRoles',
+        actions: ['sts:AssumeRole'],
+        resources: [`arn:aws:iam::${this.account}:role/cdk-*`],
+        conditions: {
+          StringEquals: {
+            'aws:ResourceAccount': this.account,
+          },
+        },
+      }),
+    );
+
+    lambdaDeployRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'ReadCdkBootstrapVersion',
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/*`,
+        ],
+      }),
+    );
+
+    new cdk.CfnOutput(this, 'LambdaDeployRoleArn', {
+      value: lambdaDeployRole.roleArn,
+      description: 'Put this in deploy-lambdas.yml as AWS_LAMBDA_DEPLOY_ROLE_ARN secret.',
+    });
   }
 }

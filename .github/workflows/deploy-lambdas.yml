@@ -1,0 +1,123 @@
+name: Deploy lambdas
+
+# Triggers:
+#   - Pushing a tag matching `lambdaV*.*.*` (e.g. lambdaV0.1.0).
+#   - Manual run via the Actions UI ("Run workflow").
+#
+# Branch pushes do NOT trigger this. Use a tag.
+#
+# Why tags? Same reasoning as deploy-data / deploy-frontend: every backend
+# deploy corresponds to a named, reviewable version so `git tag` answers
+# "what code is live?".
+#
+# The bundling step uses Docker (runs `pip install` inside a python3.12
+# image to land Linux-compatible wheels), which ubuntu-latest runners
+# provide out of the box.
+on:
+  push:
+    tags:
+      - 'lambdaV*.*.*'
+  workflow_dispatch:
+    inputs:
+      version_label:
+        description: 'Version string for the deploy session name (defaults to git short sha)'
+        required: false
+        default: ''
+
+# OIDC requires id-token: write. contents: read is the default minimum.
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-lambdas
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: cdk deploy FatchadApiStack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: infra/package-lock.json
+
+      # Python isn't strictly needed (bundling runs inside Docker) but it's
+      # cheap and lets future steps run pytest / mypy without a second setup.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve version label
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            # Strip the `lambdaV` prefix: "lambdaV0.1.0" -> "0.1.0"
+            echo "label=${GITHUB_REF_NAME#lambdaV}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.version_label }}" ]]; then
+            echo "label=${{ inputs.version_label }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install CDK dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_LAMBDA_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+          role-session-name: GitHubActions-FatchadLambdaDeploy-${{ steps.ver.outputs.label }}
+
+      # adminToken + corsOrigins are passed as CDK context so they end up in
+      # the Lambda environment without being committed to the repo.
+      - name: CDK synth
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        run: |
+          npx cdk synth FatchadApiStack \
+            -c adminToken="$ADMIN_TOKEN" \
+            -c corsOrigins="$CORS_ORIGINS"
+
+      - name: CDK diff
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        run: |
+          npx cdk diff FatchadApiStack \
+            -c adminToken="$ADMIN_TOKEN" \
+            -c corsOrigins="$CORS_ORIGINS" || true
+
+      - name: CDK deploy
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        run: |
+          npx cdk deploy FatchadApiStack \
+            -c adminToken="$ADMIN_TOKEN" \
+            -c corsOrigins="$CORS_ORIGINS" \
+            --require-approval never \
+            --outputs-file cdk-outputs.json
+
+      - name: Show stack outputs
+        run: cat cdk-outputs.json
+
+      - name: Summary
+        run: |
+          echo "### Deployed lambdas ${{ steps.ver.outputs.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Stack: \`FatchadApiStack\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Functions: \`fatchad-admin\`, \`fatchad-gameplay\`" >> $GITHUB_STEP_SUMMARY
+          API_URL=$(jq -r '.FatchadApiStack.HttpApiUrl' cdk-outputs.json)
+          echo "- HTTP API: \`$API_URL\`" >> $GITHUB_STEP_SUMMARY
