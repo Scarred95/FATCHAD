@@ -1,4 +1,4 @@
-# app/schemas.py
+# shared/schemas.py
 from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import uuid4
@@ -27,7 +27,7 @@ StatHint = Literal["up", "down", "unknown", "hidden"]
 
 class ChoiceHints(BaseModel):
     """Frontend display hints for what a choice will do.
-    
+
     These are AUTHORED separately from effects — they don't have to mirror
     the actual effects. A card writer can hide consequences for drama,
     or show fake hints for a card that "lies" to the player.
@@ -60,7 +60,7 @@ class Stats(BaseModel):
     chaos: int
 
 # =============================================================================
-# Event schema (events collection)
+# Event schema (catalog: PK=EVENT)
 # =============================================================================
 
 class Requirements(BaseModel):
@@ -95,7 +95,7 @@ class Choice(BaseModel):
     removes_endings: list[str] = Field(default_factory=list)
 
 class Event(BaseModel):
-    """An immutable event/card definition stored in the events collection."""
+    """An immutable event/card definition stored in the catalog."""
     id: str = Field(alias="_id")
     title: str
     description: str
@@ -114,8 +114,7 @@ class Event(BaseModel):
     # Soft-toggle published state. Disabled cards are skipped by the
     # gameplay deck loop (never refilled, dropped if surfaced) but stay in
     # the database so they remain editable / re-enabled via the admin UI.
-    # Defaults True so pre-existing documents (no `enabled` field in
-    # Mongo) read as enabled.
+    # Defaults True so pre-existing documents (no `enabled` field) read as enabled.
     enabled: bool = True
     requires: Requirements = Field(default_factory=Requirements)
     choices: list[Choice] = Field(min_length=2, max_length=3)
@@ -123,7 +122,7 @@ class Event(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 # =============================================================================
-# Ending state schema 
+# Ending state schema
 # =============================================================================
 
 class EndingRequirements(BaseModel):
@@ -135,7 +134,7 @@ class EndingRequirements(BaseModel):
 
 
 class Ending(BaseModel):
-    """Immutable ending definition stored in the endings collection."""
+    """Immutable ending definition stored in the catalog."""
     id: str = Field(alias="_id")
     title: str
     description: str
@@ -156,7 +155,7 @@ class Ending(BaseModel):
 
 
 # =============================================================================
-# Game state schema (game_states collection)
+# Game state schema (user_data: SK=RUN#<status>#<run_id>)
 # =============================================================================
 
 class ScheduledCard(BaseModel):
@@ -172,7 +171,7 @@ class HistoryEntry(BaseModel):
 GameStatus = Literal["active", "ended", "abandoned"]
 
 class GameState(BaseModel):
-    """Per-run save data stored in the game_states collection."""
+    """Per-run save data."""
     id: str = Field(alias="_id")
     user_id: str
     deck: list[str] = Field(default_factory=list)
@@ -221,7 +220,7 @@ class GameState(BaseModel):
 
 
 # =============================================================================
-# Catalog: Deck schema (fatchad_catalog, SK = DECK#<name>)
+# Catalog: Deck schema (fatchad_catalog, PK=DECK, SK=<name>)
 # =============================================================================
 
 class DeckUnlockRule(BaseModel):
@@ -239,9 +238,9 @@ class DeckUnlockRule(BaseModel):
 class Deck(BaseModel):
     """A pack of cards/endings the admin can toggle as a unit.
 
-    The DDB SK is `DECK#<name>`, so `name` is the natural key. Cards and
-    endings reference their parent deck by name via `Event.deck_name` /
-    `Ending` (linked through requirements, not a direct field).
+    The DDB SK is `<name>` (within PK=DECK), so `name` is the natural key.
+    Cards and endings reference their parent deck by name via `Event.deck_name`
+    / `Ending` (linked through requirements, not a direct field).
 
     Effective enabled-ness at publish time:
         item.enabled AND parent_deck.enabled
@@ -256,7 +255,7 @@ class Deck(BaseModel):
 
 
 # =============================================================================
-# Catalog: Achievement schema (fatchad_catalog, SK = ACH#<id>)
+# Catalog: Achievement schema (fatchad_catalog, PK=ACH, SK=<id>)
 # =============================================================================
 
 class AchievementCriteria(BaseModel):
@@ -290,7 +289,7 @@ class Achievement(BaseModel):
 
 
 # =============================================================================
-# Catalog: pointer to the currently published bundle (SK = "current")
+# Catalog: pointer to the currently published bundle (PK=META, SK=current)
 # =============================================================================
 
 class CatalogPointer(BaseModel):
@@ -300,7 +299,7 @@ class CatalogPointer(BaseModel):
       1. Lambda reads the whole catalog table (decks/events/endings/achs).
       2. Strips disabled items + admin-only fields, writes two JSON blobs to
          the catalog S3 bucket: catalog_public.json and catalog_full.json.
-      3. Writes this pointer item (PK=CATALOG, SK=current) so backend/frontend
+      3. Writes this pointer item (PK=META, SK=current) so backend/frontend
          know which version to fetch and cache.
 
     `version` is the `database-v*` tag at publish time, or a content hash if

@@ -1,4 +1,4 @@
-# app/game/effects.py
+# shared/game/effects.py
 """Turn orchestrator — applies a player's choice to the game state.
 
 This is the single mutation entry point. It sequences the sub-steps and
@@ -7,34 +7,34 @@ delegates to specialised modules:
   - endings.py   → win/loss condition evaluation
   - hints.py     → frontend hint derivation (imported by routes, not called here)
 
-Pure-ish: takes a state, returns a new state. The only async steps are the
-deck operations that need EventRepo to fetch card content from the DB.
+Sync — see deck.py for the rationale.
 """
+from __future__ import annotations
+
 import random
 from datetime import datetime, timezone
 
-from app.db.repositories import EndingRepo, EventRepo
-from app.game.deck import (
+from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.game.deck import (
     apply_deck_additions,
     cleanup_zombie_tutorial_cards,
     consume_top_card,
     promote_due_scheduled,
     refill_deck_if_needed,
 )
-from app.game.endings import check_endings
-from app.schemas import Choice, Effects, Event, GameState, HistoryEntry, Stats
+from shared.game.endings import check_endings
+from shared.schemas import Choice, Effects, Event, GameState, HistoryEntry, Stats
 
 
 # =============================================================================
 # Main entry point
 # =============================================================================
 
-async def apply_choice(
+def apply_choice(
     state: GameState,
     card: Event,
     choice_index: int,
-    events: EventRepo,
-    endings_repo: EndingRepo,
+    catalog: CatalogSnapshot,
 ) -> GameState:
     """Apply a choice and return the fully updated state.
 
@@ -68,7 +68,7 @@ async def apply_choice(
     # 1. Remove the played card from the deck. consume_top_card deep-copies state,
     #    drops any stale/ineligible cards that were sitting above it, and returns
     #    the new deck state. The card itself is discarded (we already have it).
-    new_state, _ = await consume_top_card(state, events)
+    new_state, _ = consume_top_card(state, catalog)
 
     # 2. Stats — returns a new Stats object
     new_state.stats = _apply_effects(new_state.stats, choice.effects)
@@ -92,12 +92,12 @@ async def apply_choice(
     #    candidate slots on cards that are about to be stripped.
     new_state = cleanup_zombie_tutorial_cards(new_state)
 
-    # 8. Refill deck if running low (async — needs DB access)
-    new_state = await refill_deck_if_needed(new_state, events)
+    # 8. Refill deck if running low
+    new_state = refill_deck_if_needed(new_state, catalog)
 
     # 9. Evaluate ending conditions; also applies this choice's
     #    unlocks_endings/removes_endings to active_endings (see endings.py).
-    new_state = await check_endings(new_state, choice, endings_repo)
+    new_state = check_endings(new_state, choice, catalog)
 
     new_state.updated_at = datetime.now(timezone.utc)
     return new_state

@@ -1,4 +1,4 @@
-# app/game/hints.py
+# shared/game/hints.py
 """Frontend hint derivation.
 
 Generates ChoiceHints from a choice's actual effects when the card author
@@ -6,7 +6,7 @@ didn't write explicit hints. This is a presentation concern — it lives
 here rather than in the routes layer so it stays testable in isolation,
 but it has no role in the game engine itself.
 """
-from app.schemas import Choice, ChoiceHints, StatHint
+from shared.schemas import Choice, ChoiceHints, StatHint
 
 
 def derive_hints_from_effects(choice: Choice) -> ChoiceHints:

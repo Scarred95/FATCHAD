@@ -1,4 +1,4 @@
-# app/game/constants.py
+# shared/game/constants.py
 """Tunable constants for the game engine.
 
 Centralised so deck sizes and card pools live in one place rather than being

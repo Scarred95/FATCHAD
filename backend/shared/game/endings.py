@@ -1,17 +1,18 @@
-# app/game/endings.py
-"""Ending evaluation — data-driven, async.
+# shared/game/endings.py
+"""Ending evaluation — data-driven, sync.
 
 Called once per turn after stats, flags, and deck are fully updated.
-Checks for Active, not Disabled, endings whose requirements are satisfied by the new state, 
-and applies the highest-priority match if any. 
+Checks for Active, not Disabled, endings whose requirements are satisfied by the new state,
+and applies the highest-priority match if any.
 Also applies card-triggered endings if the card has one
 
 The "active set" lives on the savestate and is mutated by quest choices —
 new runs snapshot defaults at creation, then the run's rules evolve.
 """
+from __future__ import annotations
 
-from app.db.repositories import EndingRepo
-from app.schemas import Choice, Ending, EndingRequirements, GameState
+from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.schemas import Choice, Ending, EndingRequirements, GameState
 
 
 
@@ -19,10 +20,10 @@ from app.schemas import Choice, Ending, EndingRequirements, GameState
 # Public entry point
 # =============================================================================
 
-async def check_endings(
+def check_endings(
     state: GameState,
     choice: Choice,
-    endings_repo: EndingRepo,
+    catalog: CatalogSnapshot,
 ) -> GameState:
     """Evaluate active endings and apply this choice's ending mutations.
 
@@ -30,7 +31,7 @@ async def check_endings(
     Always returns the (possibly mutated) state — never raises.
     """
     # 1-2. Load + filter to enabled-only.
-    active = await endings_repo.get_many(state.active_endings)
+    active = catalog.get_endings(state.active_endings)
     active = [e for e in active if e.enabled]
     by_id = {e.id: e for e in active}
 

@@ -3,21 +3,29 @@
 
 These routes manage the run record itself. The active game loop
 (card display, choice submission, summary) lives in gameplay.py.
+
+`user_id` is currently passed explicitly (query param on lookups, body
+field on creates). When auth lands, derive it from the bearer token and
+strip those parameters in one pass.
 """
 import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pymongo.errors import DuplicateKeyError
 
-from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
-from app.schemas import GameState
-from app.game.deck import draw_eligible_card
-from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
+from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.user_repo import RunConflict, UserRepo
+from shared.game.deck import draw_eligible_card
+from shared.schemas import Effects, GameState
+
+from app.routes._deps import get_catalog, get_user_repo
 from app.routes._schemas import (
-    CardResponse, CreateRunRequest, HistoryDetailEntry, RunSummary, TurnResponse,
+    CardResponse,
+    CreateRunRequest,
+    HistoryDetailEntry,
+    RunSummary,
+    TurnResponse,
 )
-from app.schemas import Effects
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -27,17 +35,16 @@ _STARTER_DECK = ["evt_tut_01_awakening"]
 
 
 @router.post("", response_model=TurnResponse, status_code=201)
-async def create_run(
+def create_run(
     payload: CreateRunRequest,
-    states: GameStateRepo = Depends(get_state_repo),
-    events: EventRepo = Depends(get_event_repo),
-    endings: EndingRepo = Depends(get_ending_repo),
+    users: UserRepo = Depends(get_user_repo),
+    catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Start a new run. Returns state + first card so the client needs only one request."""
     # Snapshot the current default ending ids into the run. From here on the
     # set lives in the savestate and is mutated only by quest choices; admin
     # edits to default endings won't retroactively change in-flight runs.
-    default_ending_ids = await endings.list_default_ids()
+    default_ending_ids = catalog.default_ending_ids()
 
     state = GameState.new_run(
         run_id=GameState.generate_id(),
@@ -48,8 +55,8 @@ async def create_run(
     )
 
     # Peek at the first card before saving — if nothing is playable, end the
-    # run up-front so we write the final state in a single Mongo round-trip.
-    first_card = await draw_eligible_card(state, events)
+    # run up-front so we write the final state in a single DDB round-trip.
+    first_card = draw_eligible_card(state, catalog)
     if first_card is None:
         # Engine-level sentinel — not backed by an Ending doc. The run never
         # really started, so there are no active endings to evaluate against.
@@ -57,8 +64,8 @@ async def create_run(
         state.ending = "softlock_no_cards"
 
     try:
-        await states.insert(state)
-    except DuplicateKeyError:
+        users.insert_run(state)
+    except RunConflict:
         # generate_id() collided with an existing run — astronomically rare,
         # but treat as a real conflict rather than silently overwriting.
         raise HTTPException(409, "Run id collision — retry")
@@ -70,48 +77,66 @@ async def create_run(
 
 
 @router.get("", response_model=list[RunSummary])
-async def list_runs(
+def list_runs(
     user_id: str,  # TODO: derive from auth token once auth is wired up
-    states: GameStateRepo = Depends(get_state_repo),
+    users: UserRepo = Depends(get_user_repo),
 ):
-    """List all runs belonging to a user. Returns lightweight summaries only."""
-    return await states.list_summaries_for_user(user_id)
+    """List all runs belonging to a user. Returns lightweight summaries only.
+
+    Pulls full GameState rows from DDB then projects them down — a
+    ProjectionExpression in UserRepo.list_runs_for_user would save bytes
+    once a user has many hundreds of runs; for now the simpler path wins.
+    """
+    states = users.list_runs_for_user(user_id)
+    return [
+        RunSummary(
+            _id=s.id,
+            status=s.status,
+            turn=s.turn,
+            stats=s.stats,
+            ending=s.ending,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )
+        for s in states
+    ]
 
 
 @router.get("/{run_id}", response_model=GameState)
-async def get_run(
+def get_run(
     run_id: str,
-    states: GameStateRepo = Depends(get_state_repo),
+    user_id: str,
+    users: UserRepo = Depends(get_user_repo),
 ):
     """Load a run — used to resume an in-progress run after a page reload."""
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     return state
 
 
 @router.get("/{run_id}/history", response_model=list[HistoryDetailEntry])
-async def get_history(
+def get_history(
     run_id: str,
-    states: GameStateRepo = Depends(get_state_repo),
-    events: EventRepo = Depends(get_event_repo),
+    user_id: str,
+    users: UserRepo = Depends(get_user_repo),
+    catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Return the run's play history with card + chosen-option data joined.
 
-    Oldest first. One Mongo round-trip for the events (batched via $in).
-    Entries whose event was deleted since play keep their turn/choice_index
-    but get a placeholder title and zeroed effects.
+    Oldest first. Entries whose event was deleted since play keep their
+    turn/choice_index but get a placeholder title and zeroed effects.
     """
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
 
     if not state.history:
         return []
 
-    # De-dupe ids before the find; a card can be played multiple times.
+    # De-dupe ids before the lookup; a card can be played multiple times.
     ids = list({h.event_id for h in state.history})
-    by_id = {e.id: e for e in await events.get_many(ids)}
+    by_id = {e.id: e for e in catalog.get_cards(ids)}
 
     result: list[HistoryDetailEntry] = []
     for h in state.history:
@@ -146,36 +171,37 @@ async def get_history(
 
 
 @router.post("/{run_id}/abandon", response_model=GameState)
-async def abandon_run(
+def abandon_run(
     run_id: str,
-    states: GameStateRepo = Depends(get_state_repo),
+    user_id: str,
+    users: UserRepo = Depends(get_user_repo),
 ):
     """Gracefully quit an active run. Marks it abandoned (preserves history) rather than deleting."""
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status != "active":
         raise HTTPException(409, f"Run is already {state.status}")
-    state.status    = "abandoned"
+    prior_status = state.status
+    state.status     = "abandoned"
     state.updated_at = datetime.now(timezone.utc)
-    if not await states.update(state):
-        # Deleted between load and write — race condition.
-        raise HTTPException(404, "Run not found")
+    users.update_run(state, prior_status=prior_status)
     return state
 
 
 @router.delete("/{run_id}", status_code=204)
-async def delete_run(
+def delete_run(
     run_id: str,
+    user_id: str,
     force: bool = False,
-    states: GameStateRepo = Depends(get_state_repo),
+    users: UserRepo = Depends(get_user_repo),
 ):
     """Permanently delete a run record.
 
     Active runs are protected — pass ?force=true to delete anyway.
     Prefer POST /abandon to quit cleanly while preserving history.
     """
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status == "active" and not force:
@@ -184,7 +210,7 @@ async def delete_run(
             "Run is active. Use POST /abandon to quit cleanly, "
             "or pass ?force=true to delete anyway.",
         )
-    deleted = await states.delete(run_id)
+    deleted = users.delete_run(user_id, run_id)
     if not deleted:
         # Shouldn't happen — we just loaded it. Treat as race condition.
         raise HTTPException(404, "Run not found")

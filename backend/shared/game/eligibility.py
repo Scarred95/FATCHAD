@@ -1,9 +1,9 @@
-# app/game/eligibility.py
+# shared/game/eligibility.py
 """Eligibility checks — can a card be drawn given the current game state?
 
 Pure functions. No I/O, no side effects. Easy to test in isolation.
 """
-from app.schemas import Event, GameState, StatRange
+from shared.schemas import Event, GameState, StatRange
 
 
 def is_eligible(event: Event, state: GameState) -> bool:
@@ -56,7 +56,7 @@ def _stats_satisfied(event: Event, state: GameState) -> bool:
     constraints = event.requires.stats
     if not constraints:
         return True
-    
+
     stats_dict = state.stats.model_dump()
     for stat_name, range_spec in constraints.items():
         if stat_name not in stats_dict:

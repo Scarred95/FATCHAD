@@ -1,38 +1,27 @@
 # app/main.py
+"""Combined FastAPI app — both admin and gameplay surfaces in one process.
+
+Phase 4 will carve this into two Lambda-shaped entry points
+(admin_lambda/, gameplay_lambda/) with Mangum handlers. For now the
+single app stays so local `uvicorn app.main:app` keeps working.
+"""
 import logging
 import os
 import uuid
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.db.connection import make_connection_from_env
-from app.db.repositories import ensure_indexes
-from app.routes import health, runs, gameplay
+from app.routes import gameplay, health, runs
 from app.routes.admin import router as admin_router
 
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    conn = make_connection_from_env()
-    await conn.connect()
-    # Idempotent — Mongo no-ops if the index already exists.
-    await ensure_indexes(conn.db)
-    app.state.mongo = conn
-    try:
-        yield
-    finally:
-        await conn.disconnect()
-
-
 app = FastAPI(
     title="FATCHAD API",
     version="0.1.0",
-    lifespan=lifespan,
 )
 
 

@@ -9,10 +9,12 @@ Run lifecycle (create / list / get / abandon / delete) lives in runs.py.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.db.repositories import EndingRepo, EventRepo, GameStateRepo
-from app.game.deck import draw_eligible_card, draw_with_refill_retry
-from app.game.effects import apply_choice
-from app.routes._deps import get_ending_repo, get_event_repo, get_state_repo
+from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.user_repo import UserRepo
+from shared.game.deck import draw_eligible_card, draw_with_refill_retry
+from shared.game.effects import apply_choice
+
+from app.routes._deps import get_catalog, get_user_repo
 from app.routes._schemas import (
     CardResponse,
     ChoiceRequest,
@@ -22,11 +24,13 @@ from app.routes._schemas import (
 
 router = APIRouter(prefix="/runs", tags=["gameplay"])
 
+
 @router.get("/{run_id}/card", response_model=CardResponse | None)
-async def get_current_card(
+def get_current_card(
     run_id: str,
-    states: GameStateRepo = Depends(get_state_repo),
-    events: EventRepo = Depends(get_event_repo),
+    user_id: str,
+    users: UserRepo = Depends(get_user_repo),
+    catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Peek at the card currently at the top of the deck without consuming it.
 
@@ -37,30 +41,30 @@ async def get_current_card(
     so a None here is a real signal (no playable cards right now) rather than
     something to paper over with a force-refill.
     """
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status != "active":
         raise HTTPException(409, f"Run is no longer active (status={state.status}); no current card")
 
-    card = await draw_eligible_card(state, events)
+    card = draw_eligible_card(state, catalog)
     return CardResponse.from_event(card) if card else None
 
 
 @router.post("/{run_id}/choice", response_model=TurnResponse)
-async def submit_choice(
+def submit_choice(
     run_id: str,
+    user_id: str,
     payload: ChoiceRequest,
-    states: GameStateRepo = Depends(get_state_repo),
-    events: EventRepo = Depends(get_event_repo),
-    endings: EndingRepo = Depends(get_ending_repo),
+    users: UserRepo = Depends(get_user_repo),
+    catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Submit a choice for the current card.
 
     Applies all effects, advances the turn, and returns the updated state
     plus the next card (saves the client an extra round-trip).
     """
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status != "active":
@@ -79,7 +83,7 @@ async def submit_choice(
     # refill almost always covers this, but a rare flag/stat shift could leave
     # the top batch all ineligible. Refill is in-memory only; we save once at
     # the end of the request.
-    state, current_card = await draw_with_refill_retry(state, events)
+    state, current_card = draw_with_refill_retry(state, catalog)
     if current_card is None:
         raise HTTPException(409, "No drawable card right now — try again")
 
@@ -88,20 +92,19 @@ async def submit_choice(
 
     # apply_choice handles: card consumption, stat effects, flags, deck
     # additions, scheduled promotion, tutorial cleanup, refill, and ending checks.
-    new_state = await apply_choice(state, current_card, payload.choice_index, events, endings)
+    prior_status = state.status
+    new_state = apply_choice(state, current_card, payload.choice_index, catalog)
 
     # Ending hit — save and return without a next card.
     if new_state.status != "active":
-        if not await states.update(new_state):
-            raise HTTPException(404, "Run not found")
+        users.update_run(new_state, prior_status=prior_status)
         return TurnResponse(state=new_state, next_card=None)
 
     # Piggyback the next card on the response. Same safety-net retry — if still
     # None, the run stays active and the client can poll /card again.
-    new_state, next_card = await draw_with_refill_retry(new_state, events)
+    new_state, next_card = draw_with_refill_retry(new_state, catalog)
 
-    if not await states.update(new_state):
-        raise HTTPException(404, "Run not found")
+    users.update_run(new_state, prior_status=prior_status)
     return TurnResponse(
         state=new_state,
         next_card=CardResponse.from_event(next_card) if next_card else None,
@@ -109,23 +112,24 @@ async def submit_choice(
 
 
 @router.get("/{run_id}/summary", response_model=EndSummary)
-async def get_summary(
+def get_summary(
     run_id: str,
-    states: GameStateRepo = Depends(get_state_repo),
-    endings: EndingRepo = Depends(get_ending_repo),
+    user_id: str,
+    users: UserRepo = Depends(get_user_repo),
+    catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """End-screen data: ending label + body, final stats, turn count, card count.
 
     Only callable once the run has ended (status != active). The ending body
     is denormalised in so the frontend renders the recap from one fetch.
     """
-    state = await states.get(run_id)
+    state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")
     if state.status == "active":
         raise HTTPException(409, "Run is still active")
 
-    ending_doc = await endings.get_by_id(state.ending) if state.ending else None
+    ending_doc = catalog.get_ending(state.ending) if state.ending else None
 
     return EndSummary(
         ending=state.ending,

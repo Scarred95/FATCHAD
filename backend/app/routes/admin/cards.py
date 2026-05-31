@@ -6,61 +6,69 @@ Mounted under /admin/cards. Auth is enforced at the parent admin router.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.db.repositories import EventRepo
-from app.routes._deps import get_event_repo
-from app.schemas import Choice, Event, Requirements
+from shared.db.catalog_repo import CatalogConflict, CatalogRepo
+from shared.schemas import Choice, Event, Requirements
+
+from app.routes._deps import get_catalog_repo
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[Event])
-async def list_cards(
+def list_cards(
     category: str | None = None,
     limit: int = 100,
     skip: int = 0,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    """List all cards, optionally filtered by category. Paginated."""
-    return await events.list_paginated(category=category, limit=limit, skip=skip)
+    """List all cards, optionally filtered by category.
+
+    Pagination is applied in-memory — the catalog partition is small enough
+    (a few thousand items max) that a full-partition query is cheap and the
+    DDB cost of a Query is the same regardless of how many items the
+    frontend asks for in a page.
+    """
+    cards = catalog.list_cards(category=category)
+    return cards[skip:skip + limit]
 
 
 @router.get("/{card_id}", response_model=Event)
-async def get_card(
+def get_card(
     card_id: str,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    card = await events.get_by_id(card_id)
+    card = catalog.get_card(card_id)
     if card is None:
         raise HTTPException(404, "Card not found")
     return card
 
 
 @router.post("", response_model=Event, status_code=201)
-async def create_card(
+def create_card(
     card: Event,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Create a new card. Pydantic validates the full document on input."""
-    existing = await events.get_by_id(card.id)
-    if existing is not None:
+    try:
+        catalog.insert_card(card)
+    except CatalogConflict:
         raise HTTPException(409, f"Card {card.id} already exists")
-    await events.insert(card)
     return card
 
 
 @router.put("/{card_id}", response_model=Event)
-async def replace_card(
+def replace_card(
     card_id: str,
     card: Event,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Replace a card entirely. id in URL must match id in body."""
     if card.id != card_id:
         raise HTTPException(400, "card_id in URL must match _id in body")
-    existing = await events.get_by_id(card_id)
+    existing = catalog.get_card(card_id)
     if existing is None:
         raise HTTPException(404, "Card not found")
-    await events.upsert(card)
+    catalog.put_card(card)
     return card
 
 
@@ -79,27 +87,27 @@ class PatchCardRequest(BaseModel):
 
 
 @router.patch("/{card_id}", response_model=Event)
-async def patch_card(
+def patch_card(
     card_id: str,
     payload: PatchCardRequest,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Partial update — only fields present in the request body are changed."""
-    existing = await events.get_by_id(card_id)
+    existing = catalog.get_card(card_id)
     if existing is None:
         raise HTTPException(404, "Card not found")
     # exclude_unset so fields the caller didn't send don't overwrite existing values
     updated = existing.model_copy(update=payload.model_dump(exclude_unset=True))
-    await events.upsert(updated)
+    catalog.put_card(updated)
     return updated
 
 
 @router.delete("/{card_id}", status_code=204)
-async def delete_card(
+def delete_card(
     card_id: str,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    deleted = await events.delete(card_id)
+    deleted = catalog.delete_card(card_id)
     if not deleted:
         raise HTTPException(404, "Card not found")
 
@@ -120,15 +128,15 @@ class DeckToggleResponse(BaseModel):
 
 
 @router.post("/decks/{deck_name}/toggle", response_model=DeckToggleResponse)
-async def toggle_deck(
+def toggle_deck(
     deck_name: str,
     payload: DeckToggleRequest,
-    events: EventRepo = Depends(get_event_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Set `enabled` on every card belonging to a given deck.
 
     Pass `deck_name="__orphans__"` to target cards with no deck_name
     (matches how the admin UI labels the orphan bucket).
     """
-    matched, modified = await events.set_enabled_for_deck(deck_name, payload.enabled)
+    matched, modified = catalog.set_enabled_for_deck(deck_name, payload.enabled)
     return DeckToggleResponse(matched=matched, modified=modified)

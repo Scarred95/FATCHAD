@@ -10,61 +10,63 @@ rollback, toast) for both.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.db.repositories import EndingRepo
-from app.routes._deps import get_ending_repo
-from app.schemas import Ending, EndingRequirements
+from shared.db.catalog_repo import CatalogConflict, CatalogRepo
+from shared.schemas import Ending, EndingRequirements
+
+from app.routes._deps import get_catalog_repo
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[Ending])
-async def list_endings(
+def list_endings(
     limit: int = 100,
     skip: int = 0,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    """List all endings. Paginated. No category filter — endings are few enough
+    """List all endings. No category filter — endings are few enough
     that the admin UI can keep them all in memory and filter client-side."""
-    return await endings.list_paginated(limit=limit, skip=skip)
+    endings_ = catalog.list_endings()
+    return endings_[skip:skip + limit]
 
 
 @router.get("/{ending_id}", response_model=Ending)
-async def get_ending(
+def get_ending(
     ending_id: str,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    ending = await endings.get_by_id(ending_id)
+    ending = catalog.get_ending(ending_id)
     if ending is None:
         raise HTTPException(404, "Ending not found")
     return ending
 
 
 @router.post("", response_model=Ending, status_code=201)
-async def create_ending(
+def create_ending(
     ending: Ending,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Create a new ending. Pydantic validates the full document on input."""
-    existing = await endings.get_by_id(ending.id)
-    if existing is not None:
+    try:
+        catalog.insert_ending(ending)
+    except CatalogConflict:
         raise HTTPException(409, f"Ending {ending.id} already exists")
-    await endings.insert(ending)
     return ending
 
 
 @router.put("/{ending_id}", response_model=Ending)
-async def replace_ending(
+def replace_ending(
     ending_id: str,
     ending: Ending,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Replace an ending entirely. id in URL must match id in body."""
     if ending.id != ending_id:
         raise HTTPException(400, "ending_id in URL must match _id in body")
-    existing = await endings.get_by_id(ending_id)
+    existing = catalog.get_ending(ending_id)
     if existing is None:
         raise HTTPException(404, "Ending not found")
-    await endings.upsert(ending)
+    catalog.put_ending(ending)
     return ending
 
 
@@ -80,26 +82,26 @@ class PatchEndingRequest(BaseModel):
 
 
 @router.patch("/{ending_id}", response_model=Ending)
-async def patch_ending(
+def patch_ending(
     ending_id: str,
     payload: PatchEndingRequest,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
     """Partial update — only fields present in the request body are changed."""
-    existing = await endings.get_by_id(ending_id)
+    existing = catalog.get_ending(ending_id)
     if existing is None:
         raise HTTPException(404, "Ending not found")
     # exclude_unset so fields the caller didn't send don't overwrite existing values
     updated = existing.model_copy(update=payload.model_dump(exclude_unset=True))
-    await endings.upsert(updated)
+    catalog.put_ending(updated)
     return updated
 
 
 @router.delete("/{ending_id}", status_code=204)
-async def delete_ending(
+def delete_ending(
     ending_id: str,
-    endings: EndingRepo = Depends(get_ending_repo),
+    catalog: CatalogRepo = Depends(get_catalog_repo),
 ):
-    deleted = await endings.delete(ending_id)
+    deleted = catalog.delete_ending(ending_id)
     if not deleted:
         raise HTTPException(404, "Ending not found")

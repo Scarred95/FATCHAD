@@ -1,6 +1,5 @@
 fastapi
 uvicorn[standard]
 pydantic
-motor
-pymongo
 boto3
+mangum

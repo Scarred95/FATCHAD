@@ -108,8 +108,8 @@ def require_admin_token(
     is supplied in the Authorization header.
 
     Mounted at router level via `dependencies=[Depends(require_admin_token)]`
-    on the `/admin` router (see __init__.py), so every route under
-    `/admin/*` is automatically guarded — no per-handler boilerplate.
+    on the `/admin` router, so every route under `/admin/*` is automatically
+    guarded — no per-handler boilerplate.
 
     Returns None on success. Raises HTTPException(401) on any failure.
     """

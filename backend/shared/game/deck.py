@@ -1,31 +1,34 @@
-# app/game/deck.py
+# shared/game/deck.py
 """Deck operations: draw eligible cards, refill from generic pool,
 advance scheduled cards into the deck.
 
-These functions are async ONLY because they need EventRepo to fetch card
-content. The mutations themselves are pure.
+Sync because the input is a `CatalogSnapshot` (RAM dict lookups, no IO).
+The Lambda is single-invocation per container — no concurrency to win by
+making the engine async.
 """
+from __future__ import annotations
+
 import random
 
-from app.db.repositories import EventRepo
-from app.game.constants import (
+from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.game.constants import (
     DECK_DRAW_BATCH,
     DECK_REFILL_THRESHOLD,
     DECK_TARGET_SIZE,
     GENERIC_CATEGORIES,
     TUTORIAL_ID_PREFIX,
 )
-from app.game.eligibility import is_eligible
-from app.schemas import DeckAddition, Event, GameState, ScheduledCard
+from shared.game.eligibility import is_eligible
+from shared.schemas import DeckAddition, Event, GameState, ScheduledCard
 
 
 # =============================================================================
 # Drawing
 # =============================================================================
 
-async def _scan_top(
+def _scan_top(
     state: GameState,
-    events: EventRepo,
+    catalog: CatalogSnapshot,
 ) -> tuple[list[str], dict[str, Event], int | None]:
     """Fetch the top DECK_DRAW_BATCH cards and find the first eligible one.
 
@@ -42,7 +45,7 @@ async def _scan_top(
         return [], {}, None
 
     top_ids = state.deck[:DECK_DRAW_BATCH]
-    cards = await events.get_many(top_ids)
+    cards = catalog.get_cards(top_ids)
     by_id = _by_id(cards)
 
     for i, card_id in enumerate(top_ids):
@@ -55,26 +58,25 @@ async def _scan_top(
     return top_ids, by_id, None
 
 
-async def draw_eligible_card(state: GameState, events: EventRepo) -> Event | None:
+def draw_eligible_card(state: GameState, catalog: CatalogSnapshot) -> Event | None:
     """Find the top-of-deck card that's eligible given current state.
 
-    Peeks the top DECK_DRAW_BATCH cards in one Mongo call without mutating
-    the deck — consumption happens in consume_top_card when a choice is
-    committed.
+    Peeks the top DECK_DRAW_BATCH cards in one call without mutating the
+    deck — consumption happens in consume_top_card when a choice is committed.
 
     Returns None if the deck is empty or none of the top batch are eligible.
     Refill should keep the deck large enough that the eligible card is
     almost always inside this window.
     """
-    top_ids, by_id, drawn_index = await _scan_top(state, events)
+    top_ids, by_id, drawn_index = _scan_top(state, catalog)
     if drawn_index is None:
         return None
     return by_id[top_ids[drawn_index]]
 
 
-async def draw_with_refill_retry(
+def draw_with_refill_retry(
     state: GameState,
-    events: EventRepo,
+    catalog: CatalogSnapshot,
 ) -> tuple[GameState, Event | None]:
     """Draw, force-refill once if nothing eligible, retry the draw.
 
@@ -87,16 +89,16 @@ async def draw_with_refill_retry(
 
     Returns (state, card) — state may be a new instance if refill ran.
     """
-    card = await draw_eligible_card(state, events)
+    card = draw_eligible_card(state, catalog)
     if card is not None:
         return state, card
 
-    new_state = await refill_deck_if_needed(state, events, force=True)
-    card = await draw_eligible_card(new_state, events)
+    new_state = refill_deck_if_needed(state, catalog, force=True)
+    card = draw_eligible_card(new_state, catalog)
     return new_state, card
 
 
-async def consume_top_card(state: GameState, events: EventRepo) -> tuple[GameState, Event | None]:
+def consume_top_card(state: GameState, catalog: CatalogSnapshot) -> tuple[GameState, Event | None]:
     """Remove the top eligible card from the deck and return it along with the new state.
 
     Cleanup of ineligible cards happens here, only when something is actually
@@ -108,7 +110,7 @@ async def consume_top_card(state: GameState, events: EventRepo) -> tuple[GameSta
     the deck UNCHANGED so it can recover later if state changes.
     """
     new_state = _clone(state)
-    top_ids, by_id, drawn_index = await _scan_top(new_state, events)
+    top_ids, by_id, drawn_index = _scan_top(new_state, catalog)
 
     if drawn_index is None:
         # Empty deck or nothing eligible in the top batch — leave the deck untouched.
@@ -236,9 +238,9 @@ def cleanup_zombie_tutorial_cards(state: GameState) -> GameState:
     return new_state
 
 
-async def refill_deck_if_needed(
+def refill_deck_if_needed(
     state: GameState,
-    events: EventRepo,
+    catalog: CatalogSnapshot,
     force: bool = False,
 ) -> GameState:
     """If the deck has fewer than threshold cards, top it up to the target size.
@@ -263,7 +265,7 @@ async def refill_deck_if_needed(
     rng = random.Random(state.rng_seed + state.turn)  # per-turn seeded RNG
     needed = DECK_TARGET_SIZE - len(new_state.deck)
 
-    candidates = await _gather_candidate_pool(new_state, events)
+    candidates = _gather_candidate_pool(new_state, catalog)
     if not candidates:
         # Nothing to add. Caller should probably end the run gracefully.
         return new_state
@@ -309,22 +311,18 @@ def _tutorial_still_queued(state: GameState) -> bool:
     return any(cid.startswith(TUTORIAL_ID_PREFIX) for cid in state.deck)
 
 
-async def _gather_candidate_pool(
+def _gather_candidate_pool(
     state: GameState,
-    events: EventRepo,
+    catalog: CatalogSnapshot,
 ) -> list[Event]:
     """Collect eligible cards from generic categories for refill.
-
-    Single $in query — fetches all cards across all generic categories at once.
-    Fine for hundreds of cards; if your library grows past a few thousand,
-    switch to a server-side sample query.
 
     Excludes:
       - weight <= 0  (questline / ending cards opt-out of refill explicitly)
       - important   (these only enter the deck via adds_to_deck from another
                      card; they should never be picked at random)
     """
-    cards = await events.get_by_categories(GENERIC_CATEGORIES)
+    cards = catalog.cards_by_categories(GENERIC_CATEGORIES)
     return [
         c for c in cards
         if c.weight > 0 and not c.important and is_eligible(c, state)

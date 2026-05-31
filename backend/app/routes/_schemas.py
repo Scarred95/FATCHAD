@@ -8,8 +8,8 @@ import them without creating circular dependencies.
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.game.hints import derive_hints_from_effects
-from app.schemas import Choice, Effects, Event, GameState, GameStatus, StatHint, Stats
+from shared.game.hints import derive_hints_from_effects
+from shared.schemas import Choice, Effects, Event, GameState, GameStatus, StatHint, Stats
 
 
 # =============================================================================
