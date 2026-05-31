@@ -47,16 +47,17 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   async loadRun(runId) {
     set({ isLoading: true, error: null });
+    const uid = getUserId();
     try {
-      const state = await api.getRun(runId);
+      const state = await api.getRun(runId, uid);
       let currentCard: CardResponse | null = null;
       if (state.status === 'active') {
         try {
-          currentCard = await api.getCurrentCard(runId);
+          currentCard = await api.getCurrentCard(runId, uid);
         } catch (e) {
           // Softlock — state will already be marked lost on the server.
           // Re-fetch to pick up the new status.
-          const refreshed = await api.getRun(runId);
+          const refreshed = await api.getRun(runId, uid);
           set({ state: refreshed, currentCard: null, isLoading: false });
           return;
         }
@@ -92,6 +93,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const prevStats = state.stats;
       const { state: next, next_card } = await api.submitChoice(
         state._id,
+        getUserId(),
         index,
         state.turn,
       );
@@ -112,7 +114,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { state } = get();
     if (!state) return;
     try {
-      const next = await api.abandonRun(state._id);
+      const next = await api.abandonRun(state._id, getUserId());
       set({ state: next, currentCard: null });
     } catch (e) {
       set({ error: errorMessage(e) });

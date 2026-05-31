@@ -15,7 +15,14 @@
  */
 import { getAdminToken, useAdminStore } from '../stores/adminStore';
 
-const BASE = '/api/admin';
+// Admin routes live at `<base>/admin`. `VITE_ADMIN_API_BASE_URL` is kept
+// separate from `VITE_API_BASE_URL` so an environment can route admin
+// traffic through a different host (e.g. VPN-only domain) without ceremony.
+// Falls back to `/api/admin` so the Vite dev proxy keeps working untouched.
+const BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/api/admin').replace(
+  /\/+$/,
+  '',
+);
 
 /* ─── Types (mirror backend Pydantic + CardEditor) ─────────────── */
 

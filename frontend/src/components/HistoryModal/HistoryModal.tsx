@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { getHistory } from '../../api/client';
 import { useAdminStore } from '../../stores/adminStore';
+import { getUserId } from '../../stores/userStore';
 import type { HistoryDetailEntry, StatName } from '../../api/types';
 import styles from './HistoryModal.module.css';
 
@@ -55,7 +56,7 @@ export default function HistoryModal({ open, runId, onClose }: Props) {
     setOpenTurns(new Set());
     setLoading(true);
     let cancelled = false;
-    getHistory(runId)
+    getHistory(runId, getUserId())
       .then((rows) => {
         if (!cancelled) setEntries(rows);
       })

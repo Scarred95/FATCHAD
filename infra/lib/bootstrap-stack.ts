@@ -144,6 +144,20 @@ export class FatchadBootstrapStack extends cdk.Stack {
       }),
     );
 
+    // The deploy workflow reads `HttpApiUrl` from `FatchadApiStack` outputs
+    // at build time so it can bake `VITE_API_BASE_URL` into the bundle.
+    // Scoped to just describing this one stack — no other CloudFormation
+    // visibility, no template downloads.
+    frontendUploadRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'DescribeApiStackOutputs',
+        actions: ['cloudformation:DescribeStacks'],
+        resources: [
+          `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadApiStack/*`,
+        ],
+      }),
+    );
+
     new cdk.CfnOutput(this, 'FrontendUploadRoleArn', {
       value: frontendUploadRole.roleArn,
       description: 'Put this in deploy-frontend.yml as AWS_FRONTEND_UPLOAD_ROLE_ARN secret.',
