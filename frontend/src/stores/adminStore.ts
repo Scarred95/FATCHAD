@@ -26,6 +26,13 @@ import { create } from 'zustand';
 
 const STORAGE_KEY = 'fatchad_admin_token';
 
+// Mirror the BASE resolution in api/admin.ts. Inlined (not imported) to
+// avoid a circular dep — api/admin.ts already imports from this file.
+const ADMIN_BASE = (import.meta.env.VITE_ADMIN_API_BASE_URL ?? '/api/admin').replace(
+  /\/+$/,
+  '',
+);
+
 /** Reads the token straight from localStorage. Used by the API client
  *  on every admin request so we don't have to subscribe to the store
  *  from non-React code. */
@@ -56,7 +63,7 @@ interface AdminStore {
 
 async function pingAuth(token: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/admin/auth/ping', {
+    const res = await fetch(`${ADMIN_BASE}/auth/ping`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.ok;
