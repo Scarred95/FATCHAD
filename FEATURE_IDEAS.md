@@ -44,3 +44,45 @@ would be speculative.
 **Scope:** a `migrate` function (registry keyed by from-version) invoked in the
 repo deserialize path before `model_validate`. No-op passthrough until the first
 breaking schema change lands.
+
+---
+
+## Client-safe game state (stop leaking the full GameState)
+
+**What:** Return a trimmed, player-facing view of a run instead of the raw
+`GameState`. Strip the anti-cheat-sensitive fields before they reach the wire.
+
+**Why:** `TurnResponse.state`, `GET /runs/{id}`, and every `POST /choice`
+response currently ship the entire `GameState` — including `rng_seed`, the full
+`deck` order, `scheduled`, `active_endings`, and `flags`. Every engine RNG is
+`random.Random(rng_seed + turn)` (`deck.py`, `effects.py`), so a leaked seed
+lets a client **predict every future draw, shuffle, and refill**; `deck` and
+`active_endings` are direct spoilers. This silently undoes all the field
+stripping done in `CardResponse`/`ChoicePreview`.
+
+**Scope (why it's a feature, not a clean-up):**
+- A `PublicGameState` projection (stats, turn, status, ending, maybe a flag
+  allow-list) + a mapper from `GameState`.
+- Swap `response_model` on the run/turn endpoints; decide per-field what the
+  client legitimately needs (the SPA currently reads the full object, so this is
+  a frontend contract change, not just a backend edit).
+- Keep the raw `GameState` server-side only.
+
+**Decision recorded:** deferred but flagged as the highest-priority correctness
+item — do this before any public/competitive launch.
+
+---
+
+## Authn/authz on the gameplay surface
+
+**What:** Derive `user_id` from a verified bearer token instead of taking it as
+a client-supplied query param / body field, and authorize run ownership.
+
+**Why:** Right now every gameplay route trusts a client-provided `user_id`
+(`runs.py`, `gameplay.py`), so anyone can read or mutate anyone else's runs by
+guessing `user_id` + `run_id`. Combined with the seed leak above, that's a full
+account-data exposure. Marked TODO throughout the code.
+
+**Scope:** token verification middleware/dependency; replace the explicit
+`user_id` params in one pass; the `get_owned_run` dependency (see code clean-up
+D1) is the natural single seam to enforce ownership once auth lands.

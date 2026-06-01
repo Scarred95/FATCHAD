@@ -26,7 +26,8 @@ def check_endings(
     May set status="ended" + ending=<id>. Always returns the (possibly
     mutated) state — never raises.
     """
-    # Active set, enabled-only.
+    # Active set. The snapshot is already enabled-only (publish strips disabled
+    # endings); the `if e.enabled` is a cheap defensive guard, not the gate.
     active = [e for e in catalog.get_endings(state.active_endings) if e.enabled]
     by_id = {e.id: e for e in active}
 

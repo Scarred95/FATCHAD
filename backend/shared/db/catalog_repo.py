@@ -31,6 +31,11 @@ from shared.schemas import (
     Event,
 )
 
+# Sentinel deck name for the bulk toggle: targets cards with no deck_name.
+# Matches how the admin UI labels its orphan bucket; single source of truth so
+# the route and the repo can't drift on the magic string.
+ORPHAN_DECK_SENTINEL = "__orphans__"
+
 
 # =============================================================================
 # (de)serialization helpers
@@ -132,20 +137,6 @@ class CatalogRepo:
             cards = [c for c in cards if c.category == category]
         return cards
 
-    def list_cards_by_categories(self, categories: list[str]) -> list[Event]:
-        """All cards whose category is in the given list. One full-partition
-        scan + a set-based filter — same shape the old EventRepo had.
-
-        NOTE: gameplay uses CatalogSnapshot.cards_by_categories (S3-backed);
-        confirm this repo variant still has a caller before relying on it.
-        """
-        if not categories:
-            return []
-        cats = set(categories)
-        items = self._query_all(CatalogPk.CARD)
-        cards = [Event.model_validate(_item_to_dict(i)) for i in items]
-        return [c for c in cards if c.category in cats]
-
     def put_card(self, card: Event) -> None:
         """Upsert. Use `insert_card` if you want a 409 on duplicate id."""
         self._t.put_item(Item=_model_to_item(card, CatalogPk.CARD, card.id))
@@ -176,7 +167,7 @@ class CatalogRepo:
         targets deck-less cards). Returns (matched, modified) — one PutItem per
         changed card, already-correct cards skipped."""
         cards = self.list_cards()
-        if deck_name == "__orphans__":
+        if deck_name == ORPHAN_DECK_SENTINEL:
             targets = [c for c in cards if not c.deck_name]
         else:
             targets = [c for c in cards if c.deck_name == deck_name]
@@ -309,9 +300,9 @@ class CatalogRepo:
     def set_pointer(self, pointer: CatalogPointer) -> None:
         """Overwrites unconditionally. Publish flow owns the version-bump.
 
-        No CAS guard: publish is admin-only and single-operator, so a
-        concurrent-publish race is ACCEPTED. Add a ConditionExpression (and
-        return 409) only if publishing is ever automated / multi-actor.
+        No CAS guard: with multiple admins a concurrent-publish race exists but
+        is low-likelihood and ACCEPTED for now. Add a ConditionExpression (and
+        return 409) if simultaneous publishes ever become a real problem.
         """
         data = json.loads(pointer.model_dump_json())
         data.update(catalog_pointer_key())

@@ -69,7 +69,7 @@ router = APIRouter()
 
 
 @router.get("/ping")
-async def ping() -> dict[str, bool]:
+def ping() -> dict[str, bool]:
     """Token-validation heartbeat: 200 (guarded by require_admin_token) means
     the token is valid and the admin UI may mount; 401 means clear it."""
     return {"ok": True}

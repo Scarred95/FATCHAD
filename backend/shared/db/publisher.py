@@ -181,9 +181,9 @@ def _dump_deck_public(deck: Deck) -> dict:
 def _mint_version() -> str:
     """UTC timestamp version, e.g. `20260531T143022Z`.
 
-    Sortable by string compare and unique per second. The 1-second collision
-    window (two publishes in the same second reuse the key) is ACCEPTED: publish
-    is admin-only and single-operator. Revisit (sub-second suffix) only if
-    publishing is ever automated. CI publishes pass an explicit version instead.
+    Sortable by string compare and unique per second. With multiple admins the
+    1-second collision window is real but unlikely (two publishes in the same
+    second reuse the key); ACCEPTED for now — add a sub-second suffix if it ever
+    bites. CI publishes pass an explicit version instead.
     """
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

@@ -1,10 +1,13 @@
 # admin_lambda/routes/publish.py
 """POST /admin/publish — snapshot the working catalog into a versioned bundle."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from shared.db.catalog_repo import CatalogRepo
 from shared.db.publisher import publish_catalog
 from shared.schemas import CatalogPointer
+
+from admin_lambda.routes._deps import get_catalog_repo
 
 router = APIRouter()
 
@@ -25,12 +28,13 @@ def publish(payload: PublishRequest | None = None) -> CatalogPointer:
 
 
 @router.get("/current", response_model=CatalogPointer | None)
-def get_current_pointer() -> CatalogPointer | None:
+def get_current_pointer(
+    catalog: CatalogRepo = Depends(get_catalog_repo),
+) -> CatalogPointer | None:
     """What's live right now. Used by the admin UI badge ("you're editing
     1 ahead of v20260531...") and as the frontend bootstrap fetch on app load.
 
     Returns None before the first publish; the admin UI shows "never
     published" in that case.
     """
-    from shared.db.catalog_repo import CatalogRepo
-    return CatalogRepo().get_pointer()
+    return catalog.get_pointer()

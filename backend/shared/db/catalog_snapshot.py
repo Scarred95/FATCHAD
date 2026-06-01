@@ -66,9 +66,10 @@ class CatalogSnapshot:
         return self._endings.get(ending_id)
 
     def get_endings(self, ids: list[str]) -> list[Ending]:
-        """Old EndingRepo.get_many — preserves order, skips stale ids. Disabled
-        endings ARE returned; the engine filters on `enabled` so admin toggles
-        take effect mid-run."""
+        """Old EndingRepo.get_many — preserves order, skips stale ids. The
+        snapshot is already enabled-only (publish strips disabled endings), so a
+        just-disabled ending drops out on the next publish + version bump — it
+        simply isn't here to return, which is how toggles take effect mid-run."""
         return [e for eid in ids if (e := self._endings.get(eid))]
 
     def default_ending_ids(self) -> list[str]:

@@ -72,6 +72,7 @@ class PatchEndingRequest(BaseModel):
     default:     bool | None = None
     enabled:     bool | None = None
     image_url:   str | None = None
+    deck_name:   str | None = None
 
 
 @router.patch("/{ending_id}", response_model=Ending)
