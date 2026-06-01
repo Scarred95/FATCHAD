@@ -16,15 +16,14 @@ from datetime import datetime, timezone
 from shared.db.catalog_repo import CatalogRepo
 from shared.db.catalog_snapshot import invalidate_cache
 from shared.db.ddb import catalog_bucket, s3_client
-from shared.game.hints import derive_hints_from_effects
 from shared.schemas import (
     Achievement,
     CatalogPointer,
-    Choice,
     Deck,
     Ending,
     Event,
 )
+from shared.views import public_card_dict
 
 
 # =============================================================================
@@ -67,7 +66,7 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     public_payload = {
         "version": version,
         "decks":    [_dump_deck_public(d) for d in pub_decks],
-        "cards":    [_dump_card_public(c) for c in pub_cards],
+        "cards":    [public_card_dict(c) for c in pub_cards],
         "endings":  [_dump_ending_public(e) for e in pub_endings],
         "achievements": [_dump_ach_public(a) for a in pub_achs],
     }
@@ -140,28 +139,6 @@ def _dump(model) -> dict:
     """Full dump — `mode=json` so datetimes become ISO strings rather than
     requiring a second serializer pass."""
     return model.model_dump(mode="json")
-
-
-def _dump_card_public(card: Event) -> dict:
-    """Player-visible card fields only — strips all engine/anti-cheat fields
-    (effects, requires, weight, flags, deck-adds, ending links). Hints fall
-    back to effect-derived arrows when not explicitly authored."""
-    return {
-        "id":          card.id,
-        "title":       card.title,
-        "description": card.description,
-        "category":    card.category,
-        "deck_name":   card.deck_name,
-        "image_url":   card.image_url,
-        "choices":     [_dump_choice_public(c) for c in card.choices],
-    }
-
-
-def _dump_choice_public(choice: Choice) -> dict:
-    """Choice with text + hints only — no effects, flags, or ending links."""
-    explicit = choice.hints.model_dump(exclude_none=True)
-    hints = explicit or derive_hints_from_effects(choice).model_dump(exclude_none=True)
-    return {"text": choice.text, "hints": hints}
 
 
 def _dump_ending_public(ending: Ending) -> dict:

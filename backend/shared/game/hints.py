@@ -21,3 +21,12 @@ def _sign(value: int) -> StatHint | None:
     if value < 0:
         return "down"
     return None
+
+
+def resolve_hints(choice: Choice) -> dict[str, StatHint]:
+    """Authored hints if present, else derived from effect signs. Returns only
+    stats with a non-null hint (no nulls). Shared by the publish and live paths."""
+    explicit = choice.hints.model_dump(exclude_none=True)
+    if explicit:
+        return explicit
+    return derive_hints_from_effects(choice).model_dump(exclude_none=True)

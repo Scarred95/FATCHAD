@@ -6,7 +6,6 @@ Sequences the sub-steps and delegates to deck.py (cards), endings.py
 """
 from __future__ import annotations
 
-import random
 from datetime import datetime, timezone
 
 from shared.db.catalog_snapshot import CatalogSnapshot
@@ -17,6 +16,7 @@ from shared.game.deck import (
     consume_top_card,
     promote_due_scheduled,
     refill_deck_if_needed,
+    turn_rng,
 )
 from shared.game.endings import check_endings
 from shared.schemas import Choice, Effects, Event, GameState, HistoryEntry, Stats
@@ -42,12 +42,13 @@ def apply_choice(
         raise ValueError(f"choice_index {choice_index} out of range for card {card.id}")
 
     choice = card.choices[choice_index]
-    # Per-turn seeded RNG: deterministic within a turn, different each turn.
-    rng = random.Random(state.rng_seed + state.turn)
+    # One RNG stream for the whole turn — threaded through every sub-step so
+    # they don't independently replay the same seed (no correlated draws).
+    rng = turn_rng(state)
 
     # 1. Remove the played card (deep-copies state, drops stale/ineligible
     #    cards above it). The card itself is discarded — we already have it.
-    new_state, _ = consume_top_card(state, catalog)
+    new_state, _ = consume_top_card(state, catalog, rng=rng)
 
     # 2. Stats (no clamping). 3. Flags.
     new_state.stats = _apply_effects(new_state.stats, choice.effects)
@@ -70,7 +71,7 @@ def apply_choice(
     new_state = cleanup_zombie_tutorial_cards(new_state)
 
     # 8. Refill if low.
-    new_state = refill_deck_if_needed(new_state, catalog)
+    new_state = refill_deck_if_needed(new_state, catalog, rng=rng)
 
     # 9. Evaluate endings + apply this choice's unlocks/removes (see endings.py).
     new_state = check_endings(new_state, choice, catalog)

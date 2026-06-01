@@ -10,9 +10,6 @@ ending docs.
 # ----- Deck sizing -----
 DECK_TARGET_SIZE      = 12
 DECK_REFILL_THRESHOLD = 5
-# How many top-of-deck cards to fetch in one batch when looking for an eligible card.
-# Bigger value = fewer round-trips at the cost of fetching cards we may not use.
-DECK_DRAW_BATCH       = 5
 
 # ----- Player stats -----
 # The five stat axes in canonical display order. Single source of truth for

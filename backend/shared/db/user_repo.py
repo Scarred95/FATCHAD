@@ -75,6 +75,11 @@ class RunConflict(Exception):
     translate this into HTTP 409."""
 
 
+class StaleRunWrite(Exception):
+    """Raised when an optimistic-locked update finds the stored turn already
+    moved (a concurrent double-submit). Routes translate this into HTTP 409."""
+
+
 # =============================================================================
 # The repo
 # =============================================================================
@@ -129,23 +134,51 @@ class UserRepo:
                 raise RunConflict(f"Run {state.id} already exists") from e
             raise
 
-    def update_run(self, state: GameState, *, prior_status: str | None = None) -> bool:
+    def update_run(
+        self,
+        state: GameState,
+        *,
+        prior_status: str | None = None,
+        expected_turn: int | None = None,
+    ) -> bool:
         """Save an existing run. Status unchanged (hot path): one PutItem.
 
         Status changed: the SK changes (RUN#ACTIVE#x → RUN#ENDED#x), so PutItem
         the new key + DeleteItem the old — two writes, no transaction. If the
         delete fails after the put, get_run's ACTIVE-first order reads the right
         row until cleanup. Pass `prior_status` when the status transitioned.
+
+        Pass `expected_turn` to optimistic-lock the same-SK write: the stored
+        turn must still equal it or the put fails with StaleRunWrite, blocking a
+        concurrent double-submit (a plain put would silently lose one).
         """
         current_sk_status = _sk_status(state.status)
         prior_sk_status = (
             _sk_status(prior_status) if prior_status else current_sk_status
         )
+        status_changed = current_sk_status != prior_sk_status
 
         new_key = user_run_key(state.user_id, current_sk_status, state.id)
-        self._t.put_item(Item=_model_to_item(state, new_key["PK"], new_key["SK"]))
+        item = _model_to_item(state, new_key["PK"], new_key["SK"])
 
-        if current_sk_status != prior_sk_status:
+        if expected_turn is not None and not status_changed:
+            try:
+                self._t.put_item(
+                    Item=item,
+                    ConditionExpression="#t = :t",
+                    ExpressionAttributeNames={"#t": "turn"},
+                    ExpressionAttributeValues={":t": expected_turn},
+                )
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                    raise StaleRunWrite(
+                        f"Run {state.id} changed since turn {expected_turn}"
+                    ) from e
+                raise
+        else:
+            self._t.put_item(Item=item)
+
+        if status_changed:
             self._t.delete_item(
                 Key=user_run_key(state.user_id, prior_sk_status, state.id),
             )

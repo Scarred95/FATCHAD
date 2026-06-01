@@ -3,18 +3,25 @@
 
 GET  /runs/{run_id}/card      → peek at the current card (used on resume)
 POST /runs/{run_id}/choice    → submit a choice; returns updated state + next card
-GET  /runs/{run_id}/summary   → end-screen data (only available once run has ended)
+GET  /runs/{run_id}/summary   → end-screen data (only once the run has ended)
 
 Run lifecycle (create / list / get / abandon / delete) lives in runs.py.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
 from shared.db.catalog_snapshot import CatalogSnapshot
-from shared.db.user_repo import UserRepo
+from shared.db.user_repo import StaleRunWrite, UserRepo
 from shared.game.deck import draw_eligible_card, draw_with_refill_retry
 from shared.game.effects import apply_choice
+from shared.schemas import GameState
 
-from gameplay_lambda.routes._deps import get_catalog, get_user_repo
+from gameplay_lambda.routes._deps import (
+    get_catalog,
+    get_owned_run,
+    get_user_repo,
+    require_active,
+    require_inactive,
+)
 from gameplay_lambda.routes._schemas import (
     CardResponse,
     ChoiceRequest,
@@ -27,51 +34,29 @@ router = APIRouter(prefix="/runs", tags=["gameplay"])
 
 @router.get("/{run_id}/card", response_model=CardResponse | None)
 def get_current_card(
-    run_id: str,
-    user_id: str,
-    users: UserRepo = Depends(get_user_repo),
+    state: GameState = Depends(get_owned_run),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
-    """Peek at the card currently at the top of the deck without consuming it.
-
-    Used on resume after a page reload — during normal play the next card is
-    already included in the TurnResponse from POST /choice.
-
-    Read-only: never writes to the DB. apply_choice keeps the deck stocked,
-    so a None here is a real signal (no playable cards right now) rather than
-    something to paper over with a force-refill.
-    """
-    state = users.get_run(user_id, run_id)
-    if state is None:
-        raise HTTPException(404, "Run not found")
-    if state.status != "active":
-        raise HTTPException(409, f"Run is no longer active (status={state.status}); no current card")
-
+    """Peek the current card without consuming it (used on resume; normal play
+    already gets the next card in the POST /choice response). Read-only — a None
+    is a real "nothing playable right now" signal, not papered over here."""
+    require_active(state)
     card = draw_eligible_card(state, catalog)
     return CardResponse.from_event(card) if card else None
 
 
 @router.post("/{run_id}/choice", response_model=TurnResponse)
 def submit_choice(
-    run_id: str,
-    user_id: str,
     payload: ChoiceRequest,
+    state: GameState = Depends(get_owned_run),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
-    """Submit a choice for the current card.
+    """Submit a choice: apply effects, advance the turn, return updated state +
+    the next card (saves the client a round-trip)."""
+    require_active(state)
 
-    Applies all effects, advances the turn, and returns the updated state
-    plus the next card (saves the client an extra round-trip).
-    """
-    state = users.get_run(user_id, run_id)
-    if state is None:
-        raise HTTPException(404, "Run not found")
-    if state.status != "active":
-        raise HTTPException(409, f"Run is already {state.status}")
-
-    # Reject stale retries — if the client thinks it's on a different turn,
-    # this request was already applied. Required field (no opt-out).
+    # Reject stale sequential retries — a turn mismatch means it already applied.
     if payload.expected_turn != state.turn:
         raise HTTPException(
             409,
@@ -79,10 +64,8 @@ def submit_choice(
             f"run is on turn {state.turn}",
         )
 
-    # Use the refill-retry helper as a safety net — apply_choice's standard
-    # refill almost always covers this, but a rare flag/stat shift could leave
-    # the top batch all ineligible. Refill is in-memory only; we save once at
-    # the end of the request.
+    # Safety net for a top batch gone all-ineligible: refill+shuffle once,
+    # in-memory only. We save a single time at the end of the request.
     state, current_card = draw_with_refill_retry(state, catalog)
     if current_card is None:
         raise HTTPException(409, "No drawable card right now — try again")
@@ -90,21 +73,26 @@ def submit_choice(
     if not (0 <= payload.choice_index < len(current_card.choices)):
         raise HTTPException(400, "Invalid choice_index for this card")
 
-    # apply_choice handles: card consumption, stat effects, flags, deck
-    # additions, scheduled promotion, tutorial cleanup, refill, and ending checks.
+    # apply_choice handles consumption, effects, flags, deck adds, scheduling,
+    # tutorial cleanup, refill, and ending checks.
     prior_status = state.status
     new_state = apply_choice(state, current_card, payload.choice_index, catalog)
 
-    # Ending hit — save and return without a next card.
-    if new_state.status != "active":
-        users.update_run(new_state, prior_status=prior_status)
-        return TurnResponse(state=new_state, next_card=None)
+    try:
+        # Ending hit — save and return without a next card.
+        if new_state.status != "active":
+            users.update_run(new_state, prior_status=prior_status)
+            return TurnResponse(state=new_state, next_card=None)
 
-    # Piggyback the next card on the response. Same safety-net retry — if still
-    # None, the run stays active and the client can poll /card again.
-    new_state, next_card = draw_with_refill_retry(new_state, catalog)
+        # Piggyback the next card; same refill safety net.
+        new_state, next_card = draw_with_refill_retry(new_state, catalog)
+        users.update_run(
+            new_state, prior_status=prior_status, expected_turn=payload.expected_turn
+        )
+    except StaleRunWrite as e:
+        # A concurrent submit already advanced this run.
+        raise HTTPException(409, "Run was updated concurrently — reload and retry") from e
 
-    users.update_run(new_state, prior_status=prior_status)
     return TurnResponse(
         state=new_state,
         next_card=CardResponse.from_event(next_card) if next_card else None,
@@ -113,24 +101,15 @@ def submit_choice(
 
 @router.get("/{run_id}/summary", response_model=EndSummary)
 def get_summary(
-    run_id: str,
-    user_id: str,
-    users: UserRepo = Depends(get_user_repo),
+    state: GameState = Depends(get_owned_run),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """End-screen data: ending label + body, final stats, turn count, card count.
-
-    Only callable once the run has ended (status != active). The ending body
-    is denormalised in so the frontend renders the recap from one fetch.
-    """
-    state = users.get_run(user_id, run_id)
-    if state is None:
-        raise HTTPException(404, "Run not found")
-    if state.status == "active":
-        raise HTTPException(409, "Run is still active")
+    Only callable once the run has ended; the ending body is denormalised in so
+    the recap renders from one fetch."""
+    require_inactive(state)
 
     ending_doc = catalog.get_ending(state.ending) if state.ending else None
-
     return EndSummary(
         ending=state.ending,
         ending_title=ending_doc.title if ending_doc else None,

@@ -11,7 +11,6 @@ import random
 
 from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.game.constants import (
-    DECK_DRAW_BATCH,
     DECK_REFILL_THRESHOLD,
     DECK_TARGET_SIZE,
     GENERIC_CATEGORIES,
@@ -25,101 +24,87 @@ from shared.schemas import DeckAddition, Event, GameState, ScheduledCard
 # Drawing
 # =============================================================================
 
-def _scan_top(
+def _scan_deck(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> tuple[list[str], dict[str, Event], int | None]:
-    """Inspect the top DECK_DRAW_BATCH cards; find the first eligible one.
-
-    Single source of truth for the top-of-deck scan, shared by the peek
-    (draw_eligible_card) and pop (consume_top_card) paths.
-
-    Returns (top_ids, id->Event lookup, index of first eligible or None).
-    """
+    """Scan the WHOLE deck top→bottom for the first eligible card. Shared by the
+    peek (draw_eligible_card) and pop (consume_top_card) paths, so they always
+    agree. Returns (deck_ids, id->Event lookup, index of first eligible or None)."""
     if not state.deck:
         return [], {}, None
 
-    top_ids = state.deck[:DECK_DRAW_BATCH]
-    by_id = _by_id(catalog.get_cards(top_ids))
-
-    for i, card_id in enumerate(top_ids):
+    ids = state.deck
+    by_id = _by_id(catalog.get_cards(ids))
+    for i, card_id in enumerate(ids):
         card = by_id.get(card_id)
-        if card is None:
-            continue  # stale id (card deleted from content) — skip
-        if is_eligible(card, state):
-            return top_ids, by_id, i
-
-    return top_ids, by_id, None
+        if card is not None and is_eligible(card, state):
+            return ids, by_id, i
+    return ids, by_id, None
 
 
 def draw_eligible_card(state: GameState, catalog: CatalogSnapshot) -> Event | None:
-    """Peek the first eligible top-of-deck card without mutating the deck.
-
-    Returns None if the deck is empty or no card in the top batch is eligible.
-    """
-    top_ids, by_id, drawn_index = _scan_top(state, catalog)
-    if drawn_index is None:
-        return None
-    return by_id[top_ids[drawn_index]]
+    """Peek the first eligible card anywhere in the deck — read-only, no mutation.
+    Recovery (refill/shuffle) lives in draw_with_refill_retry, never here, so a
+    GET peek can't rewrite the saved deck."""
+    ids, by_id, idx = _scan_deck(state, catalog)
+    return by_id[ids[idx]] if idx is not None else None
 
 
 def draw_with_refill_retry(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> tuple[GameState, Event | None]:
-    """Draw; if nothing eligible, force-refill once and retry. In-memory only
-    (no DB writes). Returns (state, card) — state may be new if refill ran.
-
-    For callers that can't assume a healthy deck, e.g. POST /choice where stat
-    or flag changes can leave the top batch all ineligible.
-    """
+    """Peek the deck; if nothing's eligible anywhere, recover exactly ONCE:
+    DRAW (force refill) → MIX (seeded whole-deck shuffle) → peek again. In-memory
+    only. Returns (state, card); card may still be None if the candidate pool is
+    dry, which the caller treats as a softlock."""
     card = draw_eligible_card(state, catalog)
     if card is not None:
         return state, card
 
-    new_state = refill_deck_if_needed(state, catalog, force=True)
-    card = draw_eligible_card(new_state, catalog)
-    return new_state, card
+    rng = turn_rng(state)  # one stream shared by refill + shuffle (no correlation)
+    new_state = refill_deck_if_needed(state, catalog, force=True, rng=rng)
+    new_state = _shuffle_deck(new_state, rng)
+    return new_state, draw_eligible_card(new_state, catalog)
 
 
-def consume_top_card(state: GameState, catalog: CatalogSnapshot) -> tuple[GameState, Event | None]:
-    """Pop the top eligible card, returning it and the new state.
-
-    Ineligible cards above the drawn one are resolved here (only on an actual
-    consume): important+enabled → reshuffled deeper; everything else (non-
-    important, disabled, stale) → dropped. If nothing's eligible, the deck is
-    left UNCHANGED so it can recover when state changes.
-    """
+def consume_top_card(
+    state: GameState,
+    catalog: CatalogSnapshot,
+    rng: random.Random | None = None,
+) -> tuple[GameState, Event | None]:
+    """Pop the first eligible card (scanning the whole deck). Cards ABOVE it are
+    resolved now: important+enabled → reshuffled to a random slot (kept);
+    everything else (non-important ineligible, disabled, stale) → dropped. With
+    nothing eligible the deck is left UNCHANGED so it can recover."""
     new_state = _clone(state)
-    top_ids, by_id, drawn_index = _scan_top(new_state, catalog)
-
-    if drawn_index is None:
+    ids, by_id, idx = _scan_deck(new_state, catalog)
+    if idx is None:
         return new_state, None
 
-    drawn_card = by_id[top_ids[drawn_index]]
+    drawn_card = by_id[ids[idx]]
+    rng = rng or turn_rng(state)
 
-    # Collect important cards above the drawn one to reshuffle; drop the rest.
-    # `enabled=False` overrides `important`, so a soft-decommissioned questline
-    # card is dropped, not preserved.
-    to_reshuffle: list[str] = []
-    for j in range(drawn_index):
-        card = by_id.get(top_ids[j])
-        if card is None:
-            continue  # stale → dropped
-        if card.important and card.enabled:
-            to_reshuffle.append(top_ids[j])
-
-    # Keep everything below the drawn card untouched.
-    new_deck = new_state.deck[drawn_index + 1:]
-
-    # Re-insert important cards at random positions, per-turn seeded for replay.
-    rng = random.Random(state.rng_seed + state.turn)
-    for cid in to_reshuffle:
-        idx = rng.randrange(len(new_deck) + 1) if new_deck else 0
-        new_deck.insert(idx, cid)
+    # Keep everything below the drawn card; rebuild what's above it.
+    new_deck = new_state.deck[idx + 1:]
+    for j in range(idx):
+        card = by_id.get(ids[j])
+        if card is not None and card.important and card.enabled:
+            pos = rng.randrange(len(new_deck) + 1) if new_deck else 0
+            new_deck.insert(pos, ids[j])
+        # else (non-important ineligible / disabled / stale) → dropped
 
     new_state.deck = new_deck
     return new_state, drawn_card
+
+
+def _shuffle_deck(state: GameState, rng: random.Random) -> GameState:
+    """Whole-deck shuffle with the given seeded RNG (replay-stable). Only used by
+    the recovery path, where deck order is moot (nothing was playable)."""
+    new_state = _clone(state)
+    rng.shuffle(new_state.deck)
+    return new_state
 
 
 # =============================================================================
@@ -210,13 +195,13 @@ def refill_deck_if_needed(
     state: GameState,
     catalog: CatalogSnapshot,
     force: bool = False,
+    rng: random.Random | None = None,
 ) -> GameState:
     """Top the deck up to DECK_TARGET_SIZE when below threshold.
 
-    `force=True` bypasses the threshold (not the tutorial gate) — used by read
-    routes to recover from "has cards but none eligible". Assumes the caller
-    already ran cleanup_zombie_tutorial_cards (the effects.py orchestrator does).
-    """
+    `force=True` bypasses the threshold (not the tutorial gate). Assumes the
+    caller already ran cleanup_zombie_tutorial_cards (the effects.py orchestrator
+    does)."""
     if _tutorial_still_queued(state):
         return state
 
@@ -224,7 +209,7 @@ def refill_deck_if_needed(
         return state
 
     new_state = _clone(state)
-    rng = random.Random(state.rng_seed + state.turn)  # per-turn seeded RNG
+    rng = rng or turn_rng(state)
     needed = DECK_TARGET_SIZE - len(new_state.deck)
 
     candidates = _gather_candidate_pool(new_state, catalog)
@@ -282,6 +267,12 @@ def _gather_candidate_pool(
 # =============================================================================
 # Helpers
 # =============================================================================
+
+def turn_rng(state: GameState) -> random.Random:
+    """Per-turn seeded RNG: deterministic within a turn, different each turn.
+    Single source so every draw/shuffle/refill in a turn shares one definition."""
+    return random.Random(state.rng_seed + state.turn)
+
 
 def _clone(state: GameState) -> GameState:
     """Deep-copy state to keep mutations isolated."""
