@@ -13,8 +13,8 @@ for the broader picture.
 ## TL;DR
 
 ```
-git tag lambdaV0.1.0          GitHub Actions    CDK              AWS
-git push origin lambdaV0.1.0  ──────────────►   cdk deploy ────► FatchadApiStack
+git tag lambda-v0.1.0          GitHub Actions    CDK              AWS
+git push origin lambda-v0.1.0  ──────────────►   cdk deploy ────► FatchadApiStack
                                                                   ├─ S3 bucket (catalog bundles)
                                                                   ├─ Lambda: fatchad-admin
                                                                   ├─ Lambda: fatchad-gameplay
@@ -115,8 +115,8 @@ time just to call `PutRetentionPolicy`.
 
 ## How a deploy works
 
-1. **Tag the commit** — `git tag lambdaV<major>.<minor>.<patch>` and push.
-   The pattern `lambdaV*.*.*` triggers
+1. **Tag the commit** — `git tag lambda-v<major>.<minor>.<patch>` and push.
+   The pattern `lambda-v*` triggers
    [.github/workflows/deploy-lambdas.yml](../.github/workflows/deploy-lambdas.yml). Anything else (branch
    pushes, PR opens, frontend tags) is ignored.
 
@@ -124,7 +124,7 @@ time just to call `PutRetentionPolicy`.
    OIDC token for AWS credentials via
    `aws-actions/configure-aws-credentials@v4`, assuming
    `FatchadLambdaDeployRole`. That role's trust policy only accepts
-   tokens whose `sub` claim matches `refs/tags/lambdaV*` (or
+   tokens whose `sub` claim matches `refs/tags/lambda-v*` (or
    workflow_dispatch from `main` / the active dev branch), so a leaked
    ARN can't be assumed from arbitrary branches.
 
@@ -249,7 +249,7 @@ traffic shapes — gameplay is hot during play, admin is sporadic — so
 sharing a function would conflate their warm pools anyway.
 
 **Tag-driven deploys, not branch-driven.** Every backend version on
-production maps to a `lambdaV<x.y.z>` git tag. `git tag --list 'lambdaV*'`
+production maps to a `lambda-v<x.y.z>` git tag. `git tag --list 'lambda-v*'`
 answers "what shipped, in what order?". Branch pushes don't deploy,
 which means a casual merge to `main` never accidentally ships.
 

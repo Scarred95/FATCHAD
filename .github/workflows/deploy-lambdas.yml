@@ -1,7 +1,7 @@
 name: Deploy lambdas
 
 # Triggers:
-#   - Pushing a tag matching `lambdaV*.*.*` (e.g. lambdaV0.1.0).
+#   - Pushing a tag matching `lambda-v*` (e.g. lambda-v0.1.0).
 #   - Manual run via the Actions UI ("Run workflow").
 #
 # Branch pushes do NOT trigger this. Use a tag.
@@ -16,7 +16,7 @@ name: Deploy lambdas
 on:
   push:
     tags:
-      - 'lambdaV*.*.*'
+      - 'lambda-v*'
   workflow_dispatch:
     inputs:
       version_label:
@@ -62,8 +62,8 @@ jobs:
         id: ver
         run: |
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
-            # Strip the `lambdaV` prefix: "lambdaV0.1.0" -> "0.1.0"
-            echo "label=${GITHUB_REF_NAME#lambdaV}" >> "$GITHUB_OUTPUT"
+            # Strip the `lambda-v` prefix: "lambda-v0.1.0" -> "0.1.0"
+            echo "label=${GITHUB_REF_NAME#lambda-v}" >> "$GITHUB_OUTPUT"
           elif [[ -n "${{ inputs.version_label }}" ]]; then
             echo "label=${{ inputs.version_label }}" >> "$GITHUB_OUTPUT"
           else

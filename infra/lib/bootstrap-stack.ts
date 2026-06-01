@@ -166,7 +166,7 @@ export class FatchadBootstrapStack extends cdk.Stack {
     // ------------------------------------------------------------------
     // FatchadLambdaDeployRole — scoped to `cdk deploy FatchadApiStack`.
     //
-    // Trust: only `lambdaV*` tag pushes or workflow_dispatch from main /
+    // Trust: only `lambda-v*` tag pushes or workflow_dispatch from main /
     // the active dev branch. Mirrors the scoping pattern used by the
     // frontend upload role so the blast radius of a leaked token is bounded
     // to "the workflow that's allowed to deploy Lambdas".
@@ -186,7 +186,7 @@ export class FatchadBootstrapStack extends cdk.Stack {
           },
           StringLike: {
             'token.actions.githubusercontent.com:sub': [
-              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/lambdaV*`,
+              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/lambda-v*`,
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/main`,
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/aurendev-CICD_AWS_TEST`,
             ],
