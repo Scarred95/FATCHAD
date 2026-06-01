@@ -1,9 +1,7 @@
-"""Read/write access to fatchad_user_data. Used by the gameplay Lambda.
+"""Read/write access to fatchad_user_data (gameplay Lambda).
 
-Sync (boto3 is sync; Lambda is single-invocation per container — no async
-win). The shape mirrors the parts of the old Mongo GameStateRepo that
-gameplay actually uses, plus the profile/run-status-prefix mechanics the
-single-table design adds.
+Sync boto3 — Lambda is one invocation per container, no async win. Covers
+profile, runs, and the run-status-prefix mechanics of the single-table design.
 """
 from __future__ import annotations
 
@@ -105,14 +103,9 @@ class UserRepo:
     # -------------------------------------------------------------------------
 
     def get_run(self, user_id: str, run_id: str) -> GameState | None:
-        """Locate a run regardless of status partition (ACTIVE / ENDED /
-        ABANDONED). Worst case: 3 GetItems.
-
-        Tried in ACTIVE-first order because the active run is the hot path
-        (every gameplay tick hits it). Once a small GSI on run_id justifies
-        itself we'll add it and collapse this to one Query — for now three
-        small reads is cheaper than maintaining an index.
-        """
+        """Locate a run across status partitions (worst case 3 GetItems).
+        ACTIVE-first since the active run is the hot path. A run_id GSI would
+        collapse this to one Query, but isn't worth maintaining yet."""
         for status in ("ACTIVE", "ENDED", "ABANDONED"):
             item = self._t.get_item(
                 Key=user_run_key(user_id, status, run_id),  # type: ignore[arg-type]
@@ -122,12 +115,8 @@ class UserRepo:
         return None
 
     def insert_run(self, state: GameState) -> None:
-        """Insert a brand-new run. Fails loudly on id collision.
-
-        Raises RunConflict on duplicate; the route surfaces that as 409.
-        Does NOT upsert — silent overwrites of a real existing run would
-        corrupt history.
-        """
+        """Insert a brand-new run. Raises RunConflict on id collision (route
+        surfaces it as 409). Not an upsert — silent overwrites corrupt history."""
         sk_status = _sk_status(state.status)
         key = user_run_key(state.user_id, sk_status, state.id)
         try:
@@ -141,26 +130,12 @@ class UserRepo:
             raise
 
     def update_run(self, state: GameState, *, prior_status: str | None = None) -> bool:
-        """Save changes to an existing run.
+        """Save an existing run. Status unchanged (hot path): one PutItem.
 
-        Status-unchanged path (the hot case during gameplay): single PutItem.
-
-        Status-changed path (active → ended/abandoned): the SK itself changes
-        (RUN#ACTIVE#x → RUN#ENDED#x), so we PutItem at the new key and
-        DeleteItem the old. Two writes, no transaction — in the very rare
-        case the delete fails after the put, get_run's status-priority order
-        (ACTIVE first) resolves the duplicate by reading the right one until
-        someone cleans it up.
-
-        Pass `prior_status` (the status the row was last saved under) when
-        the in-memory state transitioned; otherwise the SK is assumed
-        unchanged.
-
-        Returns True always — caller treats a missing row as a race
-        condition only if `insert_run` semantics matter, but at this layer
-        we deliberately don't check existence because PutItem in DDB is
-        unconditional upsert and re-reading first would double the cost
-        of every gameplay tick.
+        Status changed: the SK changes (RUN#ACTIVE#x → RUN#ENDED#x), so PutItem
+        the new key + DeleteItem the old — two writes, no transaction. If the
+        delete fails after the put, get_run's ACTIVE-first order reads the right
+        row until cleanup. Pass `prior_status` when the status transitioned.
         """
         current_sk_status = _sk_status(state.status)
         prior_sk_status = (
@@ -191,13 +166,9 @@ class UserRepo:
         return False
 
     def list_runs_for_user(self, user_id: str) -> list[GameState]:
-        """All runs for a user, any status. One Query on the user partition,
-        SK begins_with RUN#.
-
-        Handles DDB's 1 MB page size with a pagination loop. A user with
-        thousands of runs would burn pages; if that becomes a real shape,
-        switch the summary endpoint to a ProjectionExpression that strips
-        deck/history/flags.
+        """All runs for a user, any status: one Query (SK begins_with RUN#)
+        with a 1 MB pagination loop. If users ever accumulate thousands of runs,
+        give the summary endpoint a ProjectionExpression that strips deck/history.
         """
         items: list[dict] = []
         kwargs = {

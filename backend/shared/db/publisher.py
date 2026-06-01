@@ -1,21 +1,12 @@
 """Catalog publish — turn the DDB working-copy into S3 versioned bundles.
 
-The admin Lambda calls `publish_catalog()` when an editor hits "Publish".
-The gameplay Lambda never imports this module.
+Admin-only (`publish_catalog()` on "Publish"); gameplay never imports this.
+Writes v<version>/catalog_full.json (engine, read by catalog_snapshot.py) and
+catalog_public.json (SPA via CloudFront, spoiler/anti-cheat fields stripped),
+then bumps the DDB META#current pointer.
 
-Output:
-  s3://<catalog_bucket>/v<version>/catalog_full.json   — engine bundle
-  s3://<catalog_bucket>/v<version>/catalog_public.json — frontend bundle
-  DDB META#current pointer rewritten to point at the new version
-
-`catalog_full.json` is what `catalog_snapshot.py` reads on the gameplay
-side. `catalog_public.json` is fetched directly by the SPA from CloudFront
-and intentionally hides spoiler/anti-cheat fields (effects, requires,
-weights, ending thresholds, achievement criteria).
-
-Effective-enabled cascading: when a card or ending has a `deck_name`, its
-parent deck's `enabled` flag overrides its own. Disabling a deck removes
-all its content from both bundles in one click.
+Effective-enabled cascade: a card/ending with a `deck_name` inherits its
+parent deck's `enabled`, so disabling a deck drops all its content at once.
 """
 from __future__ import annotations
 
@@ -43,15 +34,10 @@ from shared.schemas import (
 def publish_catalog(version: str | None = None) -> CatalogPointer:
     """Snapshot the working copy, upload both bundles, bump the pointer.
 
-    `version` is normally None → a UTC timestamp is minted. Callers can pass
-    an explicit string (e.g. a git tag like `database-v7`) when publishing
-    is driven by CI rather than the admin button.
-
-    Returns the new pointer that was written.
-
-    Cache invalidation: the in-process CatalogSnapshot cache is reset so the
-    *same* Lambda container picks up the new version on its next gameplay
-    call. Other warm containers will catch up via the pointer-version check.
+    `version` defaults to a minted UTC timestamp; pass an explicit string
+    (e.g. git tag `database-v7`) for CI-driven publishes. Returns the new
+    pointer. Resets the in-process snapshot cache so this container sees the
+    new version immediately; other warm containers catch up via the pointer.
     """
     catalog = CatalogRepo()
     decks       = catalog.list_decks()
@@ -157,10 +143,9 @@ def _dump(model) -> dict:
 
 
 def _dump_card_public(card: Event) -> dict:
-    """Player-visible card fields only. Strips: effects, requires, weight,
-    important, sets/clears flags, adds_to_deck, triggers_ending,
-    unlocks/removes_endings. Hints are derived from effects when not
-    explicitly authored, so players still see arrows."""
+    """Player-visible card fields only — strips all engine/anti-cheat fields
+    (effects, requires, weight, flags, deck-adds, ending links). Hints fall
+    back to effect-derived arrows when not explicitly authored."""
     return {
         "id":          card.id,
         "title":       card.title,

@@ -1,10 +1,9 @@
 # shared/game/deck.py
-"""Deck operations: draw eligible cards, refill from generic pool,
+"""Deck operations: draw eligible cards, refill from the generic pool, and
 advance scheduled cards into the deck.
 
-Sync because the input is a `CatalogSnapshot` (RAM dict lookups, no IO).
-The Lambda is single-invocation per container — no concurrency to win by
-making the engine async.
+Sync — input is a RAM-resident CatalogSnapshot and the Lambda is
+single-invocation per container, so there's no concurrency to win.
 """
 from __future__ import annotations
 
@@ -30,28 +29,23 @@ def _scan_top(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> tuple[list[str], dict[str, Event], int | None]:
-    """Fetch the top DECK_DRAW_BATCH cards and find the first eligible one.
+    """Inspect the top DECK_DRAW_BATCH cards; find the first eligible one.
 
-    Single source of truth for the top-of-deck scan — used by both
-    draw_eligible_card (peek) and consume_top_card (pop).
+    Single source of truth for the top-of-deck scan, shared by the peek
+    (draw_eligible_card) and pop (consume_top_card) paths.
 
-    Returns:
-      - top_ids: the card IDs that were inspected (may be empty if deck is empty)
-      - by_id:   id → Event lookup for those IDs (stale IDs are absent)
-      - drawn_index: index into top_ids of the first eligible card, or None
-                     if the deck is empty / nothing in the batch is eligible
+    Returns (top_ids, id->Event lookup, index of first eligible or None).
     """
     if not state.deck:
         return [], {}, None
 
     top_ids = state.deck[:DECK_DRAW_BATCH]
-    cards = catalog.get_cards(top_ids)
-    by_id = _by_id(cards)
+    by_id = _by_id(catalog.get_cards(top_ids))
 
     for i, card_id in enumerate(top_ids):
         card = by_id.get(card_id)
         if card is None:
-            continue  # stale ID (card deleted from content) — skip
+            continue  # stale id (card deleted from content) — skip
         if is_eligible(card, state):
             return top_ids, by_id, i
 
@@ -59,14 +53,9 @@ def _scan_top(
 
 
 def draw_eligible_card(state: GameState, catalog: CatalogSnapshot) -> Event | None:
-    """Find the top-of-deck card that's eligible given current state.
+    """Peek the first eligible top-of-deck card without mutating the deck.
 
-    Peeks the top DECK_DRAW_BATCH cards in one call without mutating the
-    deck — consumption happens in consume_top_card when a choice is committed.
-
-    Returns None if the deck is empty or none of the top batch are eligible.
-    Refill should keep the deck large enough that the eligible card is
-    almost always inside this window.
+    Returns None if the deck is empty or no card in the top batch is eligible.
     """
     top_ids, by_id, drawn_index = _scan_top(state, catalog)
     if drawn_index is None:
@@ -78,16 +67,11 @@ def draw_with_refill_retry(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> tuple[GameState, Event | None]:
-    """Draw, force-refill once if nothing eligible, retry the draw.
+    """Draw; if nothing eligible, force-refill once and retry. In-memory only
+    (no DB writes). Returns (state, card) — state may be new if refill ran.
 
-    Use this when the caller can't be sure the deck is healthy — primarily
-    POST /choice, where a rare combination of stat/flag mutations might
-    leave the top batch all ineligible despite apply_choice's standard refill.
-
-    In-memory only: no DB writes. The caller decides when to save the
-    (possibly refilled) state.
-
-    Returns (state, card) — state may be a new instance if refill ran.
+    For callers that can't assume a healthy deck, e.g. POST /choice where stat
+    or flag changes can leave the top batch all ineligible.
     """
     card = draw_eligible_card(state, catalog)
     if card is not None:
@@ -99,44 +83,36 @@ def draw_with_refill_retry(
 
 
 def consume_top_card(state: GameState, catalog: CatalogSnapshot) -> tuple[GameState, Event | None]:
-    """Remove the top eligible card from the deck and return it along with the new state.
+    """Pop the top eligible card, returning it and the new state.
 
-    Cleanup of ineligible cards happens here, only when something is actually
-    consumed. For each ineligible card sitting above the drawn card:
-      - card.important == True  → re-shuffled to a random position deeper in the deck
-      - card.important == False → dropped (its moment passed; it won't come up again)
-      - stale ID (card deleted)  → dropped
-    If no card in the top batch is eligible, returns (cloned_state, None) with
-    the deck UNCHANGED so it can recover later if state changes.
+    Ineligible cards above the drawn one are resolved here (only on an actual
+    consume): important+enabled → reshuffled deeper; everything else (non-
+    important, disabled, stale) → dropped. If nothing's eligible, the deck is
+    left UNCHANGED so it can recover when state changes.
     """
     new_state = _clone(state)
     top_ids, by_id, drawn_index = _scan_top(new_state, catalog)
 
     if drawn_index is None:
-        # Empty deck or nothing eligible in the top batch — leave the deck untouched.
         return new_state, None
 
     drawn_card = by_id[top_ids[drawn_index]]
 
-    # Walk the cards above the drawn one: drop non-important ineligibles and
-    # stales; collect important ineligibles to re-shuffle back into the deck.
-    # Disabled cards are always dropped — `enabled=False` overrides `important`,
-    # so admins can soft-decommission a questline card without surgery.
+    # Collect important cards above the drawn one to reshuffle; drop the rest.
+    # `enabled=False` overrides `important`, so a soft-decommissioned questline
+    # card is dropped, not preserved.
     to_reshuffle: list[str] = []
     for j in range(drawn_index):
-        cid = top_ids[j]
-        card = by_id.get(cid)
+        card = by_id.get(top_ids[j])
         if card is None:
             continue  # stale → dropped
         if card.important and card.enabled:
-            to_reshuffle.append(cid)
-        # else: ineligible non-important OR disabled → dropped
+            to_reshuffle.append(top_ids[j])
 
-    # Keep everything from drawn_index+1 onward (untouched portion of deck).
+    # Keep everything below the drawn card untouched.
     new_deck = new_state.deck[drawn_index + 1:]
 
-    # Re-insert important cards at random positions. Per-turn seeded RNG so
-    # reshuffles are reproducible from (rng_seed, turn).
+    # Re-insert important cards at random positions, per-turn seeded for replay.
     rng = random.Random(state.rng_seed + state.turn)
     for cid in to_reshuffle:
         idx = rng.randrange(len(new_deck) + 1) if new_deck else 0
@@ -144,6 +120,7 @@ def consume_top_card(state: GameState, catalog: CatalogSnapshot) -> tuple[GameSt
 
     new_state.deck = new_deck
     return new_state, drawn_card
+
 
 # =============================================================================
 # Adding cards from a choice
@@ -154,14 +131,12 @@ def apply_deck_additions(
     additions: list[DeckAddition],
     rng: random.Random,
 ) -> GameState:
-    """Insert cards from a choice's adds_to_deck into deck or scheduled list.
+    """Insert a choice's adds_to_deck into the deck or the scheduled list.
 
-    - position="top"     → prepend to deck
-    - position="bottom"  → append to deck
-    - position="shuffle" → random index
-    - in_turns=N         → goes to scheduled, fires on state.turn + N
+    position top/bottom/shuffle place into the deck; in_turns=N defers to
+    scheduled, firing on state.turn + N.
     """
-    # Most choices have no deck additions — skip the deep copy in that case.
+    # Most choices add nothing — skip the deep copy.
     if not additions:
         return state
 
@@ -182,28 +157,26 @@ def apply_deck_additions(
         elif addition.position == "bottom":
             new_state.deck.append(addition.card_id)
         elif addition.position == "shuffle":
-            # randrange(n+1) covers all valid insert positions: 0 (top) through n (bottom).
+            # randrange(n+1) spans every insert slot, 0 (top) through n (bottom).
             idx = rng.randrange(len(new_state.deck) + 1) if new_state.deck else 0
             new_state.deck.insert(idx, addition.card_id)
-        # any other position value: silently ignored — schema's Literal prevents this
+        # other values can't occur — schema Literal constrains position.
 
     return new_state
+
 
 # =============================================================================
 # Scheduling — promote due scheduled cards into the deck
 # =============================================================================
 
 def promote_due_scheduled(state: GameState) -> GameState:
-    """Move scheduled cards whose play_on_turn has arrived into the deck.
-
-    Called once per turn after stats/flags are updated.
-    """
+    """Move scheduled cards whose play_on_turn has arrived to the top of the
+    deck (so the consequence lands now). Called once per turn after updates."""
     new_state = _clone(state)
     still_scheduled: list[ScheduledCard] = []
 
     for sched in new_state.scheduled:
         if sched.play_on_turn <= new_state.turn:
-            # Insert at top so the consequence lands now, not in 5 more cards
             new_state.deck.insert(0, sched.card_id)
         else:
             still_scheduled.append(sched)
@@ -211,20 +184,15 @@ def promote_due_scheduled(state: GameState) -> GameState:
     new_state.scheduled = still_scheduled
     return new_state
 
+
 # =============================================================================
 # Refill — keep the deck from drying up
 # =============================================================================
 
 def cleanup_zombie_tutorial_cards(state: GameState) -> GameState:
-    """Strip leftover tutorial cards once the tutorial is complete.
-
-    `evt_tut_10_finale` sets `tutorial_done` and clears the intermediate
-    tutorial flags. Any tut_* cards still sitting in the deck or scheduled
-    list are permanently ineligible after that — drop them so they can't
-    clog the top of the deck or get promoted into it later.
-
-    No-op while the tutorial is still running.
-    """
+    """Once `tutorial_done` is set, drop any leftover tut_* cards from deck and
+    scheduled — they're permanently ineligible and would clog the deck. No-op
+    while the tutorial is still running."""
     if "tutorial_done" not in state.flags:
         return state
 
@@ -243,17 +211,11 @@ def refill_deck_if_needed(
     catalog: CatalogSnapshot,
     force: bool = False,
 ) -> GameState:
-    """If the deck has fewer than threshold cards, top it up to the target size.
+    """Top the deck up to DECK_TARGET_SIZE when below threshold.
 
-    Tutorial gate: skipped while a tutorial card is still in the deck so the
-    scripted intro plays without generic cards bleeding in.
-
-    `force=True` bypasses the threshold check (but not the tutorial gate),
-    used by the read-side routes to recover from a "deck has cards but none
-    eligible right now" state.
-
-    Assumes the caller has already run `cleanup_zombie_tutorial_cards`
-    (the orchestrator in effects.py does so).
+    `force=True` bypasses the threshold (not the tutorial gate) — used by read
+    routes to recover from "has cards but none eligible". Assumes the caller
+    already ran cleanup_zombie_tutorial_cards (the effects.py orchestrator does).
     """
     if _tutorial_still_queued(state):
         return state
@@ -270,7 +232,7 @@ def refill_deck_if_needed(
         # Nothing to add. Caller should probably end the run gracefully.
         return new_state
 
-    # Already in the deck or scheduled? Don't double-add.
+    # Skip cards already in the deck or scheduled.
     in_deck = set(new_state.deck)
     in_scheduled = {s.card_id for s in new_state.scheduled}
     fresh = [
@@ -278,10 +240,8 @@ def refill_deck_if_needed(
         if c.id not in in_deck and c.id not in in_scheduled
     ]
 
-    # Weighted-random sample without replacement (Efraimidis-Spirakis):
-    # for each card draw a key = rand^(1/weight), then take the top-k by key.
-    # Equivalent to repeated weighted picks but in one pass and stable under
-    # the per-turn seeded RNG.
+    # Weighted sample without replacement (Efraimidis-Spirakis): key each card
+    # by rand^(1/weight), take the top-k. One pass, stable under the seeded RNG.
     keyed = [(rng.random() ** (1.0 / c.weight), c) for c in fresh]
     keyed.sort(key=lambda kc: kc[0], reverse=True)
 
@@ -291,20 +251,14 @@ def refill_deck_if_needed(
 
     return new_state
 
+
 def _tutorial_still_queued(state: GameState) -> bool:
-    """True if the tutorial is still running and tutorial cards remain in the deck.
+    """True while the tutorial is running and tut_* cards remain in the deck.
 
-    Once the player has played `evt_tut_10_finale` (which sets `tutorial_done`
-    and clears the intermediate tutorial flags), the gate drops — any
-    leftover tutorial cards in the deck are zombies (their required flags
-    were just cleared) and would block refill forever otherwise.
-
-    Intentionally ignores `state.scheduled` — a scheduled tutorial card may
-    not be due to promote for several turns, and gating refill on it would
-    leave the deck empty in the meantime, softlocking the run. Scheduled
-    tutorial cards get inserted at the top of the deck via
-    `promote_due_scheduled` when their turn arrives, so they still play
-    next even if a few generic refill cards now sit under them.
+    Drops once `evt_tut_10_finale` sets `tutorial_done` (otherwise zombie
+    tutorial cards would block refill forever). Ignores state.scheduled on
+    purpose: a not-yet-due scheduled tutorial card would gate refill and empty
+    the deck — it gets promoted to the top when due, so it still plays next.
     """
     if "tutorial_done" in state.flags:
         return False
@@ -315,27 +269,24 @@ def _gather_candidate_pool(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> list[Event]:
-    """Collect eligible cards from generic categories for refill.
-
-    Excludes:
-      - weight <= 0  (questline / ending cards opt-out of refill explicitly)
-      - important   (these only enter the deck via adds_to_deck from another
-                     card; they should never be picked at random)
-    """
+    """Eligible refill candidates from the generic categories. Excludes
+    weight<=0 (questline/ending opt-outs) and important cards (those only
+    enter via adds_to_deck, never at random)."""
     cards = catalog.cards_by_categories(GENERIC_CATEGORIES)
     return [
         c for c in cards
         if c.weight > 0 and not c.important and is_eligible(c, state)
     ]
 
+
 # =============================================================================
 # Helpers
 # =============================================================================
 
 def _clone(state: GameState) -> GameState:
-    """Deep-copy a state to keep mutations isolated."""
+    """Deep-copy state to keep mutations isolated."""
     return state.model_copy(deep=True)
 
+
 def _by_id(cards: list[Event]) -> dict[str, Event]:
-    """Helper to map card IDs to card objects."""
     return {c.id: c for c in cards}
