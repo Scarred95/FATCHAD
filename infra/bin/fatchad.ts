@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { FatchadBootstrapStack } from '../lib/bootstrap-stack';
 import { FatchadFrontendStack } from '../lib/frontend-stack';
 import { FatchadDataStack } from '../lib/ddb-stack';
+import { FatchadApiStack } from '../lib/api-stack';
 
 
 
@@ -31,4 +32,18 @@ new FatchadFrontendStack(app, 'FatchadFrontendStack', {
 new FatchadDataStack(app, 'FatchadDataStack', {
   env,
   description: 'FATCHAD data: DynamoDB tables for catalog + user data.',
+});
+
+// adminToken: pulled from CDK context so it doesn't get committed. Set with
+//   `npx cdk deploy FatchadApiStack -c adminToken=... -c corsOrigins=...`
+// or in the deploy workflow as `--context adminToken=$ADMIN_TOKEN`. A dev
+// fallback keeps `cdk synth` working locally without ceremony.
+const adminToken = (app.node.tryGetContext('adminToken') as string) ?? 'dev-token-change-me';
+const corsOrigins = (app.node.tryGetContext('corsOrigins') as string) ?? 'http://localhost:5173';
+
+new FatchadApiStack(app, 'FatchadApiStack', {
+  env,
+  description: 'FATCHAD API: admin + gameplay Lambdas behind one HTTP API.',
+  adminToken,
+  corsOrigins,
 });

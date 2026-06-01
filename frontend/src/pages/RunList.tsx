@@ -41,7 +41,7 @@ export default function RunList() {
   async function handleDelete(r: RunSummary) {
     setConfirmDelete(null);
     try {
-      await deleteRun(r._id, true);
+      await deleteRun(r._id, getUserId(), true);
       pushToast('Lauf gelöscht', 'info');
       await refresh();
     } catch (e) {

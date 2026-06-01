@@ -7,6 +7,7 @@ import StatIcon from '../components/StatIcon/StatIcon';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
+import { getUserId } from '../stores/userStore';
 import styles from './EndScreen.module.css';
 
 export default function EndScreen() {
@@ -21,7 +22,7 @@ export default function EndScreen() {
 
   useEffect(() => {
     if (!runId) return;
-    getEndSummary(runId)
+    getEndSummary(runId, getUserId())
       .then(setSummary)
       .catch((e) => setError(errMsg(e)));
   }, [runId]);

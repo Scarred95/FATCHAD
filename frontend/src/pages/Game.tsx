@@ -55,18 +55,6 @@ export default function Game() {
 
   const chaosValue = state?.stats.chaos || 0;
 
-  let backgroundStyle = {};
-
-  if (chaosValue >= 10) {
-    backgroundStyle = {
-      // Keine Variablen, keine Punkte – einfach die direkte Web-Adresse:
-      backgroundImage: "linear-gradient(rgba(10, 10, 15, 0.75), rgba(10, 10, 15, 0.85)), url('/images/this_is_fine.gif')",
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      transition: 'background 0.8s ease-in-out'
-    };
-  }
-
   const hasDown = !!currentCard && currentCard.choices.length >= 3;
   // Swipe is enabled on every card. 2-choice cards commit on horizontal
   // swipes (index 0 / 1); 3-choice cards additionally commit on a down

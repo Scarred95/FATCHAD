@@ -55,19 +55,48 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build
-        working-directory: frontend
-        env:
-          VITE_WIP_MODE: 'true'
-          VITE_APP_VERSION: ${{ steps.ver.outputs.label }}
-        run: npm run build
-
+      # OIDC role assume happens BEFORE the build so the build step can read
+      # the API URL out of CloudFormation. The role has scoped permissions:
+      # S3 sync to fatchad-frontend + DescribeStacks on FatchadApiStack only.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_FRONTEND_UPLOAD_ROLE_ARN }}
           aws-region: eu-central-1
           role-session-name: GitHubActions-FrontendDeploy-${{ steps.ver.outputs.label }}
+
+      # Pull the HTTP API base URL from FatchadApiStack outputs so the SPA
+      # build embeds the real endpoint. No GitHub secret to keep in sync —
+      # the CDK stack is the single source of truth. If the stack doesn't
+      # exist yet (first deploy, or someone destroyed it), the build still
+      # proceeds with empty values and the runtime falls back to `/api`,
+      # which won't reach anything on S3 but won't break the build either.
+      - name: Resolve API base URL from CloudFormation
+        id: api
+        run: |
+          set -euo pipefail
+          URL=$(aws cloudformation describe-stacks \
+            --stack-name FatchadApiStack \
+            --region eu-central-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='HttpApiUrl'].OutputValue" \
+            --output text 2>/dev/null || true)
+          if [[ -z "$URL" || "$URL" == "None" ]]; then
+            echo "::warning::FatchadApiStack/HttpApiUrl not found — building with empty API base URL"
+            URL=""
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Resolved API URL: $URL"
+
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_APP_VERSION: ${{ steps.ver.outputs.label }}
+          # Gameplay/public surface lives at the HTTP API root.
+          VITE_API_BASE_URL: ${{ steps.api.outputs.url }}
+          # Admin routes are mounted under `/admin` on the same API. If we
+          # ever route admin through a separate domain, override this var.
+          VITE_ADMIN_API_BASE_URL: ${{ steps.api.outputs.url }}/admin
+        run: npm run build
 
       - name: Sync hashed assets (long cache)
         run: |
