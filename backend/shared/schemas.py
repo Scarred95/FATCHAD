@@ -6,13 +6,30 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict
 
 
+# Bump when a persisted model's stored shape changes in a way that needs a
+# read-time migration. The migrate() hook is deferred (see FEATURE_IDEAS.md);
+# for now records are stamped with the current version so the field exists the
+# day we need it.
+CURRENT_SCHEMA_VERSION = 1
+
+
 # =============================================================================
 # Shared building blocks
 # =============================================================================
 
-class Effects(BaseModel):
-    """Stat changes applied by a choice. All default to 0 so cards only
-    declare the stats they actually touch."""
+class StatBlock(BaseModel):
+    """The five stat axes as ints. One place defines the axis set; STAT_NAMES
+    in game/constants.py mirrors it for iteration code. A shared base so
+    Effects (deltas) and Stats (absolutes) are substitutable in stat helpers."""
+    moneten: int
+    aura: int
+    respekt: int
+    rizz: int
+    chaos: int
+
+class Effects(StatBlock):
+    """Per-choice stat deltas. Optional — a card only declares the axes it
+    touches, so every axis defaults to 0 (overriding StatBlock's required)."""
     moneten: int = 0
     aura: int = 0
     respekt: int = 0
@@ -44,20 +61,14 @@ class StatRange(BaseModel):
     max: Optional[int] = None
 
 
-class Stats(BaseModel):
-    """The four player stats plus the global Chaos value.
+class Stats(StatBlock):
+    """Absolute player stats (inherits the five required axes from StatBlock).
 
     Nominal ranges are 0-100 for the main stats and -100..+100 for Chaos, but
     values are NOT clamped — quests/endings handle out-of-band behavior. The
     nominal ranges only matter for UI display and as the default ending
-    thresholds (see seed endings). A quest can remove the corresponding
-    ending and let a stat climb past 100 (or below 0).
+    thresholds (see seed endings).
     """
-    moneten: int
-    aura: int
-    respekt: int
-    rizz: int
-    chaos: int
 
 # =============================================================================
 # Event schema (catalog: PK=EVENT)
@@ -125,12 +136,10 @@ class Event(BaseModel):
 # Ending state schema
 # =============================================================================
 
-class EndingRequirements(BaseModel):
-    """Same shape as Event.requires — reused so predicate logic stays DRY."""
-    flags_all:  list[str] = []
-    flags_none: list[str] = []
-    flags_any:  list[str] = []
-    stats: dict[str, StatRange] = {}   # e.g. {"moneten": {"min": 100}}
+# Endings use the same predicate shape as cards — alias the type so the two
+# can't drift apart (and so default_factory mutable-default handling stays in
+# one place). Was a duplicate class; the name is kept for readability at use sites.
+EndingRequirements = Requirements
 
 
 class Ending(BaseModel):
@@ -172,6 +181,8 @@ GameStatus = Literal["active", "ended", "abandoned"]
 
 class GameState(BaseModel):
     """Per-run save data."""
+    # Stored-format version; read path migrates older records (hook deferred).
+    schema_version: int = CURRENT_SCHEMA_VERSION
     id: str = Field(alias="_id")
     user_id: str
     deck: list[str] = Field(default_factory=list)
@@ -304,10 +315,12 @@ class CatalogPointer(BaseModel):
 
     `version` is the `database-v*` tag at publish time, or a content hash if
     publishing happened off-tag.
+
+    Bundle keys are derived from `version` (v<version>/catalog_{full,public}.json),
+    so no URL is stored — the frontend fetches the public bundle over HTTPS and
+    gameplay reads the full bundle by version (see catalog_snapshot.py).
     """
     version: str
-    public_url: str
-    full_url: str
     published_at: datetime
 
 
@@ -330,6 +343,8 @@ class ProfileTotals(BaseModel):
 
 class Profile(BaseModel):
     """Per-user profile item. One per user, PK=USER#<uid>, SK=PROFILE."""
+    # Stored-format version; read path migrates older records (hook deferred).
+    schema_version: int = CURRENT_SCHEMA_VERSION
     user_id: str
     display_name: str
     totals: ProfileTotals = Field(default_factory=ProfileTotals)

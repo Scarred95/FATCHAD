@@ -10,6 +10,8 @@ per container — there's no event loop to win latency back from.
 from __future__ import annotations
 
 import json
+import random
+import time
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
@@ -110,12 +112,21 @@ class CatalogRepo:
         # BatchGetItem caps at 100 keys per request; loop in chunks.
         out: list[Event] = []
         for chunk in _chunks(ids, 100):
-            keys = [catalog_card_key(i) for i in chunk]
-            resp = self._t.meta.client.batch_get_item(
-                RequestItems={self._t.name: {"Keys": keys}}
-            )
-            for item in resp.get("Responses", {}).get(self._t.name, []):
-                out.append(Event.model_validate(_item_to_dict(item)))
+            # DDB BatchGetItem is best-effort: under throttling or the 16 MB
+            # response cap it returns a partial result and hands the leftovers
+            # back in UnprocessedKeys. Re-request just those with exponential
+            # backoff + jitter until drained — otherwise those cards silently
+            # vanish and a partial list looks identical to "id not found".
+            request = {self._t.name: {"Keys": [catalog_card_key(i) for i in chunk]}}
+            attempt = 0
+            while request:
+                resp = self._t.meta.client.batch_get_item(RequestItems=request)
+                for item in resp.get("Responses", {}).get(self._t.name, []):
+                    out.append(Event.model_validate(_item_to_dict(item)))
+                request = resp.get("UnprocessedKeys") or {}
+                if request:
+                    attempt += 1
+                    time.sleep(min(0.05 * 2 ** attempt, 1.0) + random.random() * 0.05)
         return out
 
     def list_cards(self, category: str | None = None) -> list[Event]:
@@ -133,7 +144,11 @@ class CatalogRepo:
 
     def list_cards_by_categories(self, categories: list[str]) -> list[Event]:
         """All cards whose category is in the given list. One full-partition
-        scan + a set-based filter — same shape the old EventRepo had."""
+        scan + a set-based filter — same shape the old EventRepo had.
+
+        NOTE: gameplay uses CatalogSnapshot.cards_by_categories (S3-backed);
+        confirm this repo variant still has a caller before relying on it.
+        """
         if not categories:
             return []
         cats = set(categories)
@@ -307,7 +322,12 @@ class CatalogRepo:
         return CatalogPointer.model_validate(_item_to_dict(item)) if item else None
 
     def set_pointer(self, pointer: CatalogPointer) -> None:
-        """Overwrites unconditionally. Publish flow owns the version-bump."""
+        """Overwrites unconditionally. Publish flow owns the version-bump.
+
+        No CAS guard: publish is admin-only and single-operator, so a
+        concurrent-publish race is ACCEPTED. Add a ConditionExpression (and
+        return 409) only if publishing is ever automated / multi-actor.
+        """
         data = json.loads(pointer.model_dump_json())
         data.update(catalog_pointer_key())
         self._t.put_item(Item=data)

@@ -14,6 +14,12 @@ DECK_REFILL_THRESHOLD = 5
 # Bigger value = fewer round-trips at the cost of fetching cards we may not use.
 DECK_DRAW_BATCH       = 5
 
+# ----- Player stats -----
+# The five stat axes in canonical display order. Single source of truth for
+# any "for each stat" loop (hint derivation, serialization). The Pydantic
+# models carrying these axes live in schemas.py (StatBlock + subclasses).
+STAT_NAMES = ("moneten", "aura", "respekt", "rizz", "chaos")
+
 # ----- Card pools -----
 # Categories considered "filler" — used to top up the deck when running low.
 GENERIC_CATEGORIES = ["politik", "social", "economy", "chaos"]

@@ -156,7 +156,12 @@ def _padded_score(score: int) -> str:
 
 def leaderboard_sk(score: int, user_id: str) -> str:
     """Build the SK for a leaderboard entry. Top-N is a Query with
-    ScanIndexForward=False; no client-side sort needed."""
+    ScanIndexForward=False; no client-side sort needed.
+
+    INVARIANT (writer must enforce): the score lives IN the SK, so a user's new
+    score is a different SK than their old one. Updating an entry is therefore
+    delete-old-SK + put-new-SK — a plain put leaves a stale row per old score.
+    """
     return f"SCORE#{_padded_score(score)}#{user_id}"
 
 

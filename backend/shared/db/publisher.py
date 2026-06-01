@@ -91,14 +91,14 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     public_key = f"v{version}/catalog_public.json"
 
     s3 = s3_client()
+    # no gzip/CacheControl yet. Bundles are immutable per version
+    # and CloudFront can compress on the fly; revisit object-level gzip only if
+    # bundle size starts hurting cold-start fetch time.
     s3.put_object(
         Bucket=bucket,
         Key=full_key,
         Body=json.dumps(full_payload).encode("utf-8"),
         ContentType="application/json",
-        # No CacheControl: bundles are immutable per version, but the admin
-        # might overwrite-and-republish under the same explicit version
-        # during testing. Frontend caches them by URL anyway.
     )
     s3.put_object(
         Bucket=bucket,
@@ -108,10 +108,9 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     )
 
     # ---- Bump the pointer ------------------------------------------------
+    # Only the version is stored; bundle keys are derived from it on read.
     pointer = CatalogPointer(
         version=version,
-        public_url=f"s3://{bucket}/{public_key}",
-        full_url=f"s3://{bucket}/{full_key}",
         published_at=datetime.now(timezone.utc),
     )
     catalog.set_pointer(pointer)
@@ -220,8 +219,9 @@ def _dump_deck_public(deck: Deck) -> dict:
 def _mint_version() -> str:
     """UTC timestamp version, e.g. `20260531T143022Z`.
 
-    Sortable by string compare and unique per second. The admin-driven publish
-    flow won't hit collisions; CI-driven publishes that need to override get
-    to pass an explicit version (typically a git tag).
+    Sortable by string compare and unique per second. The 1-second collision
+    window (two publishes in the same second reuse the key) is ACCEPTED: publish
+    is admin-only and single-operator. Revisit (sub-second suffix) only if
+    publishing is ever automated. CI publishes pass an explicit version instead.
     """
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
