@@ -6,15 +6,16 @@ drifting apart on copy-paste.
 """
 from __future__ import annotations
 
-import logging
 import os
+import time
 import uuid
 
+from aws_lambda_powertools import Logger
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-log = logging.getLogger(__name__)
+logger = Logger(service="fatchad")
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -28,7 +29,20 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         request.state.request_id = rid
+
+        start = time.perf_counter()
         response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000)
+
+        logger.info(
+            "request",
+            request_id=rid,
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+        )
+
         response.headers["X-Request-ID"] = rid
         return response
 
@@ -49,7 +63,7 @@ def install_middleware(app: FastAPI) -> None:
     ]
     allow_credentials = True
     if "*" in origins:
-        log.warning(
+        logger.warning(
             "CORS_ORIGINS contains '*' — disabling allow_credentials "
             "(browsers reject wildcard origin + credentials)."
         )
