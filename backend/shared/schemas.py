@@ -6,13 +6,30 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict
 
 
+# Bump when a persisted model's stored shape changes in a way that needs a
+# read-time migration. The migrate() hook is deferred (see FEATURE_IDEAS.md);
+# for now records are stamped with the current version so the field exists the
+# day we need it.
+CURRENT_SCHEMA_VERSION = 1
+
+
 # =============================================================================
 # Shared building blocks
 # =============================================================================
 
-class Effects(BaseModel):
-    """Stat changes applied by a choice. All default to 0 so cards only
-    declare the stats they actually touch."""
+class StatBlock(BaseModel):
+    """The five stat axes as ints. One place defines the axis set; STAT_NAMES
+    in game/constants.py mirrors it for iteration code. A shared base so
+    Effects (deltas) and Stats (absolutes) are substitutable in stat helpers."""
+    moneten: int
+    aura: int
+    respekt: int
+    rizz: int
+    chaos: int
+
+class Effects(StatBlock):
+    """Per-choice stat deltas. Optional — a card only declares the axes it
+    touches, so every axis defaults to 0 (overriding StatBlock's required)."""
     moneten: int = 0
     aura: int = 0
     respekt: int = 0
@@ -20,18 +37,12 @@ class Effects(BaseModel):
     chaos: int = 0
 
 StatHint = Literal["up", "down", "unknown", "hidden"]
-# "up"      → arrow up icon
-# "down"    → arrow down icon
-# "unknown" → question mark icon (this stat will change, magnitude unknown)
-# "hidden"  → don't show this stat at all (acts like the field wasn't there)
+# up/down → arrow icons; unknown → "?" (will change, magnitude hidden);
+# hidden → omit the stat entirely.
 
 class ChoiceHints(BaseModel):
-    """Frontend display hints for what a choice will do.
-
-    These are AUTHORED separately from effects — they don't have to mirror
-    the actual effects. A card writer can hide consequences for drama,
-    or show fake hints for a card that "lies" to the player.
-    """
+    """Frontend display hints for a choice. AUTHORED separately from effects
+    and free to lie — a card can hide consequences or show fake arrows."""
     moneten: Optional[StatHint] = None
     aura: Optional[StatHint] = None
     respekt: Optional[StatHint] = None
@@ -44,20 +55,10 @@ class StatRange(BaseModel):
     max: Optional[int] = None
 
 
-class Stats(BaseModel):
-    """The four player stats plus the global Chaos value.
-
-    Nominal ranges are 0-100 for the main stats and -100..+100 for Chaos, but
-    values are NOT clamped — quests/endings handle out-of-band behavior. The
-    nominal ranges only matter for UI display and as the default ending
-    thresholds (see seed endings). A quest can remove the corresponding
-    ending and let a stat climb past 100 (or below 0).
-    """
-    moneten: int
-    aura: int
-    respekt: int
-    rizz: int
-    chaos: int
+class Stats(StatBlock):
+    """Absolute player stats (the five required axes from StatBlock). Nominal
+    ranges (0-100, Chaos -100..+100) are NOT clamped — they only drive UI
+    display and default ending thresholds; quests handle out-of-band values."""
 
 # =============================================================================
 # Event schema (catalog: PK=EVENT)
@@ -100,21 +101,15 @@ class Event(BaseModel):
     title: str
     description: str
     category: str
-    # Human-readable name of the deck/pack this card belongs to. Surfaced in
-    # the card-art top-right corner so the player can see which storyline /
-    # source pack a card is drawn from. Optional — older content may not
-    # declare it; the UI falls back to a generic label.
+    # Parent deck/pack name, shown in the card-art corner. Optional — UI falls
+    # back to a generic label for older content.
     deck_name: Optional[str] = None
     weight: int = Field(default=10, ge=0)
-    # If True, this card is preserved when ineligible — re-shuffled to a random
-    # position in the deck instead of being dropped. Use for questline / arc
-    # cards that should still get a chance to play once their requirements
-    # eventually unlock.
+    # If True, kept when ineligible (re-shuffled, not dropped) so questline/arc
+    # cards still get a chance once their requirements unlock.
     important: bool = False
-    # Soft-toggle published state. Disabled cards are skipped by the
-    # gameplay deck loop (never refilled, dropped if surfaced) but stay in
-    # the database so they remain editable / re-enabled via the admin UI.
-    # Defaults True so pre-existing documents (no `enabled` field) read as enabled.
+    # Soft-toggle. Disabled cards are skipped by the deck loop but stay in the
+    # DB for re-enabling. Defaults True so pre-`enabled` docs read as enabled.
     enabled: bool = True
     requires: Requirements = Field(default_factory=Requirements)
     choices: list[Choice] = Field(min_length=2, max_length=3)
@@ -125,12 +120,10 @@ class Event(BaseModel):
 # Ending state schema
 # =============================================================================
 
-class EndingRequirements(BaseModel):
-    """Same shape as Event.requires — reused so predicate logic stays DRY."""
-    flags_all:  list[str] = []
-    flags_none: list[str] = []
-    flags_any:  list[str] = []
-    stats: dict[str, StatRange] = {}   # e.g. {"moneten": {"min": 100}}
+# Endings use the same predicate shape as cards — alias the type so the two
+# can't drift apart (and so default_factory mutable-default handling stays in
+# one place). Was a duplicate class; the name is kept for readability at use sites.
+EndingRequirements = Requirements
 
 
 class Ending(BaseModel):
@@ -138,12 +131,9 @@ class Ending(BaseModel):
     id: str = Field(alias="_id")
     title: str
     description: str
-    # Optional parent deck. None = global ending (always available regardless
-    # of which decks the player has unlocked). When set, the ending is only
-    # added to runs that include the named deck — same string as the parent
-    # Deck.name, mirroring how Event.deck_name links cards to their deck.
-    # Effective enabled-ness becomes: ending.enabled AND parent_deck.enabled,
-    # with deck-less endings only gated by their own `enabled`.
+    # Parent deck name (mirrors Event.deck_name). None = global ending, always
+    # available; when set, only added to runs including that deck. Effective
+    # enabled = ending.enabled AND parent_deck.enabled.
     deck_name: Optional[str] = None
     priority: int = 100                # lower = checked first when multiple match
     requires: EndingRequirements = Field(default_factory=EndingRequirements)
@@ -172,6 +162,8 @@ GameStatus = Literal["active", "ended", "abandoned"]
 
 class GameState(BaseModel):
     """Per-run save data."""
+    # Stored-format version; read path migrates older records (hook deferred).
+    schema_version: int = CURRENT_SCHEMA_VERSION
     id: str = Field(alias="_id")
     user_id: str
     deck: list[str] = Field(default_factory=list)
@@ -204,8 +196,7 @@ class GameState(BaseModel):
         starting_deck: list[str] | None = None,
         starting_endings: list[str] | None = None,
     ) -> "GameState":
-        """Factory for a fresh run with sensible defaults.
-        """
+        """Factory for a fresh run with sensible defaults."""
         now = datetime.now(timezone.utc)
         return cls(
             _id=run_id,
@@ -224,28 +215,18 @@ class GameState(BaseModel):
 # =============================================================================
 
 class DeckUnlockRule(BaseModel):
-    """How a deck becomes available to a user.
-
-    - kind="default":     available to everyone from the start.
-    - kind="achievement": unlocks when `achievement_id` is earned. The user's
-                          UNLOCK#DECK# item is written by the achievement
-                          handler, not by gameplay.
-    """
+    """How a deck becomes available. "default" = everyone from the start;
+    "achievement" = unlocks when `achievement_id` is earned (the UNLOCK#DECK#
+    item is written by the achievement handler, not gameplay)."""
     kind: Literal["default", "achievement"] = "default"
     achievement_id: Optional[str] = None
 
 
 class Deck(BaseModel):
-    """A pack of cards/endings the admin can toggle as a unit.
-
-    The DDB SK is `<name>` (within PK=DECK), so `name` is the natural key.
-    Cards and endings reference their parent deck by name via `Event.deck_name`
-    / `Ending` (linked through requirements, not a direct field).
-
-    Effective enabled-ness at publish time:
-        item.enabled AND parent_deck.enabled
-    So disabling a deck cascades to all its cards without touching them.
-    """
+    """A pack of cards/endings the admin can toggle as a unit. `name` is the
+    natural key (DDB SK within PK=DECK); cards/endings link via deck_name. At
+    publish, effective-enabled = item.enabled AND deck.enabled, so disabling a
+    deck cascades to its content without touching each item."""
     name: str
     description: str = ""
     enabled: bool = True
@@ -259,14 +240,9 @@ class Deck(BaseModel):
 # =============================================================================
 
 class AchievementCriteria(BaseModel):
-    """Free-form criteria payload for v1.
-
-    We deliberately don't lock down a criteria DSL yet — we don't know which
-    predicates we'll actually need until a few achievements exist. Once we do,
-    replace `description` with typed predicates (min_stats, ended_with,
-    survived_turns, ...). For now the criteria engine is a Lambda that reads
-    this blob plus run history and decides.
-    """
+    """Free-form criteria payload for v1. No DSL yet — until a few achievements
+    exist we don't know which predicates we need. A Lambda reads this blob plus
+    run history and decides; typed predicates replace `description` later."""
     description: str
     payload: dict = Field(default_factory=dict)
 
@@ -293,21 +269,10 @@ class Achievement(BaseModel):
 # =============================================================================
 
 class CatalogPointer(BaseModel):
-    """The 'what is currently live?' item.
-
-    Publishing flow:
-      1. Lambda reads the whole catalog table (decks/events/endings/achs).
-      2. Strips disabled items + admin-only fields, writes two JSON blobs to
-         the catalog S3 bucket: catalog_public.json and catalog_full.json.
-      3. Writes this pointer item (PK=META, SK=current) so backend/frontend
-         know which version to fetch and cache.
-
-    `version` is the `database-v*` tag at publish time, or a content hash if
-    publishing happened off-tag.
-    """
+    """The 'what is currently live?' item (PK=META, SK=current). `version` is a
+    minted UTC timestamp per publish (CI may pass an explicit one); bundle keys
+    derive from it — v<version>/catalog_{full,public}.json — so no URL stored."""
     version: str
-    public_url: str
-    full_url: str
     published_at: datetime
 
 
@@ -316,12 +281,9 @@ class CatalogPointer(BaseModel):
 # =============================================================================
 
 class ProfileTotals(BaseModel):
-    """Lifetime counters surfaced on the profile screen.
-
-    These are denormalized — the source of truth is the RUN#ENDED# /
-    RUN#ABANDONED# items plus ACH# items. Totals are updated by the same
-    Lambda that writes those, so they stay consistent without scans.
-    """
+    """Lifetime counters for the profile screen. Denormalized from the
+    RUN#ENDED#/RUN#ABANDONED#/ACH# items and updated by the same Lambda that
+    writes those, so they stay consistent without scans."""
     runs_started: int = 0
     runs_completed: int = 0
     runs_abandoned: int = 0
@@ -330,6 +292,8 @@ class ProfileTotals(BaseModel):
 
 class Profile(BaseModel):
     """Per-user profile item. One per user, PK=USER#<uid>, SK=PROFILE."""
+    # Stored-format version; read path migrates older records (hook deferred).
+    schema_version: int = CURRENT_SCHEMA_VERSION
     user_id: str
     display_name: str
     totals: ProfileTotals = Field(default_factory=ProfileTotals)
@@ -354,14 +318,9 @@ class DeckUnlock(BaseModel):
 
 
 class UserAchievement(BaseModel):
-    """An achievement the user has earned or is making progress on.
-
-    PK=USER#<uid>, SK=ACH#<ach_id>.
-
-    Progress is an opaque dict because each achievement type tracks different
-    things (counters, sets, max-values). The achievement Lambda owns the
-    shape; gameplay code only reads `unlocked_at`.
-    """
+    """An earned/in-progress achievement (PK=USER#<uid>, SK=ACH#<ach_id>).
+    `progress` is opaque — each achievement type tracks different things and
+    the achievement Lambda owns the shape; gameplay only reads `unlocked_at`."""
     achievement_id: str
     unlocked_at: Optional[datetime] = None
     progress: dict = Field(default_factory=dict)
@@ -372,16 +331,10 @@ class UserAchievement(BaseModel):
 # =============================================================================
 
 class LbEntry(BaseModel):
-    """A leaderboard row.
-
-    One model for both leaderboard scopes — the LB#points board reads
-    `score` as points; the LB#longest board reads it as turn count. `run_id`
-    is set on `longest` entries so the UI can deep-link to the run.
-
-    The padded numeric portion of the SK is built by `keys.leaderboard_sk` —
-    do not hand-roll it. DynamoDB sorts SKs lexicographically, so the
-    padding is the only thing making string sort agree with numeric sort.
-    """
+    """A leaderboard row, one model for both scopes — LB#points reads `score`
+    as points, LB#longest as turn count (with `run_id` for deep-linking). Build
+    the SK via `keys.leaderboard_sk`; its padding makes DDB's lexicographic
+    sort agree with numeric sort — don't hand-roll it."""
     user_id: str
     display_name: str
     score: int

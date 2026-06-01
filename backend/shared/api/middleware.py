@@ -1,8 +1,6 @@
-"""HTTP middleware shared by all FastAPI apps (admin, gameplay, dev).
+"""Shared HTTP middleware (CORS + request correlation) for all FastAPI apps.
 
-Both Lambda apps and the dev_app combined app need the same CORS + request
-correlation behaviour — factoring it out keeps them in lock-step instead of
-drifting apart on copy-paste.
+Factored out so the admin, gameplay, and dev apps stay in lock-step.
 """
 from __future__ import annotations
 
@@ -20,9 +18,8 @@ log = logging.getLogger(__name__)
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Stamp every request with an X-Request-ID, echoed in the response.
 
-    If the client supplied one we keep it (lets the frontend stitch a trace);
-    otherwise we mint a fresh hex uuid. Stashed on `request.state.request_id`
-    so loggers and handlers can grab it without re-reading the header.
+    Reuses a client-supplied id (for trace stitching) or mints a hex uuid;
+    stashed on request.state.request_id for loggers/handlers.
     """
 
     async def dispatch(self, request: Request, call_next):
@@ -36,9 +33,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 def install_middleware(app: FastAPI) -> None:
     """Apply request-id + CORS to a FastAPI app.
 
-    CORS_ORIGINS env var is a comma-separated allow-list. The wildcard `*`
-    case forces credentials off — the browser rejects wildcard origin +
-    credentials together, so we don't ship a config that silently breaks.
+    CORS_ORIGINS is a comma-separated allow-list. A wildcard `*` forces
+    credentials off, since browsers reject wildcard origin + credentials.
     """
     app.add_middleware(RequestIDMiddleware)
 

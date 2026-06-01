@@ -134,8 +134,8 @@ def toggle_deck(
 ):
     """Set `enabled` on every card belonging to a given deck.
 
-    Pass `deck_name="__orphans__"` to target cards with no deck_name
-    (matches how the admin UI labels the orphan bucket).
+    Pass "__orphans__" (catalog_repo.ORPHAN_DECK_SENTINEL) to target cards with no
+    deck_name — matches how the admin UI labels the orphan bucket.
     """
     matched, modified = catalog.set_enabled_for_deck(deck_name, payload.enabled)
     return DeckToggleResponse(matched=matched, modified=modified)

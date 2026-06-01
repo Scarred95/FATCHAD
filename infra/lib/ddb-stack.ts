@@ -31,8 +31,8 @@ import { Construct } from 'constructs';
  *  ACH        <ach_id>            Achievement { id, name, criteria,
  *                                               points, unlocks_deck,
  *                                               enabled, ... }
- *  META       current             Pointer { version, public_url, full_url,
- *                                           published_at }
+ *  META       current             Pointer { version, published_at }
+ *                                           (bundle keys derived from version)
  *
  *  One PK per entity type, not a single PK="CATALOG". The classic single-
  *  table trick (one Query returns parent + children together) buys nothing

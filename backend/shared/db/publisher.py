@@ -1,21 +1,12 @@
 """Catalog publish — turn the DDB working-copy into S3 versioned bundles.
 
-The admin Lambda calls `publish_catalog()` when an editor hits "Publish".
-The gameplay Lambda never imports this module.
+Admin-only (`publish_catalog()` on "Publish"); gameplay never imports this.
+Writes v<version>/catalog_full.json (engine, read by catalog_snapshot.py) and
+catalog_public.json (SPA via CloudFront, spoiler/anti-cheat fields stripped),
+then bumps the DDB META#current pointer.
 
-Output:
-  s3://<catalog_bucket>/v<version>/catalog_full.json   — engine bundle
-  s3://<catalog_bucket>/v<version>/catalog_public.json — frontend bundle
-  DDB META#current pointer rewritten to point at the new version
-
-`catalog_full.json` is what `catalog_snapshot.py` reads on the gameplay
-side. `catalog_public.json` is fetched directly by the SPA from CloudFront
-and intentionally hides spoiler/anti-cheat fields (effects, requires,
-weights, ending thresholds, achievement criteria).
-
-Effective-enabled cascading: when a card or ending has a `deck_name`, its
-parent deck's `enabled` flag overrides its own. Disabling a deck removes
-all its content from both bundles in one click.
+Effective-enabled cascade: a card/ending with a `deck_name` inherits its
+parent deck's `enabled`, so disabling a deck drops all its content at once.
 """
 from __future__ import annotations
 
@@ -25,15 +16,14 @@ from datetime import datetime, timezone
 from shared.db.catalog_repo import CatalogRepo
 from shared.db.catalog_snapshot import invalidate_cache
 from shared.db.ddb import catalog_bucket, s3_client
-from shared.game.hints import derive_hints_from_effects
 from shared.schemas import (
     Achievement,
     CatalogPointer,
-    Choice,
     Deck,
     Ending,
     Event,
 )
+from shared.views import public_card_dict
 
 
 # =============================================================================
@@ -43,15 +33,10 @@ from shared.schemas import (
 def publish_catalog(version: str | None = None) -> CatalogPointer:
     """Snapshot the working copy, upload both bundles, bump the pointer.
 
-    `version` is normally None → a UTC timestamp is minted. Callers can pass
-    an explicit string (e.g. a git tag like `database-v7`) when publishing
-    is driven by CI rather than the admin button.
-
-    Returns the new pointer that was written.
-
-    Cache invalidation: the in-process CatalogSnapshot cache is reset so the
-    *same* Lambda container picks up the new version on its next gameplay
-    call. Other warm containers will catch up via the pointer-version check.
+    `version` defaults to a minted UTC timestamp; pass an explicit string
+    (e.g. git tag `database-v7`) for CI-driven publishes. Returns the new
+    pointer. Resets the in-process snapshot cache so this container sees the
+    new version immediately; other warm containers catch up via the pointer.
     """
     catalog = CatalogRepo()
     decks       = catalog.list_decks()
@@ -81,7 +66,7 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     public_payload = {
         "version": version,
         "decks":    [_dump_deck_public(d) for d in pub_decks],
-        "cards":    [_dump_card_public(c) for c in pub_cards],
+        "cards":    [public_card_dict(c) for c in pub_cards],
         "endings":  [_dump_ending_public(e) for e in pub_endings],
         "achievements": [_dump_ach_public(a) for a in pub_achs],
     }
@@ -91,14 +76,14 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     public_key = f"v{version}/catalog_public.json"
 
     s3 = s3_client()
+    # no gzip/CacheControl yet. Bundles are immutable per version
+    # and CloudFront can compress on the fly; revisit object-level gzip only if
+    # bundle size starts hurting cold-start fetch time.
     s3.put_object(
         Bucket=bucket,
         Key=full_key,
         Body=json.dumps(full_payload).encode("utf-8"),
         ContentType="application/json",
-        # No CacheControl: bundles are immutable per version, but the admin
-        # might overwrite-and-republish under the same explicit version
-        # during testing. Frontend caches them by URL anyway.
     )
     s3.put_object(
         Bucket=bucket,
@@ -108,10 +93,9 @@ def publish_catalog(version: str | None = None) -> CatalogPointer:
     )
 
     # ---- Bump the pointer ------------------------------------------------
+    # Only the version is stored; bundle keys are derived from it on read.
     pointer = CatalogPointer(
         version=version,
-        public_url=f"s3://{bucket}/{public_key}",
-        full_url=f"s3://{bucket}/{full_key}",
         published_at=datetime.now(timezone.utc),
     )
     catalog.set_pointer(pointer)
@@ -157,29 +141,6 @@ def _dump(model) -> dict:
     return model.model_dump(mode="json")
 
 
-def _dump_card_public(card: Event) -> dict:
-    """Player-visible card fields only. Strips: effects, requires, weight,
-    important, sets/clears flags, adds_to_deck, triggers_ending,
-    unlocks/removes_endings. Hints are derived from effects when not
-    explicitly authored, so players still see arrows."""
-    return {
-        "id":          card.id,
-        "title":       card.title,
-        "description": card.description,
-        "category":    card.category,
-        "deck_name":   card.deck_name,
-        "image_url":   card.image_url,
-        "choices":     [_dump_choice_public(c) for c in card.choices],
-    }
-
-
-def _dump_choice_public(choice: Choice) -> dict:
-    """Choice with text + hints only — no effects, flags, or ending links."""
-    explicit = choice.hints.model_dump(exclude_none=True)
-    hints = explicit or derive_hints_from_effects(choice).model_dump(exclude_none=True)
-    return {"text": choice.text, "hints": hints}
-
-
 def _dump_ending_public(ending: Ending) -> dict:
     """Ending blurb only — strips requires, priority, default-flag."""
     return {
@@ -220,8 +181,9 @@ def _dump_deck_public(deck: Deck) -> dict:
 def _mint_version() -> str:
     """UTC timestamp version, e.g. `20260531T143022Z`.
 
-    Sortable by string compare and unique per second. The admin-driven publish
-    flow won't hit collisions; CI-driven publishes that need to override get
-    to pass an explicit version (typically a git tag).
+    Sortable by string compare and unique per second. With multiple admins the
+    1-second collision window is real but unlikely (two publishes in the same
+    second reuse the key); ACCEPTED for now — add a sub-second suffix if it ever
+    bites. CI publishes pass an explicit version instead.
     """
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

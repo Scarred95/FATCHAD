@@ -1,16 +1,10 @@
 """Shared boto3 client/table singletons for both Lambdas.
 
-Lazy-initialized at first use so importing this module doesn't require AWS
-credentials in scope (eases local testing and import-time analysis).
-Lambda containers reuse the same boto3 client across invocations — that's
-the standard pattern for connection reuse and avoids the ~100 ms TLS
-handshake cost on warm calls.
+Lazy-initialized so import needs no AWS creds; reused across warm invocations
+(standard connection-reuse pattern, avoids the TLS handshake per call).
 
-Env vars (with prod defaults):
-  CATALOG_TABLE   default "fatchad_catalog"
-  USER_TABLE      default "fatchad_user_data"
-  CATALOG_BUCKET  default "fatchad-catalog"
-  AWS_REGION      default "eu-central-1"   (Lambda sets this automatically)
+Env (prod defaults): CATALOG_TABLE=fatchad_catalog, USER_TABLE=fatchad_user_data,
+CATALOG_BUCKET=fatchad-catalog, AWS_REGION=eu-central-1 (Lambda sets it).
 """
 from __future__ import annotations
 

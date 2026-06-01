@@ -1,15 +1,14 @@
-"""Working-copy CRUD on fatchad_catalog. Used by the admin Lambda only.
+"""Working-copy CRUD on fatchad_catalog — admin Lambda only.
 
-The gameplay Lambda never touches this — it reads the published snapshot
-from S3 via `catalog_snapshot.py`. The split is what makes the design's
-"every gameplay tick hits a cache, not a DB row" property true.
-
-Sync, not async: boto3 is sync, and Lambda invokes are single-threaded
-per container — there's no event loop to win latency back from.
+Gameplay never touches this; it reads the published S3 snapshot via
+catalog_snapshot.py (that split is the "cache, not a DB row" property). Sync,
+since boto3 is sync and Lambda is single-threaded per container.
 """
 from __future__ import annotations
 
 import json
+import random
+import time
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
@@ -32,15 +31,19 @@ from shared.schemas import (
     Event,
 )
 
+# Sentinel deck name for the bulk toggle: targets cards with no deck_name.
+# Matches how the admin UI labels its orphan bucket; single source of truth so
+# the route and the repo can't drift on the magic string.
+ORPHAN_DECK_SENTINEL = "__orphans__"
+
 
 # =============================================================================
 # (de)serialization helpers
 # =============================================================================
 
 def _normalize_decimals(obj):
-    """boto3 returns DDB Numbers as Decimal. Catalog only stores ints
-    (weight, priority, points), so a flat int cast is correct. If we ever
-    store floats this needs to branch on `obj % 1 != 0`."""
+    """DDB Numbers come back as Decimal; catalog stores only ints, so a flat
+    int cast is correct. Branch on `obj % 1` here if floats are ever stored."""
     if isinstance(obj, list):
         return [_normalize_decimals(v) for v in obj]
     if isinstance(obj, dict):
@@ -51,13 +54,9 @@ def _normalize_decimals(obj):
 
 
 def _model_to_item(model, pk: str, sk: str) -> dict:
-    """Serialize a Pydantic model to a DDB item dict, adding PK/SK.
-
-    Goes via JSON round-trip so datetimes become ISO strings — boto3's
-    high-level resource API rejects raw datetimes. Dumping without
-    `by_alias=True` keeps the natural field name on disk (`id`, not `_id`)
-    so reading back doesn't need alias massaging.
-    """
+    """Serialize a model to a DDB item (+ PK/SK). JSON round-trip turns
+    datetimes into ISO strings (boto3 rejects raw datetimes); no by_alias, so
+    the natural field name is stored (`id`, not `_id`)."""
     data = json.loads(model.model_dump_json())
     data["PK"] = pk
     data["SK"] = sk
@@ -110,12 +109,19 @@ class CatalogRepo:
         # BatchGetItem caps at 100 keys per request; loop in chunks.
         out: list[Event] = []
         for chunk in _chunks(ids, 100):
-            keys = [catalog_card_key(i) for i in chunk]
-            resp = self._t.meta.client.batch_get_item(
-                RequestItems={self._t.name: {"Keys": keys}}
-            )
-            for item in resp.get("Responses", {}).get(self._t.name, []):
-                out.append(Event.model_validate(_item_to_dict(item)))
+            # BatchGetItem is best-effort: throttling / the 16 MB cap return a
+            # partial result + leftovers in UnprocessedKeys. Re-drain those with
+            # backoff, else cards silently vanish (looks like "id not found").
+            request = {self._t.name: {"Keys": [catalog_card_key(i) for i in chunk]}}
+            attempt = 0
+            while request:
+                resp = self._t.meta.client.batch_get_item(RequestItems=request)
+                for item in resp.get("Responses", {}).get(self._t.name, []):
+                    out.append(Event.model_validate(_item_to_dict(item)))
+                request = resp.get("UnprocessedKeys") or {}
+                if request:
+                    attempt += 1
+                    time.sleep(min(0.05 * 2 ** attempt, 1.0) + random.random() * 0.05)
         return out
 
     def list_cards(self, category: str | None = None) -> list[Event]:
@@ -130,16 +136,6 @@ class CatalogRepo:
         if category is not None:
             cards = [c for c in cards if c.category == category]
         return cards
-
-    def list_cards_by_categories(self, categories: list[str]) -> list[Event]:
-        """All cards whose category is in the given list. One full-partition
-        scan + a set-based filter — same shape the old EventRepo had."""
-        if not categories:
-            return []
-        cats = set(categories)
-        items = self._query_all(CatalogPk.CARD)
-        cards = [Event.model_validate(_item_to_dict(i)) for i in items]
-        return [c for c in cards if c.category in cats]
 
     def put_card(self, card: Event) -> None:
         """Upsert. Use `insert_card` if you want a 409 on duplicate id."""
@@ -167,16 +163,11 @@ class CatalogRepo:
         return resp.get("Attributes") is not None
 
     def set_enabled_for_deck(self, deck_name: str, enabled: bool) -> tuple[int, int]:
-        """Bulk-update `enabled` for every card in a deck.
-
-        `deck_name="__orphans__"` targets cards with no deck_name set, matching
-        the orphan bucket convention used in the admin UI.
-
-        Returns (matched_count, modified_count). One PutItem per modified card;
-        unchanged cards (already at the target value) are skipped.
-        """
+        """Bulk-set `enabled` for every card in a deck (deck_name="__orphans__"
+        targets deck-less cards). Returns (matched, modified) — one PutItem per
+        changed card, already-correct cards skipped."""
         cards = self.list_cards()
-        if deck_name == "__orphans__":
+        if deck_name == ORPHAN_DECK_SENTINEL:
             targets = [c for c in cards if not c.deck_name]
         else:
             targets = [c for c in cards if c.deck_name == deck_name]
@@ -307,7 +298,12 @@ class CatalogRepo:
         return CatalogPointer.model_validate(_item_to_dict(item)) if item else None
 
     def set_pointer(self, pointer: CatalogPointer) -> None:
-        """Overwrites unconditionally. Publish flow owns the version-bump."""
+        """Overwrites unconditionally. Publish flow owns the version-bump.
+
+        No CAS guard: with multiple admins a concurrent-publish race exists but
+        is low-likelihood and ACCEPTED for now. Add a ConditionExpression (and
+        return 409) if simultaneous publishes ever become a real problem.
+        """
         data = json.loads(pointer.model_dump_json())
         data.update(catalog_pointer_key())
         self._t.put_item(Item=data)
@@ -317,12 +313,8 @@ class CatalogRepo:
     # -------------------------------------------------------------------------
 
     def _query_all(self, pk: str) -> list[dict]:
-        """Query an entire partition, handling pagination.
-
-        DDB returns up to 1 MB of items per Query call; this loops until
-        every page is drained. Fine for catalog-sized data (a few thousand
-        items max) — don't reach for this on the user table at scale.
-        """
+        """Drain a whole partition, looping over DDB's 1 MB pages. Fine for
+        catalog-sized data; don't reach for this on the user table at scale."""
         items: list[dict] = []
         kwargs = {"KeyConditionExpression": Key("PK").eq(pk)}
         while True:

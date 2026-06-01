@@ -1,26 +1,22 @@
 # shared/game/effects.py
-"""Turn orchestrator — applies a player's choice to the game state.
+"""Turn orchestrator — the single mutation entry point for a player's choice.
 
-This is the single mutation entry point. It sequences the sub-steps and
-delegates to specialised modules:
-  - deck.py      → card consumption, deck additions, scheduled promotion, refill
-  - endings.py   → win/loss condition evaluation
-  - hints.py     → frontend hint derivation (imported by routes, not called here)
-
-Sync — see deck.py for the rationale.
+Sequences the sub-steps and delegates to deck.py (cards), endings.py
+(win/loss), and hints.py (presentation; called by routes, not here).
 """
 from __future__ import annotations
 
-import random
 from datetime import datetime, timezone
 
 from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.game.constants import STAT_NAMES
 from shared.game.deck import (
     apply_deck_additions,
     cleanup_zombie_tutorial_cards,
     consume_top_card,
     promote_due_scheduled,
     refill_deck_if_needed,
+    turn_rng,
 )
 from shared.game.endings import check_endings
 from shared.schemas import Choice, Effects, Event, GameState, HistoryEntry, Stats
@@ -38,65 +34,46 @@ def apply_choice(
 ) -> GameState:
     """Apply a choice and return the fully updated state.
 
-    Steps:
-      1. Remove the played card from the deck (consume_top_card handles the deep copy)
-      2. Apply stat effects (no clamping)
-      3. Apply flag mutations (sets/clears)
-      4. Add cards to deck/scheduled from this choice's adds_to_deck
-      5. Append history entry, increment turn counter
-      6. Promote scheduled cards whose turn has arrived
-      7. Strip leftover tutorial cards if the tutorial just ended
-      8. Refill deck if running low
-      9. Evaluate endings (data-driven) and apply this choice's
-         unlocks_endings / removes_endings to state.active_endings
-
-    Raises:
-        ValueError: if `choice_index` is out of range. This is a
-        programmer-error contract — the HTTP layer is expected to have
-        already validated the index against the current card and returned a
-        clean 400 to the user. The guard here protects non-HTTP callers
-        (admin/debug tools, tests) and catches refactor regressions before
-        they corrupt state with an IndexError.
+    Raises ValueError if choice_index is out of range — a programmer-error
+    contract. The HTTP layer should have already validated it and returned a
+    400; this guard protects non-HTTP callers and catches refactor regressions.
     """
     if not (0 <= choice_index < len(card.choices)):
         raise ValueError(f"choice_index {choice_index} out of range for card {card.id}")
 
     choice = card.choices[choice_index]
-    # Per-turn seeded RNG: deterministic within a turn, different each turn.
-    rng = random.Random(state.rng_seed + state.turn)
+    # One RNG stream for the whole turn — threaded through every sub-step so
+    # they don't independently replay the same seed (no correlated draws).
+    rng = turn_rng(state)
 
-    # 1. Remove the played card from the deck. consume_top_card deep-copies state,
-    #    drops any stale/ineligible cards that were sitting above it, and returns
-    #    the new deck state. The card itself is discarded (we already have it).
-    new_state, _ = consume_top_card(state, catalog)
+    # 1. Remove the played card (deep-copies state, drops stale/ineligible
+    #    cards above it). The card itself is discarded — we already have it.
+    new_state, _ = consume_top_card(state, catalog, rng=rng)
 
-    # 2. Stats — returns a new Stats object
+    # 2. Stats (no clamping). 3. Flags.
     new_state.stats = _apply_effects(new_state.stats, choice.effects)
-
-    # 3. Flags — returns a new flag list
     new_state.flags = _apply_flag_mutations(new_state.flags, choice)
 
-    # 4. Deck additions
+    # 4. Deck additions from this choice.
     new_state = apply_deck_additions(new_state, choice.adds_to_deck, rng)
 
-    # 5. History + turn counter
+    # 5. History + turn counter.
     new_state.history.append(
         HistoryEntry(event_id=card.id, choice=choice_index, turn=new_state.turn)
     )
     new_state.turn += 1
 
-    # 6. Promote scheduled cards whose turn has arrived
+    # 6. Promote due scheduled cards.
     new_state = promote_due_scheduled(new_state)
 
-    # 7. Tutorial zombie cleanup — must run before refill so it doesn't waste
-    #    candidate slots on cards that are about to be stripped.
+    # 7. Tutorial zombie cleanup — before refill, so it doesn't waste candidate
+    #    slots on cards about to be stripped.
     new_state = cleanup_zombie_tutorial_cards(new_state)
 
-    # 8. Refill deck if running low
-    new_state = refill_deck_if_needed(new_state, catalog)
+    # 8. Refill if low.
+    new_state = refill_deck_if_needed(new_state, catalog, rng=rng)
 
-    # 9. Evaluate ending conditions; also applies this choice's
-    #    unlocks_endings/removes_endings to active_endings (see endings.py).
+    # 9. Evaluate endings + apply this choice's unlocks/removes (see endings.py).
     new_state = check_endings(new_state, choice, catalog)
 
     new_state.updated_at = datetime.now(timezone.utc)
@@ -104,37 +81,22 @@ def apply_choice(
 
 
 # =============================================================================
-# Stat effects
+# Stat + flag mutation
 # =============================================================================
 
 def _apply_effects(stats: Stats, effects: Effects) -> Stats:
-    """Apply effect deltas. No clamping — endings (not the engine) gate
-    out-of-band values. A quest can remove the relevant ending to let a
-    stat climb past its nominal range."""
-    return Stats(
-        moneten=stats.moneten + effects.moneten,
-        aura=   stats.aura    + effects.aura,
-        respekt=stats.respekt + effects.respekt,
-        rizz=   stats.rizz    + effects.rizz,
-        chaos=  stats.chaos   + effects.chaos,
-    )
+    """Add effect deltas to stats. No clamping — endings (not the engine) gate
+    out-of-band values, so a quest can drop an ending to lift the cap."""
+    return Stats(**{n: getattr(stats, n) + getattr(effects, n) for n in STAT_NAMES})
 
-
-# =============================================================================
-# Flag mutations
-# =============================================================================
 
 def _apply_flag_mutations(flags: list[str], choice: Choice) -> list[str]:
     """Return a new flag list with the choice's sets/clears applied.
 
-    Flags are one-time, binary state — setting a flag that's already set is a
-    no-op (sets are idempotent). There are no flag counters; if you need
-    "how many times" semantics, model it via stats or a stand-alone counter.
-
-    Clears win over sets within a single choice — if a choice both sets and
-    clears the same flag (authoring bug), the flag ends up cleared.
+    Flags are idempotent binary state. Clears win over sets within one choice
+    (so a set+clear authoring bug ends cleared). Sorted for stable diffs.
     """
     new_flags = set(flags)
     new_flags.update(choice.sets_flags)
     new_flags.difference_update(choice.clears_flags)
-    return sorted(new_flags)  # sorted for stable serialization, easier diffs
+    return sorted(new_flags)
