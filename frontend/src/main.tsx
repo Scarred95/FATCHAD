@@ -7,7 +7,7 @@ import './styles/tokens.css';
 import './styles/globals.css';
 
 import { router } from './routes';
-import { useAdminStore } from './stores/adminStore';
+import { useAdminStore } from './stores/adminAuthStore';
 import { useCatalogStore } from './stores/catalogStore';
 
 // Fire-and-forget: if we have a stored admin token, ping the backend

@@ -1,7 +1,9 @@
+/** Saved-runs list — resume, delete, or peek at a run's history. */
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteRun, listRuns } from '../api/client';
+import { errorMessage } from '../api/http';
 import type { RunSummary } from '../api/types';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
@@ -25,7 +27,7 @@ export default function RunList() {
       data.sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at));
       setRuns(data);
     } catch (e) {
-      setError(errMsg(e));
+      setError(errorMessage(e, 'Konnte nicht laden'));
     }
   }
 
@@ -45,7 +47,7 @@ export default function RunList() {
       pushToast('Lauf gelöscht', 'info');
       await refresh();
     } catch (e) {
-      pushToast(errMsg(e), 'error');
+      pushToast(errorMessage(e, 'Konnte nicht laden'), 'error');
     }
   }
 
@@ -174,10 +176,4 @@ function statusLabel(r: RunSummary): string {
   if (r.status === 'active') return 'aktiv';
   if (r.status === 'ended') return 'beendet';
   return 'aufgegeben';
-}
-
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'detail' in e) return String((e as any).detail);
-  if (e instanceof Error) return e.message;
-  return 'Konnte nicht laden';
 }

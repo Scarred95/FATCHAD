@@ -10,36 +10,15 @@
  * already exists, prompt for replace / keep / skip.
  */
 import { useRef, useState } from 'react';
-import { z } from 'zod';
+import { endingArraySchema } from '../schema';
 import { useAdminEndingStore } from '../endingStore';
-import { download } from './ImportExportBar';
+import { download } from '../utils/download';
+import { stripJsonComments } from '../utils/jsonc';
 import type { Ending } from '../types';
 import admin from '../admin.module.css';
 import styles from './ImportExportBar.module.css';
 
 type Policy = 'replace' | 'keep' | 'skip';
-
-// Tolerant schema: only id + title + description are mandatory; everything
-// else has a server-side default and is allowed to be omitted from the file.
-const endingSchema = z.object({
-  _id: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  priority: z.number().optional(),
-  default: z.boolean().optional(),
-  enabled: z.boolean().optional(),
-  image_url: z.string().nullable().optional(),
-  requires: z.object({
-    flags_all: z.array(z.string()).optional(),
-    flags_none: z.array(z.string()).optional(),
-    flags_any: z.array(z.string()).optional(),
-    stats: z.record(z.object({
-      min: z.number().nullable().optional(),
-      max: z.number().nullable().optional(),
-    })).optional(),
-  }).optional(),
-});
-const endingArraySchema = z.array(endingSchema);
 
 export function EndingsImportExportBar() {
   const endings = useAdminEndingStore((s) => s.endings);
@@ -56,8 +35,7 @@ export function EndingsImportExportBar() {
     for (const f of Array.from(files)) {
       try {
         const text = await f.text();
-        // Strip /* */ and // comments so .jsonc seed files parse too.
-        const json = JSON.parse(text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''));
+        const json = JSON.parse(stripJsonComments(text));
         const parsed = endingArraySchema.safeParse(json);
         if (!parsed.success) {
           errCount++;

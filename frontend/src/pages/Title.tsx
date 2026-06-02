@@ -1,9 +1,10 @@
+/** Landing screen — new/continue/about plus the inline admin-token unlock. */
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listRuns, getHealth } from '../api/client';
 import { getUserId } from '../stores/userStore';
-import { useAdminStore } from '../stores/adminStore';
+import { useAdminStore } from '../stores/adminAuthStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './Title.module.css';
 

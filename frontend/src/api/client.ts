@@ -19,12 +19,12 @@ import type {
   GameState,
   HealthResponse,
   HistoryDetailEntry,
+  PublicCatalog,
   RunSummary,
   TurnResponse,
 } from './types';
-
-// Strip trailing slash so callers can use either `https://x/` or `https://x`.
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/+$/, '');
+import { ApiError, http } from './http';
+import { API_BASE } from './config';
 
 // VITE_WIP_MODE is set to "true" at build time by the deploy-frontend workflow
 // for the S3 preview deploy, where the backend is not yet reachable. In that
@@ -32,16 +32,6 @@ const BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/+$/, '');
 const WIP_MODE = import.meta.env.VITE_WIP_MODE === 'true';
 const WIP_TOAST_THROTTLE_MS = 1500;
 let lastWipToastAt = 0;
-
-class ApiError extends Error {
-  status: number;
-  detail: string;
-  constructor(status: number, detail: string) {
-    super(detail);
-    this.status = status;
-    this.detail = detail;
-  }
-}
 
 function notifyWip() {
   const now = Date.now();
@@ -62,38 +52,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     notifyWip();
     throw new ApiError(0, 'WIP — Backend nicht verfügbar');
   }
-
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}${path}`, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers ?? {}),
-      },
-    });
-  } catch (e) {
-    throw new ApiError(0, 'Server nicht erreichbar');
-  }
-
-  if (res.status === 204) return undefined as T;
-
-  let data: unknown = null;
-  try {
-    data = await res.json();
-  } catch {
-    /* empty body */
-  }
-
-  if (!res.ok) {
-    const detail =
-      (data && typeof data === 'object' && 'detail' in data && typeof (data as any).detail === 'string'
-        ? (data as any).detail
-        : null) ?? `HTTP ${res.status}`;
-    throw new ApiError(res.status, detail);
-  }
-
-  return data as T;
+  return http<T>(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  });
 }
 
 /** URL-encode a `user_id` into a `?user_id=` query string. */
@@ -108,29 +73,9 @@ export const getHealth = () => request<HealthResponse>('/healthz');
 /* ─── Catalog ──────────────────────────────────────────────────── */
 
 /** Public catalog bundle — fed from S3, gateway-proxied. Shape mirrors
- *  `publisher.py`'s `_dump_*_public` output. Bring in a proper type when
- *  the catalog store wires types end-to-end. */
+ *  `publisher.py`'s `_dump_*_public` output (see `PublicCatalog`). */
 export const getCurrentCatalog = () =>
-  request<{
-    version: string;
-    decks: Array<{ name: string; description?: string }>;
-    cards: Array<CardResponse>;
-    endings: Array<{
-      id: string;
-      title: string;
-      description: string;
-      deck_name: string | null;
-      image_url: string | null;
-    }>;
-    achievements: Array<{
-      id: string;
-      name: string;
-      description: string;
-      points: number;
-      unlocks_deck: string | null;
-      image_url: string | null;
-    }>;
-  }>('/catalog/current');
+  request<PublicCatalog>('/catalog/current');
 
 /* ─── Run lifecycle ────────────────────────────────────────────── */
 

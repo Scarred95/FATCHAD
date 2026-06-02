@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
 import type { MainStatName } from '../../api/types';
+import { useDeltaPulse } from '../../hooks/useDeltaPulse';
+import { STAT_COLOR_VAR, STAT_LABEL } from '../statMeta';
 import StatIcon from '../StatIcon/StatIcon';
 import styles from './StatBar.module.css';
 
@@ -11,44 +12,15 @@ interface Props {
   delta?: number;
 }
 
-const LABEL: Record<MainStatName, string> = {
-  moneten: 'Moneten',
-  aura: 'Aura',
-  respekt: 'Respekt',
-  rizz: 'Rizz',
-};
-
-const STAT_COLOR: Record<MainStatName, string> = {
-  moneten: 'var(--color-stat-moneten)',
-  aura: 'var(--color-stat-aura)',
-  respekt: 'var(--color-stat-respekt)',
-  rizz: 'var(--color-stat-rizz)',
-};
-
 export default function StatBar({ stat, value, delta }: Props) {
   const danger = value <= 15 || value >= 85;
-  const [pulseKey, setPulseKey] = useState(0);
-  // The delta number lingers in the store until the next choice, so we
-  // gate it locally: each non-zero delta makes it visible for ~1.6s,
-  // long enough for the float-up to settle, then we let AnimatePresence
-  // exit it.
-  const [showDelta, setShowDelta] = useState(false);
-
-  useEffect(() => {
-    if (delta && delta !== 0) {
-      setPulseKey((k) => k + 1);
-      setShowDelta(true);
-      const t = setTimeout(() => setShowDelta(false), 1600);
-      return () => clearTimeout(t);
-    }
-    setShowDelta(false);
-  }, [delta]);
+  const { showDelta, pulseKey } = useDeltaPulse(delta);
 
   return (
     <div
       className={styles.wrap}
       data-danger={danger}
-      style={{ ['--stat-color' as any]: STAT_COLOR[stat] }}
+      style={{ '--stat-color': STAT_COLOR_VAR[stat] } as React.CSSProperties}
     >
       <div className={styles.head}>
         <StatIcon stat={stat} size="sm" />
@@ -79,7 +51,7 @@ export default function StatBar({ stat, value, delta }: Props) {
           />
         )}
       </div>
-      <span className="sr-only">{LABEL[stat]}: {value}</span>
+      <span className="sr-only">{STAT_LABEL[stat]}: {value}</span>
       <AnimatePresence>
         {showDelta && delta !== undefined && delta !== 0 && (
           <motion.span

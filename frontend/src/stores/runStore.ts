@@ -5,6 +5,8 @@
  */
 import { create } from 'zustand';
 import * as api from '../api/client';
+import { errorMessage } from '../api/http';
+import { STAT_NAMES } from '../api/types';
 import type { CardResponse, GameState, Stats } from '../api/types';
 import { getUserId } from './userStore';
 
@@ -31,8 +33,7 @@ interface RunStore {
 }
 
 function diffStats(prev: Stats, next: Stats): StatDelta[] {
-  const keys: (keyof Stats)[] = ['moneten', 'aura', 'respekt', 'rizz', 'chaos'];
-  return keys
+  return STAT_NAMES
     .map((k) => ({ stat: k, amount: next[k] - prev[k] }))
     .filter((d) => d.amount !== 0);
 }
@@ -64,7 +65,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       }
       set({ state, currentCard, isLoading: false });
     } catch (e) {
-      set({ error: errorMessage(e), isLoading: false });
+      set({ error: errorMessage(e, 'Etwas ist schiefgegangen'), isLoading: false });
     }
   },
 
@@ -80,7 +81,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       });
       return state._id;
     } catch (e) {
-      set({ error: errorMessage(e), isLoading: false });
+      set({ error: errorMessage(e, 'Etwas ist schiefgegangen'), isLoading: false });
       throw e;
     }
   },
@@ -105,7 +106,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       });
       return next;
     } catch (e) {
-      set({ error: errorMessage(e), isSubmitting: false });
+      set({ error: errorMessage(e, 'Etwas ist schiefgegangen'), isSubmitting: false });
       return null;
     }
   },
@@ -117,7 +118,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const next = await api.abandonRun(state._id, getUserId());
       set({ state: next, currentCard: null });
     } catch (e) {
-      set({ error: errorMessage(e) });
+      set({ error: errorMessage(e, 'Etwas ist schiefgegangen') });
     }
   },
 
@@ -129,9 +130,3 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({ lastDeltas: [] });
   },
 }));
-
-function errorMessage(e: unknown): string {
-  if (e && typeof e === 'object' && 'detail' in e) return String((e as any).detail);
-  if (e instanceof Error) return e.message;
-  return 'Etwas ist schiefgegangen';
-}

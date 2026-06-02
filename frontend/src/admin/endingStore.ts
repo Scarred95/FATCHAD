@@ -20,20 +20,10 @@
 import { create } from 'zustand';
 import {
   createEnding, deleteEnding, listEndings, patchEnding, replaceEnding,
-  AdminApiError, type AdminEnding,
 } from '../api/admin';
-import { useToastStore } from '../stores/toastStore';
+import { errorMessage } from '../api/http';
+import { adminToast as toast } from './utils/toast';
 import type { Ending } from './types';
-
-function toast(msg: string, variant: 'info' | 'warning' | 'error' = 'info'): void {
-  useToastStore.getState().push(msg, variant);
-}
-
-function errMessage(e: unknown): string {
-  if (e instanceof AdminApiError) return e.detail;
-  if (e instanceof Error) return e.message;
-  return String(e);
-}
 
 export interface EndingImportResult {
   added: number;
@@ -77,9 +67,9 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
       const list = await listEndings({ limit: 1000 });
       const saved: Record<string, true> = {};
       for (const e of list) saved[e._id] = true;
-      set({ endings: list as Ending[], saved, loaded: true });
+      set({ endings: list, saved, loaded: true });
     } catch (e) {
-      toast(`Endings konnten nicht geladen werden: ${errMessage(e)}`, 'error');
+      toast(`Endings konnten nicht geladen werden: ${errorMessage(e, String(e))}`, 'error');
     }
   },
 
@@ -96,17 +86,17 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
 
     try {
       if (existsOnServer) {
-        await replaceEnding(ending._id, ending as AdminEnding);
+        await replaceEnding(ending._id, ending);
         toast('Ending gespeichert', 'info');
       } else {
-        await createEnding(ending as AdminEnding);
+        await createEnding(ending);
         toast('Ending erstellt', 'info');
       }
       set((s) => ({ saved: { ...s.saved, [ending._id]: true } }));
       return true;
     } catch (e) {
       set({ endings: before, saved: beforeSaved });
-      toast(`Speichern fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Speichern fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -132,7 +122,7 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ endings: before, saved: beforeSaved });
-      toast(`Löschen fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Löschen fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -152,7 +142,7 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ endings: before });
-      toast(`Status konnte nicht geändert werden: ${errMessage(e)}`, 'error');
+      toast(`Status konnte nicht geändert werden: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -172,7 +162,7 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ endings: before });
-      toast(`Default-Flag konnte nicht geändert werden: ${errMessage(e)}`, 'error');
+      toast(`Default-Flag konnte nicht geändert werden: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -211,9 +201,9 @@ export const useAdminEndingStore = create<State>()((set, get) => ({
     for (const op of ops) {
       try {
         if (op.kind === 'create') {
-          await createEnding(op.ending as AdminEnding);
+          await createEnding(op.ending);
         } else {
-          await replaceEnding(op.ending._id, op.ending as AdminEnding);
+          await replaceEnding(op.ending._id, op.ending);
         }
         savedUpdates[op.ending._id] = true;
       } catch (e) {

@@ -61,3 +61,31 @@ export const cardSchema = z.object({
 });
 
 export const cardArraySchema = z.array(cardSchema);
+
+// --- Endings -----------------------------------------------------------------
+// Tolerant: only _id/title/description are mandatory; the rest default
+// server-side. Stat keys are left unconstrained (unlike card requirements)
+// since ending thresholds are open-ended. Mirrors the seed file shape so
+// exports round-trip into backend/events/*_endings.json.
+const endingRequires = z.object({
+  flags_all: z.array(z.string()).optional(),
+  flags_none: z.array(z.string()).optional(),
+  flags_any: z.array(z.string()).optional(),
+  stats: z.record(z.object({
+    min: z.number().nullable().optional(),
+    max: z.number().nullable().optional(),
+  })).optional(),
+}).optional();
+
+export const endingSchema = z.object({
+  _id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  priority: z.number().optional(),
+  default: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+  image_url: z.string().nullable().optional(),
+  requires: endingRequires,
+});
+
+export const endingArraySchema = z.array(endingSchema);

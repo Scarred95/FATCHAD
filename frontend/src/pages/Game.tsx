@@ -1,3 +1,7 @@
+/**
+ * Active-run screen — card swipe + stat HUD, with exit/menu/history modals.
+ * Routes to the end screen once the run stops being active.
+ */
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -92,7 +96,7 @@ export default function Game() {
 
   return (
     <main className={styles.gamePage}>
-      {/* Das perfekt proportionale obere Dreieck */}
+      {/* "This is fine" easter egg — top wedge fades in once chaos hits 50+. */}
       {chaosValue >= 50 && (
         <div
           style={{
@@ -100,17 +104,12 @@ export default function Game() {
             top: 0,
             left: 0,
             width: '100%',
-            // Wir begrenzen die Höhe genau auf den oberen Bereich (ca. 45% des Schirms)
-            height: '45%',
+            height: '45%', // top ~45% of the screen
             backgroundImage: "linear-gradient(rgba(10, 10, 15, 0.4), rgba(10, 10, 15, 0.5)), url('/images/this_is_fine.gif')",
-
-            // 'contain' sorgt dafür, dass das Bild IMMER als Ganzes sichtbar bleibt und sich nicht verzerrt!
-            backgroundSize: 'contain',
-            backgroundPosition: 'center bottom', // Setzt das Bild direkt auf die untere Spitze des Keils
+            backgroundSize: 'contain', // keep the gif whole, never distorted
+            backgroundPosition: 'center bottom', // anchor to the wedge's lower tip
             backgroundRepeat: 'no-repeat',
-
-            // Ein sauberer, symmetrischer Clip-Path für die obere Hälfte
-            clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+            clipPath: 'polygon(0 0, 100% 0, 50% 100%)', // symmetric triangle
             zIndex: .1,
             pointerEvents: 'none'
           }}

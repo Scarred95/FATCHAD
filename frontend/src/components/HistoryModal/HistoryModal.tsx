@@ -11,9 +11,13 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { getHistory } from '../../api/client';
-import { useAdminStore } from '../../stores/adminStore';
+import { errorMessage } from '../../api/http';
+import { STAT_NAMES } from '../../api/types';
+import { useAdminStore } from '../../stores/adminAuthStore';
 import { getUserId } from '../../stores/userStore';
-import type { HistoryDetailEntry, StatName } from '../../api/types';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { STAT_COLOR_VAR, STAT_LABEL } from '../statMeta';
+import type { HistoryDetailEntry } from '../../api/types';
 import styles from './HistoryModal.module.css';
 
 interface Props {
@@ -21,24 +25,6 @@ interface Props {
   runId: string | null;
   onClose: () => void;
 }
-
-const STAT_LABELS: Record<StatName, string> = {
-  moneten: 'Moneten',
-  aura: 'Aura',
-  respekt: 'Respekt',
-  rizz: 'Rizz',
-  chaos: 'Chaos',
-};
-
-const STAT_VAR: Record<StatName, string> = {
-  moneten: 'var(--color-stat-moneten)',
-  aura: 'var(--color-stat-aura)',
-  respekt: 'var(--color-stat-respekt)',
-  rizz: 'var(--color-stat-rizz)',
-  chaos: 'var(--color-stat-chaos)',
-};
-
-const STAT_ORDER: StatName[] = ['moneten', 'aura', 'respekt', 'rizz', 'chaos'];
 
 export default function HistoryModal({ open, runId, onClose }: Props) {
   const isAdmin = useAdminStore((s) => s.isAdmin);
@@ -61,7 +47,7 @@ export default function HistoryModal({ open, runId, onClose }: Props) {
         if (!cancelled) setEntries(rows);
       })
       .catch((e) => {
-        if (!cancelled) setError(e?.detail || e?.message || 'Fehler beim Laden');
+        if (!cancelled) setError(errorMessage(e, 'Fehler beim Laden'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -69,14 +55,7 @@ export default function HistoryModal({ open, runId, onClose }: Props) {
     return () => { cancelled = true; };
   }, [open, runId]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   const allExpanded = useMemo(
     () => !!entries && entries.length > 0 && openTurns.size === entries.length,
@@ -180,7 +159,7 @@ interface RowProps {
 
 function HistoryRow({ entry, open, onToggle, isAdmin }: RowProps) {
   const deltas = useMemo(
-    () => STAT_ORDER
+    () => STAT_NAMES
       .map((k) => ({ stat: k, amount: entry.effects[k] ?? 0 }))
       .filter((d) => d.amount !== 0),
     [entry.effects],
@@ -224,12 +203,10 @@ function HistoryRow({ entry, open, onToggle, isAdmin }: RowProps) {
                     <span
                       key={d.stat}
                       className={styles.delta}
-                      style={{
-                        ['--stat-color' as any]: STAT_VAR[d.stat],
-                      }}
+                      style={{ '--stat-color': STAT_COLOR_VAR[d.stat] } as React.CSSProperties}
                       data-sign={d.amount > 0 ? 'pos' : 'neg'}
                     >
-                      <span className={styles.deltaStat}>{STAT_LABELS[d.stat]}</span>
+                      <span className={styles.deltaStat}>{STAT_LABEL[d.stat]}</span>
                       <span className={styles.deltaAmount}>
                         {d.amount > 0 ? '+' : ''}{d.amount}
                       </span>

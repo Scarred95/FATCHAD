@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { cardsInDeck, useAdminCardStore } from '../store';
+import { download } from '../utils/download';
 import { serializeDeck } from '../utils/jsonOrder';
 import { slugify } from '../utils/slug';
-import { download } from '../components/ImportExportBar';
 import { QuickAddDialog } from '../components/QuickAddDialog';
 import admin from '../admin.module.css';
 import styles from './DeckDetail.module.css';

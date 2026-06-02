@@ -26,36 +26,12 @@
  */
 import { create } from 'zustand';
 import { getCurrentCatalog } from '../api/client';
+import { errorMessage } from '../api/http';
+import type { PublicCatalog } from '../api/types';
 
-/** One full bundle shape, mirroring `_dump_*_public` outputs from publisher.py. */
-export interface PublicCatalog {
-  version: string;
-  decks: Array<{ name: string; description?: string }>;
-  cards: Array<{
-    id: string;
-    title: string;
-    description: string;
-    category: string;
-    deck_name: string | null;
-    image_url: string | null;
-    choices: Array<{ text: string; hints?: Record<string, string> }>;
-  }>;
-  endings: Array<{
-    id: string;
-    title: string;
-    description: string;
-    deck_name: string | null;
-    image_url: string | null;
-  }>;
-  achievements: Array<{
-    id: string;
-    name: string;
-    description: string;
-    points: number;
-    unlocks_deck: string | null;
-    image_url: string | null;
-  }>;
-}
+// Re-exported so existing `import { PublicCatalog } from '.../catalogStore'`
+// call sites keep working — the type itself lives in `api/types`.
+export type { PublicCatalog };
 
 interface CachedBundle {
   catalog: PublicCatalog;
@@ -129,7 +105,7 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
         // Keep the previous catalog visible if we had one — partial UI
         // beats empty UI when the network blips.
         isLoading: false,
-        error: errorMessage(e),
+        error: errorMessage(e, 'Catalog konnte nicht geladen werden'),
       });
     }
   },
@@ -143,9 +119,3 @@ export const useCatalogStore = create<CatalogStore>((set, get) => ({
     set({ catalog: null });
   },
 }));
-
-function errorMessage(e: unknown): string {
-  if (e && typeof e === 'object' && 'detail' in e) return String((e as any).detail);
-  if (e instanceof Error) return e.message;
-  return 'Catalog konnte nicht geladen werden';
-}

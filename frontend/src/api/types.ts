@@ -3,8 +3,15 @@
  * Backend serialises with by_alias=True, so document IDs are wired as `_id`.
  */
 
-export type StatName = 'moneten' | 'aura' | 'respekt' | 'rizz' | 'chaos';
-export type MainStatName = 'moneten' | 'aura' | 'respekt' | 'rizz';
+/** Canonical stat order. Single source of truth — iterate this instead of
+ *  re-listing the five stats. `StatName` is derived from it. */
+export const STAT_NAMES = ['moneten', 'aura', 'respekt', 'rizz', 'chaos'] as const;
+
+/** The four 0–100 stats. Chaos (±100) is the outlier, handled separately. */
+export const MAIN_STAT_NAMES = ['moneten', 'aura', 'respekt', 'rizz'] as const;
+
+export type StatName = (typeof STAT_NAMES)[number];
+export type MainStatName = (typeof MAIN_STAT_NAMES)[number];
 
 export type StatHint = 'up' | 'down' | 'unknown' | 'hidden';
 
@@ -112,4 +119,28 @@ export interface HistoryDetailEntry {
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: boolean;
+}
+
+/** Player-safe catalog bundle served by GET /catalog/current.
+ *  Mirrors `publisher.py`'s `_dump_*_public` output. Cards reuse the
+ *  stripped `CardResponse` shape (no weight/requires/effects). */
+export interface PublicCatalog {
+  version: string;
+  decks: Array<{ name: string; description?: string }>;
+  cards: CardResponse[];
+  endings: Array<{
+    id: string;
+    title: string;
+    description: string;
+    deck_name: string | null;
+    image_url: string | null;
+  }>;
+  achievements: Array<{
+    id: string;
+    name: string;
+    description: string;
+    points: number;
+    unlocks_deck: string | null;
+    image_url: string | null;
+  }>;
 }
