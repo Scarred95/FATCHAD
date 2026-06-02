@@ -10,16 +10,16 @@ export default function Login() {
   const initializing = useAuthStore((s) => s.initializing);
   const navigate = useNavigate();
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
   // Session still being restored from localStorage — render nothing to
   // avoid flashing the login form before a potential redirect.
   if (initializing) return null;
 
   // Already logged in — skip the login page entirely.
   if (userId) return <Navigate to="/" replace />;
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

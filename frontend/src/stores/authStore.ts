@@ -20,10 +20,29 @@ import {
   CognitoUserSession,
 } from 'amazon-cognito-identity-js';
 
-const userPool = new CognitoUserPool({
-  UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID as string,
-  ClientId: import.meta.env.VITE_COGNITO_APP_CLIENT_ID as string,
-});
+const POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID as string | undefined;
+const CLIENT_ID = import.meta.env.VITE_COGNITO_APP_CLIENT_ID as string | undefined;
+
+/** True when the build was given both Cognito IDs. When false, the auth
+ *  methods reject with a clear error instead of the whole app white-screening
+ *  on a top-level `new CognitoUserPool(...)` throw. */
+export const authConfigured = Boolean(POOL_ID && CLIENT_ID);
+
+// Lazily constructed so a missing config doesn't throw at module load (which
+// would crash the SPA before any route — including the login screen — renders).
+let _userPool: CognitoUserPool | null = null;
+function getUserPool(): CognitoUserPool {
+  if (!POOL_ID || !CLIENT_ID) {
+    throw new Error(
+      'Cognito is not configured: VITE_COGNITO_USER_POOL_ID / ' +
+        'VITE_COGNITO_APP_CLIENT_ID were empty at build time.',
+    );
+  }
+  if (!_userPool) {
+    _userPool = new CognitoUserPool({ UserPoolId: POOL_ID, ClientId: CLIENT_ID });
+  }
+  return _userPool;
+}
 
 function extractGroups(session: CognitoUserSession): string[] {
   try {
@@ -75,7 +94,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initializing: true,
 
   async initFromSession() {
-    const user = userPool.getCurrentUser();
+    if (!authConfigured) { set({ initializing: false }); return; }
+    const user = getUserPool().getCurrentUser();
     if (!user) { set({ initializing: false }); return; }
     return new Promise<void>((resolve) => {
       user.getSession((err: Error | null, session: CognitoUserSession | null) => {
@@ -93,7 +113,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   async login(email, password) {
     set({ loading: true });
     const authDetails = new AuthenticationDetails({ Username: email, Password: password });
-    const user = new CognitoUser({ Username: email, Pool: userPool });
+    const user = new CognitoUser({ Username: email, Pool: getUserPool() });
     return new Promise<void>((resolve, reject) => {
       user.authenticateUser(authDetails, {
         onSuccess(session) {
@@ -109,14 +129,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   logout() {
-    userPool.getCurrentUser()?.signOut();
+    if (authConfigured) getUserPool().getCurrentUser()?.signOut();
     set({ userId: null, accessToken: null, isAdmin: false });
   },
 
   async register(email, password, displayName) {
     set({ loading: true });
     return new Promise<void>((resolve, reject) => {
-      userPool.signUp(
+      getUserPool().signUp(
         email,
         password,
         [
@@ -134,7 +154,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   async confirmRegistration(email, code) {
-    const user = new CognitoUser({ Username: email, Pool: userPool });
+    const user = new CognitoUser({ Username: email, Pool: getUserPool() });
     return new Promise<void>((resolve, reject) => {
       user.confirmRegistration(code, true, (err) => {
         if (err) { reject(err); return; }
@@ -144,7 +164,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   async forgotPassword(email) {
-    const user = new CognitoUser({ Username: email, Pool: userPool });
+    const user = new CognitoUser({ Username: email, Pool: getUserPool() });
     return new Promise<void>((resolve, reject) => {
       user.forgotPassword({
         onSuccess() { resolve(); },
@@ -154,7 +174,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   async confirmNewPassword(email, code, newPassword) {
-    const user = new CognitoUser({ Username: email, Pool: userPool });
+    const user = new CognitoUser({ Username: email, Pool: getUserPool() });
     return new Promise<void>((resolve, reject) => {
       user.confirmPassword(code, newPassword, {
         onSuccess() { resolve(); },
