@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import styles from './auth.module.css';
 
 export default function Login() {
   const login = useAuthStore((s) => s.login);
   const loading = useAuthStore((s) => s.loading);
+  const userId = useAuthStore((s) => s.userId);
+  const initializing = useAuthStore((s) => s.initializing);
   const navigate = useNavigate();
+
+  // Session still being restored from localStorage — render nothing to
+  // avoid flashing the login form before a potential redirect.
+  if (initializing) return null;
+
+  // Already logged in — skip the login page entirely.
+  if (userId) return <Navigate to="/" replace />;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
