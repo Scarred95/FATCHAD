@@ -8,7 +8,6 @@ import NewRun from './pages/NewRun';
 import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
-import RouteError from './pages/RouteError';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -52,7 +51,6 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
-    errorElement: <RouteError />,
     children: [
       // Public routes — no login required
       { index: true, element: <Title /> },
@@ -71,11 +69,10 @@ export const router = createBrowserRouter([
           { path: 'runs/:runId/end', element: <EndScreen /> },
         ],
       },
+
+      // Admin routes — redirect to /login if not logged in, / if not admin
       {
         path: 'admin',
-        // One Suspense boundary on the parent covers the whole admin chunk —
-        // children import from the same `./admin` module, so once AdminLayout
-        // resolves they're already in memory and never suspend again.
         element: (
           <RequireAdmin>
             <Suspense fallback={adminFallback}>
@@ -84,14 +81,14 @@ export const router = createBrowserRouter([
           </RequireAdmin>
         ),
         children: [
-          { index: true, element: <DecksIndex /> },
-          { path: 'decks/:name', element: <DeckDetail /> },
-          { path: 'graph', element: <GraphView /> },
-          { path: 'cards/new', element: <CardEditorPage mode="new" /> },
-          { path: 'cards/:id', element: <CardEditorPage mode="edit" /> },
-          { path: 'endings', element: <EndingsIndex /> },
-          { path: 'endings/new', element: <EndingEditorPage mode="new" /> },
-          { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
+          { index: true, element: <Suspense fallback={adminFallback}><DecksIndex /></Suspense> },
+          { path: 'decks/:name', element: <Suspense fallback={adminFallback}><DeckDetail /></Suspense> },
+          { path: 'graph', element: <Suspense fallback={adminFallback}><GraphView /></Suspense> },
+          { path: 'cards/new', element: <Suspense fallback={adminFallback}><CardEditorPage mode="new" /></Suspense> },
+          { path: 'cards/:id', element: <Suspense fallback={adminFallback}><CardEditorPage mode="edit" /></Suspense> },
+          { path: 'endings', element: <Suspense fallback={adminFallback}><EndingsIndex /></Suspense> },
+          { path: 'endings/new', element: <Suspense fallback={adminFallback}><EndingEditorPage mode="new" /></Suspense> },
+          { path: 'endings/:id', element: <Suspense fallback={adminFallback}><EndingEditorPage mode="edit" /></Suspense> },
         ],
       },
     ],

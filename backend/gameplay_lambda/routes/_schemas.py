@@ -15,10 +15,6 @@ from shared.views import public_card_dict
 # Requests
 # =============================================================================
 
-class CreateRunRequest(BaseModel):
-    user_id: str  # TODO: derive from auth token once auth is wired up
-
-
 class ChoiceRequest(BaseModel):
     choice_index: int = Field(ge=0)
     # Current turn the client thinks the run is on. Required — guards against

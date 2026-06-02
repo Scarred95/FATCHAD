@@ -9,7 +9,6 @@ import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useToastStore } from '../stores/toastStore';
-import { getUserId } from '../stores/userStore';
 import styles from './RunList.module.css';
 
 export default function RunList() {
@@ -22,7 +21,7 @@ export default function RunList() {
 
   async function refresh() {
     try {
-      const data = await listRuns(getUserId());
+      const data = await listRuns();
       // Newest first.
       data.sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at));
       setRuns(data);
@@ -43,7 +42,7 @@ export default function RunList() {
   async function handleDelete(r: RunSummary) {
     setConfirmDelete(null);
     try {
-      await deleteRun(r._id, getUserId(), true);
+      await deleteRun(r._id, true);
       pushToast('Lauf gelöscht', 'info');
       await refresh();
     } catch (e) {

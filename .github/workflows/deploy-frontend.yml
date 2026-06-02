@@ -87,6 +87,35 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Resolved API URL: $URL"
 
+      # Pull the Cognito pool + client IDs from FatchadCognitoStack outputs so
+      # the SPA's auth store can talk to the right pool. Same source-of-truth
+      # pattern as the API URL above — no GitHub secret to keep in sync. These
+      # IDs are not secret; they ship inside the bundle by design. (The upload
+      # role's DescribeStacks must include FatchadCognitoStack — see
+      # bootstrap-stack.ts.)
+      - name: Resolve Cognito IDs from CloudFormation
+        id: cognito
+        run: |
+          set -euo pipefail
+          POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name FatchadCognitoStack \
+            --region eu-central-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
+            --output text 2>/dev/null || true)
+          CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name FatchadCognitoStack \
+            --region eu-central-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" \
+            --output text 2>/dev/null || true)
+          if [[ -z "$POOL_ID" || "$POOL_ID" == "None" || -z "$CLIENT_ID" || "$CLIENT_ID" == "None" ]]; then
+            echo "::warning::FatchadCognitoStack outputs not found — building without Cognito config; auth will not work"
+            POOL_ID=""
+            CLIENT_ID=""
+          fi
+          echo "pool_id=$POOL_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
+          echo "Resolved User Pool: $POOL_ID"
+
       - name: Build
         working-directory: frontend
         env:
@@ -96,6 +125,9 @@ jobs:
           # Admin routes are mounted under `/admin` on the same API. If we
           # ever route admin through a separate domain, override this var.
           VITE_ADMIN_API_BASE_URL: ${{ steps.api.outputs.url }}/admin
+          # Cognito config consumed by src/stores/authStore.ts.
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.cognito.outputs.pool_id }}
+          VITE_COGNITO_APP_CLIENT_ID: ${{ steps.cognito.outputs.client_id }}
         run: npm run build
 
       - name: Sync hashed assets (long cache)

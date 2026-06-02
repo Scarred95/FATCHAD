@@ -10,12 +10,9 @@ Production flow (COGNITO_USER_POOL_ID is set):
   5. Admin routes additionally check `cognito:groups` contains "admin".
 
 Local dev fallback (COGNITO_USER_POOL_ID is NOT set):
-  - Admin routes still accept the hardcoded ADMIN_TOKEN bearer token, so the
-    admin surface works against `.\start.ps1` without a deployed pool.
-  - Gameplay routes have NO fallback: get_current_user_id requires a verified
-    JWT, and verify_token reads COGNITO_USER_POOL_ID. With the pool unset those
-    routes raise (401 / missing-config), so exercising gameplay locally means
-    pointing at a real Cognito pool via the COGNITO_* env vars.
+  - Admin routes still accept the hardcoded ADMIN_TOKEN bearer token.
+  - Gameplay routes derive user_id from the ?user_id= query param as before.
+  This keeps `.\start.ps1` working without a deployed Cognito stack.
 """
 from __future__ import annotations
 
@@ -125,8 +122,7 @@ def get_current_user_id(
 ) -> str:
     """Return the Cognito user's unique ID (the `sub` claim).
 
-    The single source of run/profile ownership — every user-scoped route keys
-    off this rather than any client-supplied id.
+    Drop-in replacement for the ?user_id= query param once Cognito is live.
     """
     return claims["sub"]
 

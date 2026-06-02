@@ -8,7 +8,6 @@ import * as api from '../api/client';
 import { errorMessage } from '../api/http';
 import { STAT_NAMES } from '../api/types';
 import type { CardResponse, GameState, Stats } from '../api/types';
-import { getUserId } from './userStore';
 
 export interface StatDelta {
   stat: keyof Stats;
@@ -48,17 +47,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   async loadRun(runId) {
     set({ isLoading: true, error: null });
-    const uid = getUserId();
     try {
-      const state = await api.getRun(runId, uid);
+      const state = await api.getRun(runId);
       let currentCard: CardResponse | null = null;
       if (state.status === 'active') {
         try {
-          currentCard = await api.getCurrentCard(runId, uid);
+          currentCard = await api.getCurrentCard(runId);
         } catch (e) {
           // Softlock — state will already be marked lost on the server.
           // Re-fetch to pick up the new status.
-          const refreshed = await api.getRun(runId, uid);
+          const refreshed = await api.getRun(runId);
           set({ state: refreshed, currentCard: null, isLoading: false });
           return;
         }
@@ -72,7 +70,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   async createRun() {
     set({ isLoading: true, error: null });
     try {
-      const { state, next_card } = await api.createRun(getUserId());
+      const { state, next_card } = await api.createRun();
       set({
         state,
         currentCard: next_card,
@@ -94,7 +92,6 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const prevStats = state.stats;
       const { state: next, next_card } = await api.submitChoice(
         state._id,
-        getUserId(),
         index,
         state.turn,
       );
@@ -115,7 +112,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { state } = get();
     if (!state) return;
     try {
-      const next = await api.abandonRun(state._id, getUserId());
+      const next = await api.abandonRun(state._id);
       set({ state: next, currentCard: null });
     } catch (e) {
       set({ error: errorMessage(e, 'Etwas ist schiefgegangen') });

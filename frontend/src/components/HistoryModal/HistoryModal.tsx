@@ -6,15 +6,14 @@
  * operator closes and reopens to see new entries.
  *
  * Admin-only details (flag changes, ending triggers) are gated behind
- * `useAdminStore.isAdmin` — non-admins see only choice text + stat deltas.
+ * `authStore.isAdmin` (Cognito group) — non-admins see only choice text + stat deltas.
  */
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { getHistory } from '../../api/client';
 import { errorMessage } from '../../api/http';
 import { STAT_NAMES } from '../../api/types';
-import { useAdminStore } from '../../stores/adminAuthStore';
-import { getUserId } from '../../stores/userStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { STAT_COLOR_VAR, STAT_LABEL } from '../statMeta';
 import type { HistoryDetailEntry } from '../../api/types';
@@ -27,7 +26,7 @@ interface Props {
 }
 
 export default function HistoryModal({ open, runId, onClose }: Props) {
-  const isAdmin = useAdminStore((s) => s.isAdmin);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
   const [entries, setEntries] = useState<HistoryDetailEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +41,7 @@ export default function HistoryModal({ open, runId, onClose }: Props) {
     setOpenTurns(new Set());
     setLoading(true);
     let cancelled = false;
-    getHistory(runId, getUserId())
+    getHistory(runId)
       .then((rows) => {
         if (!cancelled) setEntries(rows);
       })

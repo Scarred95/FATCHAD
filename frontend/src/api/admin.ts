@@ -1,20 +1,18 @@
 /**
  * Typed admin API client. Every call goes through `/api/admin/*`,
- * which the backend gates behind the bearer token configured in
- * `adminAuthStore`.
+ * which the backend gates behind the caller's Cognito `admin` group.
  *
  * Every request below automatically:
- *   - reads the token from localStorage (via getAdminToken)
- *   - attaches it as `Authorization: Bearer <token>`
- *   - on a 401, calls `useAdminStore.getState().disable()` so the
- *     UI flips back to non-admin mode and the operator is prompted
- *     to re-enter the token
+ *   - reads the Cognito access token (via getAccessToken)
+ *   - attaches it as `Authorization: Bearer <jwt>`
+ *   - on a 401, logs the session out so the user is bounced to /login
+ *     (a 401 means the token is missing/expired; group checks 403)
  *
  * Domain shapes (Card, Ending, ...) live in `src/admin/types.ts` — the
  * single source of truth the whole admin surface imports. This client
  * only adds the request/response types specific to the HTTP layer.
  */
-import { getAdminToken, useAdminStore } from '../stores/adminAuthStore';
+import { getAccessToken, useAuthStore } from '../stores/authStore';
 import { ApiError, http } from './http';
 import { ADMIN_API_BASE } from './config';
 import type { Card, Ending } from '../admin/types';
@@ -46,7 +44,7 @@ export interface DeckToggleResult {
 /* ─── Core request helper ──────────────────────────────────────── */
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAdminToken();
+  const token = getAccessToken();
   // We don't bail on a missing token — let the backend respond 401 and
   // use the same handling path below. Keeps the client honest.
   try {
@@ -59,10 +57,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch (e) {
-    // 401 = token rejected. Flip admin mode off so the UI re-prompts.
+    // 401 = token missing/expired. End the session so the guard bounces
+    // the user to /login. (403 = valid token, not in the admin group.)
     if (e instanceof ApiError && e.status === 401) {
-      useAdminStore.getState().disable();
-      throw new ApiError(401, 'Admin-Token ungültig');
+      useAuthStore.getState().logout();
+      throw new ApiError(401, 'Sitzung abgelaufen — bitte neu anmelden');
     }
     throw e;
   }
@@ -113,7 +112,7 @@ export const toggleDeck = (deckName: string, enabled: boolean) =>
     { method: 'POST', body: JSON.stringify({ enabled }) },
   );
 
-/** Quick re-validation against the same endpoint adminAuthStore uses. */
+/** Quick re-validation of the caller's admin group against the backend. */
 export const adminPing = () => request<{ ok: boolean }>('/auth/ping');
 
 /* ─── Ending endpoints ─────────────────────────────────────────── */

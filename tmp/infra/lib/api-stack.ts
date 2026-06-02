@@ -6,6 +6,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -249,6 +250,70 @@ export class FatchadApiStack extends cdk.Stack {
       methods: [apigw.HttpMethod.ANY],
       integration: gameplayIntegration,
     });
+
+    // ------------------------------------------------------------------
+    // CloudWatch Dashboard
+    //
+    // Uses only built-in AWS metrics — no custom metrics, no extra cost.
+    // Row 1: Errors per Lambda   Row 2: Duration per Lambda
+    // Row 3: DDB consumed units (reads + writes on the user table, which
+    //        takes all gameplay traffic; catalog table is read-only + tiny).
+    // ------------------------------------------------------------------
+    const dashboard = new cloudwatch.Dashboard(this, 'FatchadDashboard', {
+      dashboardName: 'fatchad',
+    });
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors',
+        left: [
+          this.adminFn.metricErrors({ period: cdk.Duration.minutes(5), label: 'Admin' }),
+          this.gameplayFn.metricErrors({ period: cdk.Duration.minutes(5), label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Duration (avg ms)',
+        left: [
+          this.adminFn.metricDuration({ period: cdk.Duration.minutes(5), label: 'Admin' }),
+          this.gameplayFn.metricDuration({ period: cdk.Duration.minutes(5), label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Invocations',
+        left: [
+          this.adminFn.metricInvocations({ period: cdk.Duration.minutes(5), label: 'Admin' }),
+          this.gameplayFn.metricInvocations({ period: cdk.Duration.minutes(5), label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'DDB Consumed Capacity (user table)',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/DynamoDB',
+            metricName: 'ConsumedReadCapacityUnits',
+            dimensionsMap: { TableName: 'fatchad_user_data' },
+            period: cdk.Duration.minutes(5),
+            statistic: 'Sum',
+            label: 'Reads',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AWS/DynamoDB',
+            metricName: 'ConsumedWriteCapacityUnits',
+            dimensionsMap: { TableName: 'fatchad_user_data' },
+            period: cdk.Duration.minutes(5),
+            statistic: 'Sum',
+            label: 'Writes',
+          }),
+        ],
+        width: 12,
+      }),
+    );
 
     // ------------------------------------------------------------------
     // Tags + outputs

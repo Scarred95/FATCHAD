@@ -144,16 +144,18 @@ export class FatchadBootstrapStack extends cdk.Stack {
       }),
     );
 
-    // The deploy workflow reads `HttpApiUrl` from `FatchadApiStack` outputs
-    // at build time so it can bake `VITE_API_BASE_URL` into the bundle.
-    // Scoped to just describing this one stack — no other CloudFormation
+    // The deploy workflow reads `HttpApiUrl` from `FatchadApiStack` and the
+    // Cognito pool/client IDs from `FatchadCognitoStack` at build time so it
+    // can bake `VITE_API_BASE_URL` + `VITE_COGNITO_*` into the bundle. Scoped
+    // to describing just these two stacks — no other CloudFormation
     // visibility, no template downloads.
     frontendUploadRole.addToPolicy(
       new iam.PolicyStatement({
-        sid: 'DescribeApiStackOutputs',
+        sid: 'DescribeStackOutputs',
         actions: ['cloudformation:DescribeStacks'],
         resources: [
           `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadApiStack/*`,
+          `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadCognitoStack/*`,
         ],
       }),
     );

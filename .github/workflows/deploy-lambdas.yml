@@ -10,9 +10,16 @@ name: Deploy lambdas
 # deploy corresponds to a named, reviewable version so `git tag` answers
 # "what code is live?".
 #
+# Why does this deploy FatchadCognitoStack too? FatchadApiStack cross-stack
+# imports the Cognito pool + client IDs (CloudFormation exports), so the pool
+# must exist before — and stay in lockstep with — the API stack. Deploying
+# both in one `cdk deploy` lets CDK order them by dependency and keeps the
+# auth pool versioned alongside the code that verifies its tokens.
+#
 # The bundling step uses Docker (runs `pip install` inside a python3.12
 # image to land Linux-compatible wheels), which ubuntu-latest runners
-# provide out of the box.
+# provide out of the box. Both the gameplay/admin Lambdas and the Cognito
+# PostConfirmation trigger Lambda are bundled this way.
 on:
   push:
     tags:
@@ -35,7 +42,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: cdk deploy FatchadApiStack
+    name: cdk deploy FatchadCognitoStack + FatchadApiStack
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -81,13 +88,18 @@ jobs:
           role-session-name: GitHubActions-FatchadLambdaDeploy-${{ steps.ver.outputs.label }}
 
       # adminToken + corsOrigins are passed as CDK context so they end up in
-      # the Lambda environment without being committed to the repo.
+      # the Lambda environment without being committed to the repo. (The
+      # Cognito stack ignores them — they only matter to the API stack.)
+      #
+      # Listing both stacks lets CDK deploy them in dependency order:
+      # FatchadCognitoStack first (it exports the pool/client IDs), then
+      # FatchadApiStack (which imports them).
       - name: CDK synth
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         run: |
-          npx cdk synth FatchadApiStack \
+          npx cdk synth FatchadCognitoStack FatchadApiStack \
             -c adminToken="$ADMIN_TOKEN" \
             -c corsOrigins="$CORS_ORIGINS"
 
@@ -96,7 +108,7 @@ jobs:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         run: |
-          npx cdk diff FatchadApiStack \
+          npx cdk diff FatchadCognitoStack FatchadApiStack \
             -c adminToken="$ADMIN_TOKEN" \
             -c corsOrigins="$CORS_ORIGINS" || true
 
@@ -105,7 +117,7 @@ jobs:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         run: |
-          npx cdk deploy FatchadApiStack \
+          npx cdk deploy FatchadCognitoStack FatchadApiStack \
             -c adminToken="$ADMIN_TOKEN" \
             -c corsOrigins="$CORS_ORIGINS" \
             --require-approval never \
@@ -117,7 +129,9 @@ jobs:
       - name: Summary
         run: |
           echo "### Deployed lambdas ${{ steps.ver.outputs.label }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Stack: \`FatchadApiStack\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Functions: \`fatchad-admin\`, \`fatchad-gameplay\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Stacks: \`FatchadCognitoStack\`, \`FatchadApiStack\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Functions: \`fatchad-admin\`, \`fatchad-gameplay\`, \`fatchad-post-confirm\`" >> $GITHUB_STEP_SUMMARY
           API_URL=$(jq -r '.FatchadApiStack.HttpApiUrl' cdk-outputs.json)
+          POOL_ID=$(jq -r '.FatchadCognitoStack.UserPoolId' cdk-outputs.json)
           echo "- HTTP API: \`$API_URL\`" >> $GITHUB_STEP_SUMMARY
+          echo "- User Pool: \`$POOL_ID\`" >> $GITHUB_STEP_SUMMARY
