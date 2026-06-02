@@ -48,9 +48,41 @@ Both Lambdas now receive `COGNITO_USER_POOL_ID` and `COGNITO_APP_CLIENT_ID` as e
 
 ---
 
+## Frontend
+
+**New files:**
+
+| File | Purpose |
+|---|---|
+| `frontend/src/stores/authStore.ts` | Cognito session state — login, logout, register, password reset, `userId`, `accessToken`, `isAdmin` |
+| `frontend/src/pages/Login.tsx` | Login form |
+| `frontend/src/pages/Register.tsx` | Registration (2 steps: credentials → email verification code) |
+| `frontend/src/pages/ForgotPassword.tsx` | Password reset (2 steps: send code → set new password) |
+| `frontend/src/components/RequireAuth.tsx` | Route guard — redirects to `/login` if not authenticated |
+| `frontend/src/pages/auth.module.css` | Shared styles for all auth pages |
+
+**Updated files:**
+
+| File | What changed |
+|---|---|
+| `frontend/src/components/RequireAdmin.tsx` | Now uses `authStore` (Cognito groups) instead of `adminStore` (hardcoded token) |
+| `frontend/src/routes.tsx` | Added `/login`, `/register`, `/forgot-password` routes; gameplay routes wrapped with `RequireAuth` |
+| `frontend/src/main.tsx` | Calls `authStore.initFromSession()` on boot to restore session from localStorage |
+
+**Required env vars** — add to `.env.local` after deploying `FatchadCognitoStack`:
+
+```env
+VITE_COGNITO_USER_POOL_ID=eu-central-1_xxxxx
+VITE_COGNITO_APP_CLIENT_ID=yyyyy
+```
+
+Values come from the CDK stack outputs after `cdk deploy FatchadCognitoStack`.
+
+---
+
 ## What is still pending
 
 | Task | Description |
 |---|---|
-| Frontend | Login / Register / Forgot Password pages |
-| Routes migration | Remove `?user_id=` query params — derive `user_id` from JWT `sub` claim instead |
+| Routes migration | Remove `?user_id=` query params from all gameplay routes — derive `user_id` from JWT `sub` claim instead |
+| API client | Add `Authorization: Bearer <accessToken>` header to all API calls |

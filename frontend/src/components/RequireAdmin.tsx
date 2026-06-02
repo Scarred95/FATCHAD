@@ -1,36 +1,28 @@
 /**
  * Route guard for the /admin/* surface.
  *
- * Wrap any admin route element with <RequireAdmin>...</RequireAdmin>
- * (or use it as the `element` of a parent route with an <Outlet />).
- * If the adminStore doesn't have a confirmed admin session it kicks
- * the user back to the title screen.
+ * Checks both that the user is logged in AND belongs to the Cognito
+ * `admin` group. Unauthenticated users go to /login; authenticated
+ * non-admins go back to the title screen.
  *
- * We also wait out the boot-time `validating` flag so a quick refresh
- * doesn't flash a redirect before /ping has a chance to confirm the
- * stored token.
+ * Waits out `initializing` so a page reload doesn't flash a redirect
+ * before the Cognito session has been restored from localStorage.
  */
 import { Navigate, Outlet } from 'react-router-dom';
-
-import { useAdminStore } from '../stores/adminStore';
+import { useAuthStore } from '../stores/authStore';
 
 interface Props {
   children?: React.ReactNode;
 }
 
 export default function RequireAdmin({ children }: Props) {
-  const isAdmin = useAdminStore((s) => s.isAdmin);
-  const validating = useAdminStore((s) => s.validating);
+  const userId = useAuthStore((s) => s.userId);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
+  const initializing = useAuthStore((s) => s.initializing);
 
-  if (validating) {
-    // Boot-time ping in flight — render nothing rather than flicker
-    // through a redirect. Cheap and rare.
-    return null;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
-  }
+  if (initializing) return null;
+  if (!userId) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return <>{children ?? <Outlet />}</>;
 }

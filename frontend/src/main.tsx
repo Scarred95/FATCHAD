@@ -7,12 +7,13 @@ import './styles/tokens.css';
 import './styles/globals.css';
 
 import { router } from './routes';
-import { useAdminStore } from './stores/adminStore';
+import { useAuthStore } from './stores/authStore';
 import { useCatalogStore } from './stores/catalogStore';
 
-// Fire-and-forget: if we have a stored admin token, ping the backend
-// to confirm it's still valid before any admin UI tries to mount.
-void useAdminStore.getState().validateOnBoot();
+// Restore Cognito session from localStorage before the router mounts.
+// RequireAuth / RequireAdmin wait on `initializing` so no redirect
+// flicker happens while this is in flight.
+void useAuthStore.getState().initFromSession();
 
 // Warm the catalog cache on boot. Components that need card/ending data
 // (RunList, EndScreen, HistoryModal) call ensureLoaded again on mount —

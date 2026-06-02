@@ -8,6 +8,10 @@ import NewRun from './pages/NewRun';
 import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import RequireAuth from './components/RequireAuth';
 import RequireAdmin from './components/RequireAdmin';
 
 /**
@@ -48,12 +52,25 @@ export const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
+      // Public routes — no login required
       { index: true, element: <Title /> },
-      { path: 'runs', element: <RunList /> },
-      { path: 'runs/new', element: <NewRun /> },
-      { path: 'runs/:runId', element: <Game /> },
-      { path: 'runs/:runId/end', element: <EndScreen /> },
       { path: 'about', element: <About /> },
+      { path: 'login', element: <Login /> },
+      { path: 'register', element: <Register /> },
+      { path: 'forgot-password', element: <ForgotPassword /> },
+
+      // Authenticated routes — redirect to /login if not logged in
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: 'runs', element: <RunList /> },
+          { path: 'runs/new', element: <NewRun /> },
+          { path: 'runs/:runId', element: <Game /> },
+          { path: 'runs/:runId/end', element: <EndScreen /> },
+        ],
+      },
+
+      // Admin routes — redirect to /login if not logged in, / if not admin
       {
         path: 'admin',
         element: (
