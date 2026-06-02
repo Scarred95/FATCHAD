@@ -13,6 +13,7 @@ export default function Title() {
   const [online, setOnline] = useState<boolean | null>(null);
   const userId = useAuthStore((s) => s.userId);
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  const isGuest = useAuthStore((s) => s.isGuest);
   const logout = useAuthStore((s) => s.logout);
   const pushToast = useToastStore((s) => s.push);
 
@@ -80,9 +81,19 @@ export default function Title() {
       </motion.div>
 
       <div className={styles.adminBlock}>
+        {isGuest && (
+          <p className={styles.tagline}>
+            Du spielst als Gast — erstelle ein Konto, um deinen Fortschritt zu sichern.
+          </p>
+        )}
         <div className={styles.adminRow}>
           {userId ? (
             <>
+              {isGuest && (
+                <Link to="/register" className={styles.adminLink}>
+                  Konto erstellen
+                </Link>
+              )}
               {isAdmin && (
                 <Link to="/admin" className={styles.adminLink}>
                   Admin öffnen
