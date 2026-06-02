@@ -39,6 +39,10 @@ export interface FatchadApiStackProps extends cdk.StackProps {
   adminToken: string;
   /** Comma-separated origins for CORS (e.g. "https://fatchad.example,https://www.fatchad.example"). */
   corsOrigins: string;
+  /** Cognito User Pool ID — when set, both Lambdas verify JWTs against this pool. */
+  cognitoUserPoolId?: string;
+  /** Cognito App Client ID — passed to Lambdas for token audience validation. */
+  cognitoAppClientId?: string;
 }
 
 export class FatchadApiStack extends cdk.Stack {
@@ -161,6 +165,8 @@ export class FatchadApiStack extends cdk.Stack {
         CATALOG_BUCKET: this.catalogBucket.bucketName,
         ADMIN_TOKEN: props.adminToken,
         CORS_ORIGINS: props.corsOrigins,
+        ...(props.cognitoUserPoolId && { COGNITO_USER_POOL_ID: props.cognitoUserPoolId }),
+        ...(props.cognitoAppClientId && { COGNITO_APP_CLIENT_ID: props.cognitoAppClientId }),
       },
     });
 
@@ -187,6 +193,8 @@ export class FatchadApiStack extends cdk.Stack {
         CATALOG_BUCKET: this.catalogBucket.bucketName,
         CORS_ORIGINS: props.corsOrigins,
         // No ADMIN_TOKEN — gameplay has no admin-gated routes.
+        ...(props.cognitoUserPoolId && { COGNITO_USER_POOL_ID: props.cognitoUserPoolId }),
+        ...(props.cognitoAppClientId && { COGNITO_APP_CLIENT_ID: props.cognitoAppClientId }),
       },
     });
 

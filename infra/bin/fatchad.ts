@@ -4,6 +4,7 @@ import { FatchadBootstrapStack } from '../lib/bootstrap-stack';
 import { FatchadFrontendStack } from '../lib/frontend-stack';
 import { FatchadDataStack } from '../lib/ddb-stack';
 import { FatchadApiStack } from '../lib/api-stack';
+import { FatchadCognitoStack } from '../lib/cognito-stack';
 
 
 
@@ -41,9 +42,16 @@ new FatchadDataStack(app, 'FatchadDataStack', {
 const adminToken = (app.node.tryGetContext('adminToken') as string) ?? 'dev-token-change-me';
 const corsOrigins = (app.node.tryGetContext('corsOrigins') as string) ?? 'http://localhost:5173';
 
+const cognitoStack = new FatchadCognitoStack(app, 'FatchadCognitoStack', {
+  env,
+  description: 'FATCHAD auth: Cognito User Pool with admin + user groups.',
+});
+
 new FatchadApiStack(app, 'FatchadApiStack', {
   env,
   description: 'FATCHAD API: admin + gameplay Lambdas behind one HTTP API.',
   adminToken,
   corsOrigins,
+  cognitoUserPoolId: cognitoStack.userPool.userPoolId,
+  cognitoAppClientId: cognitoStack.userPoolClient.userPoolClientId,
 });
