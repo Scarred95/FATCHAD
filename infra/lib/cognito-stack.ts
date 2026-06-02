@@ -3,6 +3,9 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -83,6 +86,16 @@ export class FatchadCognitoStack extends cdk.Stack {
       precedence: 2,
     });
 
+    // Guests are throwaway accounts minted by POST /guest. The group tags them
+    // (visible in the JWT's cognito:groups, queryable for later cleanup) so a
+    // guest is distinguishable from a real user without overloading `name`.
+    new cognito.CfnUserPoolGroup(this, 'GuestGroup', {
+      userPoolId: this.userPool.userPoolId,
+      groupName: 'guest',
+      description: 'Throwaway guest accounts (POST /guest). Eligible for cleanup.',
+      precedence: 3,
+    });
+
     // ------------------------------------------------------------------
     // PostConfirmation trigger
     //
@@ -138,6 +151,63 @@ export class FatchadCognitoStack extends cdk.Stack {
       cognito.UserPoolOperation.POST_CONFIRMATION,
       postConfirmFn,
     );
+
+    // ------------------------------------------------------------------
+    // Guest cleanup — scheduled sweep
+    //
+    // Runs daily at 02:00 UTC: deletes guest accounts (Cognito user + their
+    // fatchad_user_data partition) older than GUEST_MAX_AGE_HOURS. Keeps the
+    // pool from accumulating throwaway guests. Set GUEST_MAX_AGE_HOURS=0 to
+    // wipe every guest on each run. Same bundling as the other Lambdas.
+    // ------------------------------------------------------------------
+    const guestCleanupLogGroup = new logs.LogGroup(this, 'GuestCleanupFnLogGroup', {
+      logGroupName: '/aws/lambda/fatchad-guest-cleanup',
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const guestCleanupFn = new lambda.Function(this, 'GuestCleanupFn', {
+      functionName: 'fatchad-guest-cleanup',
+      runtime: lambda.Runtime.PYTHON_3_12,
+      handler: 'cleanup_lambda.handler.handler',
+      memorySize: 256,
+      timeout: cdk.Duration.minutes(2),
+      logGroup: guestCleanupLogGroup,
+      environment: {
+        COGNITO_USER_POOL_ID: this.userPool.userPoolId,
+        USER_TABLE: 'fatchad_user_data',
+        GUEST_MAX_AGE_HOURS: '24',
+      },
+      code: lambda.Code.fromAsset(backendDir, {
+        assetHashType: cdk.AssetHashType.OUTPUT,
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'pip install --no-cache-dir -r requirements.txt -t /asset-output',
+              'cp -r cleanup_lambda shared /asset-output/',
+            ].join(' && '),
+          ],
+        },
+      }),
+    });
+
+    userTable.grantReadWriteData(guestCleanupFn);
+    guestCleanupFn.addToRolePolicy(new iam.PolicyStatement({
+      sid: 'GuestCleanup',
+      actions: [
+        'cognito-idp:ListUsersInGroup',
+        'cognito-idp:AdminDeleteUser',
+      ],
+      resources: [this.userPool.userPoolArn],
+    }));
+
+    new events.Rule(this, 'GuestCleanupSchedule', {
+      ruleName: 'fatchad-guest-cleanup-daily',
+      description: 'Daily 02:00 UTC sweep of stale guest accounts.',
+      schedule: events.Schedule.cron({ minute: '0', hour: '2' }),
+      targets: [new targets.LambdaFunction(guestCleanupFn)],
+    });
 
     // ------------------------------------------------------------------
     // App Client (used by the React frontend)

@@ -67,6 +67,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getHealth = () => request<HealthResponse>('/healthz');
 
+/* ─── Guest sessions ───────────────────────────────────────────── */
+
+/** Mint a throwaway guest account. Unauthenticated — the backend creates a
+ *  Cognito user in the `guest` group and returns its credentials so the client
+ *  can sign in via the normal SRP flow. */
+export const createGuestSession = () =>
+  request<{ email: string; password: string }>('/guest', {
+    method: 'POST',
+  });
+
+/** Absorb a guest's progress into the currently signed-in real account.
+ *  Authenticated as the real account; the guest is proven by its own token. */
+export const claimGuestAccount = (guestAccessToken: string) =>
+  request<{ migrated_runs: number }>('/account/claim', {
+    method: 'POST',
+    body: JSON.stringify({ guest_access_token: guestAccessToken }),
+  });
+
 /* ─── Catalog ──────────────────────────────────────────────────── */
 
 /** Public catalog bundle — fed from S3, gateway-proxied. Shape mirrors

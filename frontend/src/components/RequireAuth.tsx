@@ -13,7 +13,7 @@ export default function RequireAuth() {
   const initializing = useAuthStore((s) => s.initializing);
 
   if (initializing) return null;
-  if (!userId) return <Navigate to="/login" replace />;
+  if (!userId) return <Navigate to="/welcome" replace />;
 
   return <Outlet />;
 }

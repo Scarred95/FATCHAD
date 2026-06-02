@@ -202,6 +202,23 @@ export class FatchadApiStack extends cdk.Stack {
     userTable.grantReadWriteData(this.gameplayFn);
     this.catalogBucket.grantRead(this.gameplayFn);
 
+    // POST /guest mints throwaway Cognito accounts. Scope the admin actions to
+    // this one user pool. Only granted when the pool id is known at synth time.
+    if (props.cognitoUserPoolId) {
+      const userPoolArn = `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${props.cognitoUserPoolId}`;
+      this.gameplayFn.addToRolePolicy(new iam.PolicyStatement({
+        sid: 'GuestUserProvisioning',
+        actions: [
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+          'cognito-idp:AdminAddUserToGroup',
+          // Delete a guest account once its progress is claimed (/account/claim).
+          'cognito-idp:AdminDeleteUser',
+        ],
+        resources: [userPoolArn],
+      }));
+    }
+
     // ------------------------------------------------------------------
     // HTTP API (v2)
     //

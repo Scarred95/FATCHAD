@@ -54,10 +54,12 @@ function extractGroups(session: CognitoUserSession): string[] {
 
 function sessionToState(session: CognitoUserSession) {
   const payload = session.getIdToken().decodePayload();
+  const groups = extractGroups(session);
   return {
     userId: payload.sub as string,
     accessToken: session.getAccessToken().getJwtToken(),
-    isAdmin: extractGroups(session).includes('admin'),
+    isAdmin: groups.includes('admin'),
+    isGuest: groups.includes('guest'),
   };
 }
 
@@ -65,6 +67,8 @@ interface AuthStore {
   userId: string | null;
   accessToken: string | null;
   isAdmin: boolean;
+  /** True when the session belongs to a throwaway guest account. */
+  isGuest: boolean;
   /** True while login / register is in flight. */
   loading: boolean;
   /** True while restoring session on boot — UI should wait before redirecting. */
@@ -73,6 +77,14 @@ interface AuthStore {
   /** Restore session from localStorage on app boot. */
   initFromSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  /** Mint a throwaway guest account on the backend, then sign in as it.
+   *  The guest gets a real Cognito session (SDK-managed, like any user), so
+   *  runs persist and can later be claimed by a real account on register. */
+  loginAsGuest: () => Promise<void>;
+  /** Migrate a guest's runs + profile totals onto the currently signed-in real
+   *  account, then delete the guest. `guestAccessToken` is the guest session's
+   *  token, captured before logging into the new account. */
+  claimGuestData: (guestAccessToken: string) => Promise<number>;
   logout: () => void;
   /** Step 1 of registration — Cognito sends a verification code to the email.
    *  `displayName` is stored as the Cognito `name` attribute and copied into
@@ -90,6 +102,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   userId: null,
   accessToken: null,
   isAdmin: false,
+  isGuest: false,
   loading: false,
   initializing: true,
 
@@ -128,9 +141,31 @@ export const useAuthStore = create<AuthStore>((set) => ({
     });
   },
 
+  async loginAsGuest() {
+    set({ loading: true });
+    try {
+      // Dynamic import avoids a static cycle (api/client imports getAccessToken
+      // from this module).
+      const { createGuestSession } = await import('../api/client');
+      const { email, password } = await createGuestSession();
+      // Reuse the normal SRP login so the guest session is SDK-managed
+      // (persisted + refreshed + restored on reload) like any other user.
+      await useAuthStore.getState().login(email, password);
+    } catch (err) {
+      set({ loading: false });
+      throw err;
+    }
+  },
+
+  async claimGuestData(guestAccessToken) {
+    const { claimGuestAccount } = await import('../api/client');
+    const { migrated_runs } = await claimGuestAccount(guestAccessToken);
+    return migrated_runs;
+  },
+
   logout() {
     if (authConfigured) getUserPool().getCurrentUser()?.signOut();
-    set({ userId: null, accessToken: null, isAdmin: false });
+    set({ userId: null, accessToken: null, isAdmin: false, isGuest: false });
   },
 
   async register(email, password, displayName) {

@@ -23,6 +23,30 @@ class ChoiceRequest(BaseModel):
 
 
 # =============================================================================
+# Guest sessions
+# =============================================================================
+
+class GuestSessionResponse(BaseModel):
+    """Credentials for a freshly minted guest account. The client signs in with
+    these via the normal SRP flow — the password is a disposable random secret
+    for a throwaway account, returned once over HTTPS and never stored server-side."""
+    email: str
+    password: str
+
+
+class ClaimGuestRequest(BaseModel):
+    """Sent by a freshly-registered real account to absorb a guest's progress.
+    The caller authenticates as the real account (Authorization header); the
+    guest is proven by its own still-valid access token in the body — so only
+    the holder of the guest session can claim it."""
+    guest_access_token: str
+
+
+class ClaimGuestResponse(BaseModel):
+    migrated_runs: int
+
+
+# =============================================================================
 # Card / turn responses
 # =============================================================================
 

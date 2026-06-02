@@ -9,6 +9,7 @@ import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
 import RouteError from './pages/RouteError';
+import Welcome from './pages/Welcome';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -55,16 +56,18 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       // Public routes — no login required
-      { index: true, element: <Title /> },
+      { path: 'welcome', element: <Welcome /> },
       { path: 'about', element: <About /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
 
-      // Authenticated routes — redirect to /login if not logged in
+      // Authenticated routes — redirect to /welcome (the gate) if not logged in.
+      // The Title screen lives here too, so the gate is the true first screen.
       {
         element: <RequireAuth />,
         children: [
+          { index: true, element: <Title /> },
           { path: 'runs', element: <RunList /> },
           { path: 'runs/new', element: <NewRun /> },
           { path: 'runs/:runId', element: <Game /> },

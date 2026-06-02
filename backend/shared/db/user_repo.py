@@ -198,6 +198,92 @@ class UserRepo:
                 return True
         return False
 
+    # -------------------------------------------------------------------------
+    # Bulk delete — wipe an entire user's partition (guest cleanup)
+    # -------------------------------------------------------------------------
+
+    def delete_all_user_data(self, user_id: str) -> int:
+        """Delete every item under USER#<user_id> (profile, runs, anything else).
+
+        Used by the guest-cleanup sweep. Queries the partition (keys only) and
+        batch-deletes. Returns the number of items removed.
+        """
+        pk = user_pk(user_id)
+        deleted = 0
+        kwargs = {
+            "KeyConditionExpression": Key("PK").eq(pk),
+            "ProjectionExpression": "PK, SK",
+        }
+        with self._t.batch_writer() as batch:
+            while True:
+                resp = self._t.query(**kwargs)
+                for item in resp.get("Items", []):
+                    batch.delete_item(Key={"PK": item["PK"], "SK": item["SK"]})
+                    deleted += 1
+                lek = resp.get("LastEvaluatedKey")
+                if not lek:
+                    break
+                kwargs["ExclusiveStartKey"] = lek
+        return deleted
+
+    # -------------------------------------------------------------------------
+    # Guest claim — migrate a guest's data onto a real account
+    # -------------------------------------------------------------------------
+
+    def claim_guest_data(self, guest_user_id: str, real_user_id: str) -> int:
+        """Move a guest's runs onto a real account and merge profile totals.
+
+        Merge semantics (no data loss): the real account keeps its own runs and
+        gains all of the guest's; profile lifetime totals + points are summed
+        into the real profile (display name stays the real user's). Run ids are
+        UUIDs, so re-keying a guest run into the real partition never collides.
+
+        Returns the number of runs migrated. The guest's PROFILE row is removed;
+        the caller is responsible for deleting the guest's Cognito account.
+        """
+        runs = self.list_runs_for_user(guest_user_id)
+        migrated = 0
+        for state in runs:
+            state.user_id = real_user_id
+            try:
+                self.insert_run(state)
+            except RunConflict:
+                # UUID collision across accounts is astronomically unlikely;
+                # skip rather than clobber whatever already sits there.
+                continue
+            self.delete_run(guest_user_id, state.id)
+            migrated += 1
+
+        self._merge_profiles(guest_user_id, real_user_id)
+        return migrated
+
+    def _merge_profiles(self, guest_user_id: str, real_user_id: str) -> None:
+        from datetime import datetime, timezone
+
+        guest = self.get_profile(guest_user_id)
+        if guest is None:
+            return
+        real = self.get_profile(real_user_id)
+        now = datetime.now(timezone.utc)
+
+        if real is None:
+            # Real profile missing (PostConfirmation slow/failed) — re-key the
+            # guest profile onto the real id so totals aren't lost.
+            guest.user_id = real_user_id
+            guest.updated_at = now
+            self.put_profile(guest)
+        else:
+            real.totals.runs_started += guest.totals.runs_started
+            real.totals.runs_completed += guest.totals.runs_completed
+            real.totals.runs_abandoned += guest.totals.runs_abandoned
+            real.totals.achievements_unlocked += guest.totals.achievements_unlocked
+            real.current_points += guest.current_points
+            real.updated_at = now
+            self.put_profile(real)
+
+        # Drop the guest PROFILE row regardless of branch.
+        self._t.delete_item(Key=user_profile_key(guest_user_id))
+
     def list_runs_for_user(self, user_id: str) -> list[GameState]:
         """All runs for a user, any status: one Query (SK begins_with RUN#)
         with a 1 MB pagination loop. If users ever accumulate thousands of runs,

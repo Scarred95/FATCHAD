@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { useToastStore } from '../stores/toastStore';
 import styles from './auth.module.css';
 
-type Step = 'credentials' | 'confirm';
+type Step = 'credentials' | 'confirm' | 'claim';
 
 export default function Register() {
   const register = useAuthStore((s) => s.register);
   const confirmRegistration = useAuthStore((s) => s.confirmRegistration);
+  const login = useAuthStore((s) => s.login);
+  const claimGuestData = useAuthStore((s) => s.claimGuestData);
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const loading = useAuthStore((s) => s.loading);
   const navigate = useNavigate();
+  const pushToast = useToastStore((s) => s.push);
 
   const [step, setStep] = useState<Step>('credentials');
   const [email, setEmail] = useState('');
@@ -18,12 +24,19 @@ export default function Register() {
   const [confirm, setConfirm] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [claiming, setClaiming] = useState(false);
+
+  // If a guest started this registration, snapshot their access token before
+  // we log into the new account (which replaces the session) — we need it to
+  // claim their progress afterwards.
+  const guestTokenRef = useRef<string | null>(null);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     if (password !== confirm) { setError('Passwörter stimmen nicht überein'); return; }
     try {
+      guestTokenRef.current = isGuest ? accessToken : null;
       await register(email, password, displayName.trim());
       setStep('confirm');
     } catch (err: any) {
@@ -36,10 +49,65 @@ export default function Register() {
     setError('');
     try {
       await confirmRegistration(email, code);
+      // Upgrading from a guest: log straight into the new account so we hold a
+      // real session, then offer to bring the guest's progress over.
+      if (guestTokenRef.current) {
+        await login(email, password);
+        setStep('claim');
+        return;
+      }
       navigate('/login');
     } catch (err: any) {
       setError(err.message ?? 'Code ungültig');
     }
+  }
+
+  async function handleClaim() {
+    const guestToken = guestTokenRef.current;
+    if (!guestToken) { navigate('/'); return; }
+    setClaiming(true);
+    try {
+      const migrated = await claimGuestData(guestToken);
+      pushToast(
+        migrated > 0
+          ? `Fortschritt übernommen (${migrated} ${migrated === 1 ? 'Runde' : 'Runden'})`
+          : 'Fortschritt übernommen',
+        'info',
+      );
+    } catch {
+      pushToast('Fortschritt konnte nicht übernommen werden', 'error');
+    } finally {
+      setClaiming(false);
+      navigate('/');
+    }
+  }
+
+  if (step === 'claim') {
+    return (
+      <main className={`page ${styles.page}`}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>Fortschritt übernehmen?</h1>
+          <p className={styles.hint}>
+            Du hast als Gast gespielt. Sollen deine bisherigen Runden in dein
+            neues Konto übernommen werden?
+          </p>
+          <button
+            className={styles.btnPrimary}
+            onClick={handleClaim}
+            disabled={claiming}
+          >
+            {claiming ? '…' : 'Ja, übernehmen'}
+          </button>
+          <button
+            className={styles.btnText}
+            onClick={() => navigate('/')}
+            disabled={claiming}
+          >
+            Nein, neu anfangen
+          </button>
+        </div>
+      </main>
+    );
   }
 
   if (step === 'confirm') {
