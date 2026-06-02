@@ -24,11 +24,15 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+import boto3
+
 from shared.db.user_repo import UserRepo
 from shared.schemas import Profile
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+_USER_GROUP = "user"
 
 
 def handler(event: dict, _context) -> dict:
@@ -40,6 +44,20 @@ def handler(event: dict, _context) -> dict:
     if not sub:
         logger.error("PostConfirmation event has no sub claim; skipping profile create")
         return event
+
+    # Place the newly-confirmed account into the `user` group so identity
+    # checks that key off cognito:groups see a real player (self-signups land
+    # in no group otherwise). Best-effort: a failure here must not block the
+    # confirmation, and the group can be backfilled later.
+    try:
+        boto3.client("cognito-idp").admin_add_user_to_group(
+            UserPoolId=event["userPoolId"],
+            Username=event["userName"],
+            GroupName=_USER_GROUP,
+        )
+        logger.info("Added %s to group %s", sub, _USER_GROUP)
+    except Exception:  # noqa: BLE001 — never block signup on group assignment
+        logger.exception("Failed to add %s to group %s", sub, _USER_GROUP)
 
     display_name = attrs.get("name") or _name_from_email(attrs.get("email", ""))
 

@@ -147,6 +147,18 @@ export class FatchadCognitoStack extends cdk.Stack {
     );
     userTable.grantReadWriteData(postConfirmFn);
 
+    // Let the trigger drop confirmed signups into the `user` group. Scoped to a
+    // wildcard userpool ARN on purpose: the pool already references this Lambda
+    // via addTrigger, so referencing this.userPool.userPoolArn here would close
+    // a CDK circular dependency. The wildcard stays within this account/region.
+    postConfirmFn.addToRolePolicy(new iam.PolicyStatement({
+      sid: 'AddUserToGroup',
+      actions: ['cognito-idp:AdminAddUserToGroup'],
+      resources: [
+        `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`,
+      ],
+    }));
+
     this.userPool.addTrigger(
       cognito.UserPoolOperation.POST_CONFIRMATION,
       postConfirmFn,
