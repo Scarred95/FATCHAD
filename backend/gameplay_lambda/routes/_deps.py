@@ -5,6 +5,7 @@ reads the published snapshot via CatalogSnapshot's pointer-versioned cache.
 """
 from fastapi import Depends, HTTPException
 
+from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot, get_current_snapshot
 from shared.db.user_repo import UserRepo
 from shared.schemas import GameState
@@ -22,11 +23,11 @@ def get_catalog() -> CatalogSnapshot:
 
 def get_owned_run(
     run_id: str,
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
 ) -> GameState:
-    """Load (user_id, run_id) or 404. The single seam for run lookup — and where
-    the ownership check lands once auth is wired (see FEATURE_IDEAS.md)."""
+    """Load (user_id, run_id) or 404. The single seam for run lookup; ownership
+    is enforced by deriving user_id from the caller's Cognito JWT (`sub` claim)."""
     state = users.get_run(user_id, run_id)
     if state is None:
         raise HTTPException(404, "Run not found")

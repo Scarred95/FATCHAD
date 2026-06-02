@@ -3,3 +3,4 @@ uvicorn[standard]
 pydantic
 boto3
 mangum
+python-jose[cryptography]

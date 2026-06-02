@@ -1,75 +1,189 @@
-"""Admin auth — a single shared bearer token from the ADMIN_TOKEN env var.
+"""Authentication — Cognito JWT verification (production) with legacy
+bearer-token fallback for local dev.
 
-Placeholder layer: no user accounts, no hashing (the token IS the secret), no
-sessions/rotation. Every /admin/* route runs `require_admin_token`; the
-frontend pings /admin/auth/ping to check a stored token. Swap for real auth
-before exposing admin on the public internet.
+Production flow (COGNITO_USER_POOL_ID is set):
+  1. Client logs in via Cognito and receives a JWT access token.
+  2. Every request carries:  Authorization: Bearer <jwt>
+  3. verify_token() fetches Cognito's public keys (JWKS) once per Lambda
+     container, then verifies the JWT signature + expiry on every call.
+  4. The token's `sub` claim becomes the user_id throughout the app.
+  5. Admin routes additionally check `cognito:groups` contains "admin".
+
+Local dev fallback (COGNITO_USER_POOL_ID is NOT set):
+  - Admin routes still accept the hardcoded ADMIN_TOKEN bearer token, so the
+    admin surface works against `.\start.ps1` without a deployed pool.
+  - Gameplay routes have NO fallback: get_current_user_id requires a verified
+    JWT, and verify_token reads COGNITO_USER_POOL_ID. With the pool unset those
+    routes raise (401 / missing-config), so exercising gameplay locally means
+    pointing at a real Cognito pool via the COGNITO_* env vars.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
+import urllib.request
+from functools import lru_cache
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-# Clearly-marked dev default so `uvicorn ...` works without env setup; the
-# warning below fires if it's ever live. Read at import time is fine — env vars
-# are set before the process starts (move into startup if you adopt runtime dotenv).
+_bearer = HTTPBearer(auto_error=False)
+
+# ---------------------------------------------------------------------------
+# Dev-mode admin token (unchanged from the old placeholder)
+# ---------------------------------------------------------------------------
+
 _DEFAULT_DEV_TOKEN = "dev-admin-token-change-me"
 _ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", _DEFAULT_DEV_TOKEN)
 
 if _ADMIN_TOKEN == _DEFAULT_DEV_TOKEN:
-    log.warning(
-        "ADMIN_TOKEN env var not set — using the bundled dev default (%r). "
-        "Set ADMIN_TOKEN before deploying anywhere reachable from the internet.",
+    logger.warning(
+        "ADMIN_TOKEN env var not set — using the bundled dev default "
+        "(%r). Set ADMIN_TOKEN before deploying anywhere reachable from "
+        "the internet.",
         _DEFAULT_DEV_TOKEN,
     )
 
-# auto_error=False: we handle the missing/invalid case ourselves to return a
-# 401 + WWW-Authenticate challenge (the default is a bare 403, no challenge).
-_bearer_scheme = HTTPBearer(auto_error=False)
+
+# ---------------------------------------------------------------------------
+# Cognito JWKS — fetched once per Lambda container, cached in RAM
+# ---------------------------------------------------------------------------
+
+def _cognito_configured() -> bool:
+    return bool(os.getenv("COGNITO_USER_POOL_ID"))
 
 
-def require_admin_token(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> None:
-    """Reject the request unless a valid admin token is in the Authorization
-    header. Mounted at the /admin router so every route is guarded. Raises 401
-    on any failure; returns None on success.
+@lru_cache(maxsize=1)
+def _fetch_jwks(jwks_url: str) -> dict:
+    """Download and cache Cognito's public signing keys."""
+    with urllib.request.urlopen(jwks_url, timeout=5) as resp:
+        return json.loads(resp.read())
+
+
+def _jwks() -> dict:
+    pool_id = os.environ["COGNITO_USER_POOL_ID"]
+    region = os.getenv("COGNITO_REGION", "eu-central-1")
+    url = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}/.well-known/jwks.json"
+    return _fetch_jwks(url)
+
+
+# ---------------------------------------------------------------------------
+# JWT verification
+# ---------------------------------------------------------------------------
+
+def verify_token(token: str) -> dict:
+    """Verify a Cognito JWT and return its claims.
+
+    Raises HTTP 401 if the token is missing, expired, or has an invalid
+    signature. Uses the cached JWKS so the S3-hosted public key is only
+    fetched once per warm Lambda container.
+    """
+    pool_id = os.environ["COGNITO_USER_POOL_ID"]
+    region = os.getenv("COGNITO_REGION", "eu-central-1")
+    issuer = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}"
+
+    try:
+        claims = jwt.decode(
+            token,
+            _jwks(),
+            algorithms=["RS256"],
+            issuer=issuer,
+            # Cognito access tokens use `client_id` instead of `aud` —
+            # skip the audience check here; the issuer check is sufficient.
+            options={"verify_aud": False},
+        )
+        return claims
+    except JWTError as exc:
+        raise _unauthorized(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Shared dependencies
+# ---------------------------------------------------------------------------
+
+def get_current_user(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> dict:
+    """Verify the JWT and return its full claims dict.
+
+    Used as a base for `get_current_user_id` and `require_admin`.
+    Raises 401 if no token is provided or verification fails.
     """
     if creds is None:
         raise _unauthorized("Missing Authorization header")
+    return verify_token(creds.credentials)
 
-    # Load-bearing: with auto_error=False, HTTPBearer returns creds even for a
-    # non-Bearer scheme, so we check it explicitly (case-insensitive).
-    if creds.scheme.lower() != "bearer":
-        raise _unauthorized(f"Expected Bearer scheme, got {creds.scheme!r}")
 
-    # Constant-time compare so response timing can't leak the token byte-by-byte.
-    if not secrets.compare_digest(creds.credentials, _ADMIN_TOKEN):
-        raise _unauthorized("Invalid admin token")
+def get_current_user_id(
+    claims: dict = Depends(get_current_user),
+) -> str:
+    """Return the Cognito user's unique ID (the `sub` claim).
 
+    The single source of run/profile ownership — every user-scoped route keys
+    off this rather than any client-supplied id.
+    """
+    return claims["sub"]
+
+
+def require_admin(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> None:
+    """Reject the request unless the caller has admin rights.
+
+    Production: verifies JWT and checks the caller is in the `admin` group.
+    Local dev (no COGNITO_USER_POOL_ID): falls back to the legacy ADMIN_TOKEN
+    bearer-token check so `.\start.ps1` keeps working.
+    """
+    if not _cognito_configured():
+        # --- Legacy dev fallback ---
+        if creds is None:
+            raise _unauthorized("Missing Authorization header")
+        if creds.scheme.lower() != "bearer":
+            raise _unauthorized(f"Expected Bearer scheme, got {creds.scheme!r}")
+        if not secrets.compare_digest(creds.credentials, _ADMIN_TOKEN):
+            raise _unauthorized("Invalid admin token")
+        return
+
+    # --- Cognito path ---
+    claims = get_current_user(creds)
+    groups: list[str] = claims.get("cognito:groups", [])
+    if "admin" not in groups:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin group membership required",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Admin auth ping endpoint (unchanged)
+# ---------------------------------------------------------------------------
+
+router = APIRouter()
+
+
+@router.get("/ping")
+async def ping() -> dict[str, bool]:
+    """Token-validation heartbeat — guarded by require_admin at the parent router.
+
+    200 → credentials valid, mount the admin UI.
+    401/403 → credentials invalid, show the login screen.
+    """
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _unauthorized(detail: str) -> HTTPException:
-    """Canonical 401. The WWW-Authenticate header tells the client which scheme
-    to use — without it some clients won't even prompt for credentials."""
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
         headers={"WWW-Authenticate": "Bearer"},
     )
-
-
-# Tiny sub-router so the frontend can cheaply validate a stored token.
-router = APIRouter()
-
-
-@router.get("/ping")
-def ping() -> dict[str, bool]:
-    """Token-validation heartbeat: 200 (guarded by require_admin_token) means
-    the token is valid and the admin UI may mount; 401 means clear it."""
-    return {"ok": True}

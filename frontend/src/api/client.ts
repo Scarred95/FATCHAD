@@ -8,11 +8,11 @@
  *   - falls back to `/api` for local dev, which the Vite proxy rewrites to
  *     `http://127.0.0.1:8000` (see vite.config.ts).
  *
- * `user_id` is a required parameter on every single-run endpoint. The
- * backend no longer derives it from a session — passing it explicitly
- * keeps the seams visible until the Cognito migration lands, at which
- * point this argument becomes "derive from token" inside `request()`.
+ * Identity travels in the Cognito JWT, not the URL. `request()` attaches
+ * `Authorization: Bearer <accessToken>` on every call and the backend derives
+ * `user_id` from the token's `sub` claim — so endpoints take no `user_id` arg.
  */
+import { getAccessToken } from '../stores/authStore';
 import type {
   CardResponse,
   EndSummary,
@@ -52,23 +52,38 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     notifyWip();
     throw new ApiError(0, 'WIP — Backend nicht verfügbar');
   }
+  const token = getAccessToken();
   return http<T>(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
 }
 
-/** URL-encode a `user_id` into a `?user_id=` query string. */
-function uidQuery(user_id: string): string {
-  return `?user_id=${encodeURIComponent(user_id)}`;
-}
-
 /* ─── Meta ─────────────────────────────────────────────────────── */
 
 export const getHealth = () => request<HealthResponse>('/healthz');
+
+/* ─── Guest sessions ───────────────────────────────────────────── */
+
+/** Mint a throwaway guest account. Unauthenticated — the backend creates a
+ *  Cognito user in the `guest` group and returns its credentials so the client
+ *  can sign in via the normal SRP flow. */
+export const createGuestSession = () =>
+  request<{ email: string; password: string }>('/guest', {
+    method: 'POST',
+  });
+
+/** Absorb a guest's progress into the currently signed-in real account.
+ *  Authenticated as the real account; the guest is proven by its own token. */
+export const claimGuestAccount = (guestAccessToken: string) =>
+  request<{ migrated_runs: number }>('/account/claim', {
+    method: 'POST',
+    body: JSON.stringify({ guest_access_token: guestAccessToken }),
+  });
 
 /* ─── Catalog ──────────────────────────────────────────────────── */
 
@@ -79,49 +94,47 @@ export const getCurrentCatalog = () =>
 
 /* ─── Run lifecycle ────────────────────────────────────────────── */
 
-export const createRun = (user_id: string) =>
+export const createRun = () =>
   request<TurnResponse>('/runs', {
     method: 'POST',
-    body: JSON.stringify({ user_id }),
   });
 
-export const listRuns = (user_id: string) =>
-  request<RunSummary[]>(`/runs${uidQuery(user_id)}`);
+export const listRuns = () =>
+  request<RunSummary[]>('/runs');
 
-export const getRun = (runId: string, user_id: string) =>
-  request<GameState>(`/runs/${runId}${uidQuery(user_id)}`);
+export const getRun = (runId: string) =>
+  request<GameState>(`/runs/${runId}`);
 
-export const abandonRun = (runId: string, user_id: string) =>
-  request<GameState>(`/runs/${runId}/abandon${uidQuery(user_id)}`, {
+export const abandonRun = (runId: string) =>
+  request<GameState>(`/runs/${runId}/abandon`, {
     method: 'POST',
   });
 
-export const deleteRun = (runId: string, user_id: string, force = false) =>
+export const deleteRun = (runId: string, force = false) =>
   request<void>(
-    `/runs/${runId}${uidQuery(user_id)}${force ? '&force=true' : ''}`,
+    `/runs/${runId}${force ? '?force=true' : ''}`,
     { method: 'DELETE' },
   );
 
 /* ─── Gameplay ─────────────────────────────────────────────────── */
 
-export const getCurrentCard = (runId: string, user_id: string) =>
-  request<CardResponse>(`/runs/${runId}/card${uidQuery(user_id)}`);
+export const getCurrentCard = (runId: string) =>
+  request<CardResponse>(`/runs/${runId}/card`);
 
 export const submitChoice = (
   runId: string,
-  user_id: string,
   choice_index: number,
   expected_turn?: number,
 ) =>
-  request<TurnResponse>(`/runs/${runId}/choice${uidQuery(user_id)}`, {
+  request<TurnResponse>(`/runs/${runId}/choice`, {
     method: 'POST',
     body: JSON.stringify({ choice_index, expected_turn }),
   });
 
-export const getEndSummary = (runId: string, user_id: string) =>
-  request<EndSummary>(`/runs/${runId}/summary${uidQuery(user_id)}`);
+export const getEndSummary = (runId: string) =>
+  request<EndSummary>(`/runs/${runId}/summary`);
 
-export const getHistory = (runId: string, user_id: string) =>
-  request<HistoryDetailEntry[]>(`/runs/${runId}/history${uidQuery(user_id)}`);
+export const getHistory = (runId: string) =>
+  request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
 
 export { ApiError };

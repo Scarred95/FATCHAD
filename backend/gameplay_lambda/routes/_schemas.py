@@ -15,15 +15,35 @@ from shared.views import public_card_dict
 # Requests
 # =============================================================================
 
-class CreateRunRequest(BaseModel):
-    user_id: str  # TODO: derive from auth token once auth is wired up
-
-
 class ChoiceRequest(BaseModel):
     choice_index: int = Field(ge=0)
     # Current turn the client thinks the run is on. Required — guards against
     # double-applying the same choice when a client retries. Mismatch → 409.
     expected_turn: int = Field(ge=0)
+
+
+# =============================================================================
+# Guest sessions
+# =============================================================================
+
+class GuestSessionResponse(BaseModel):
+    """Credentials for a freshly minted guest account. The client signs in with
+    these via the normal SRP flow — the password is a disposable random secret
+    for a throwaway account, returned once over HTTPS and never stored server-side."""
+    email: str
+    password: str
+
+
+class ClaimGuestRequest(BaseModel):
+    """Sent by a freshly-registered real account to absorb a guest's progress.
+    The caller authenticates as the real account (Authorization header); the
+    guest is proven by its own still-valid access token in the body — so only
+    the holder of the guest session can claim it."""
+    guest_access_token: str
+
+
+class ClaimGuestResponse(BaseModel):
+    migrated_runs: int
 
 
 # =============================================================================

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from shared.api.middleware import install_middleware
 from shared.routes.health import router as health_router
 
-from gameplay_lambda.routes import catalog, gameplay, runs
+from gameplay_lambda.routes import account, catalog, gameplay, guest, runs
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,8 @@ def create_app() -> FastAPI:
     install_middleware(app)
     app.include_router(health_router)
     app.include_router(catalog.router)
+    app.include_router(guest.router)
+    app.include_router(account.router)
     app.include_router(runs.router)
     app.include_router(gameplay.router)
     return app

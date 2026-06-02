@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminCardStore } from './store';
 import { useAdminEndingStore } from './endingStore';
-import { useAdminStore } from '../stores/adminAuthStore';
+import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import admin from './admin.module.css';
 import styles from './AdminLayout.module.css';
@@ -21,7 +21,7 @@ export function AdminLayout() {
   const endingsLoaded = useAdminEndingStore((s) => s.loaded);
   const loadEndings = useAdminEndingStore((s) => s.loadFromServer);
   const clearEndingsLocal = useAdminEndingStore((s) => s.clearLocal);
-  const disableAdmin = useAdminStore((s) => s.disable);
+  const logout = useAuthStore((s) => s.logout);
   const pushToast = useToastStore((s) => s.push);
   const nav = useNavigate();
 
@@ -36,14 +36,14 @@ export function AdminLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Logout: drop both caches (server-side data, not local edits) and clear
-  // the bearer token. RequireAdmin will redirect us out of /admin once
-  // isAdmin flips false — but we navigate explicitly so the title screen
-  // is reached even if React Router lags behind.
+  // Logout: drop both caches (server-side data, not local edits) and end the
+  // Cognito session. RequireAdmin will redirect us out of /admin once the
+  // session clears — but we navigate explicitly so the title screen is
+  // reached even if React Router lags behind.
   function onLogout() {
     clearLocal();
     clearEndingsLocal();
-    disableAdmin();
+    logout();
     pushToast('Abgemeldet', 'info');
     nav('/');
   }

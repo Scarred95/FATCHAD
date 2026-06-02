@@ -38,6 +38,10 @@ export interface FatchadApiStackProps extends cdk.StackProps {
   adminToken: string;
   /** Comma-separated origins for CORS (e.g. "https://fatchad.example,https://www.fatchad.example"). */
   corsOrigins: string;
+  /** Cognito User Pool ID — when set, both Lambdas verify JWTs against this pool. */
+  cognitoUserPoolId?: string;
+  /** Cognito App Client ID — passed to Lambdas for token audience validation. */
+  cognitoAppClientId?: string;
 }
 
 export class FatchadApiStack extends cdk.Stack {
@@ -160,6 +164,8 @@ export class FatchadApiStack extends cdk.Stack {
         CATALOG_BUCKET: this.catalogBucket.bucketName,
         ADMIN_TOKEN: props.adminToken,
         CORS_ORIGINS: props.corsOrigins,
+        ...(props.cognitoUserPoolId && { COGNITO_USER_POOL_ID: props.cognitoUserPoolId }),
+        ...(props.cognitoAppClientId && { COGNITO_APP_CLIENT_ID: props.cognitoAppClientId }),
       },
     });
 
@@ -186,6 +192,8 @@ export class FatchadApiStack extends cdk.Stack {
         CATALOG_BUCKET: this.catalogBucket.bucketName,
         CORS_ORIGINS: props.corsOrigins,
         // No ADMIN_TOKEN — gameplay has no admin-gated routes.
+        ...(props.cognitoUserPoolId && { COGNITO_USER_POOL_ID: props.cognitoUserPoolId }),
+        ...(props.cognitoAppClientId && { COGNITO_APP_CLIENT_ID: props.cognitoAppClientId }),
       },
     });
 
@@ -193,6 +201,23 @@ export class FatchadApiStack extends cdk.Stack {
     catalogTable.grantReadData(this.gameplayFn);
     userTable.grantReadWriteData(this.gameplayFn);
     this.catalogBucket.grantRead(this.gameplayFn);
+
+    // POST /guest mints throwaway Cognito accounts. Scope the admin actions to
+    // this one user pool. Only granted when the pool id is known at synth time.
+    if (props.cognitoUserPoolId) {
+      const userPoolArn = `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${props.cognitoUserPoolId}`;
+      this.gameplayFn.addToRolePolicy(new iam.PolicyStatement({
+        sid: 'GuestUserProvisioning',
+        actions: [
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+          'cognito-idp:AdminAddUserToGroup',
+          // Delete a guest account once its progress is claimed (/account/claim).
+          'cognito-idp:AdminDeleteUser',
+        ],
+        resources: [userPoolArn],
+      }));
+    }
 
     // ------------------------------------------------------------------
     // HTTP API (v2)

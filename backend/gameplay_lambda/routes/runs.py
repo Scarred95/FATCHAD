@@ -2,14 +2,16 @@
 """Run lifecycle — create, list, load, abandon, delete.
 
 The active game loop (card display, choice submission, summary) lives in
-gameplay.py. `user_id` is passed explicitly for now; when auth lands, derive it
-from the bearer token and strip those params in one pass (see FEATURE_IDEAS.md).
+gameplay.py. `user_id` is derived from the caller's Cognito JWT (`sub` claim)
+via the get_current_user_id dependency — never taken from the request body or
+query string, so a caller can only ever touch their own runs.
 """
 import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.db.user_repo import RunConflict, UserRepo
 from shared.game.deck import draw_eligible_card
@@ -23,7 +25,6 @@ from gameplay_lambda.routes._deps import (
 )
 from gameplay_lambda.routes._schemas import (
     CardResponse,
-    CreateRunRequest,
     HistoryDetailEntry,
     RunSummary,
     TurnResponse,
@@ -38,7 +39,7 @@ _STARTER_DECK = ["evt_tut_01_awakening"]
 
 @router.post("", response_model=TurnResponse, status_code=201)
 def create_run(
-    payload: CreateRunRequest,
+    user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
@@ -47,7 +48,7 @@ def create_run(
     # the savestate, so admin edits to defaults won't change in-flight runs.
     state = GameState.new_run(
         run_id=GameState.generate_id(),
-        user_id=payload.user_id,
+        user_id=user_id,
         rng_seed=random.randint(0, 2**31 - 1),
         starting_deck=list(_STARTER_DECK),
         starting_endings=catalog.default_ending_ids(),
@@ -75,7 +76,7 @@ def create_run(
 
 @router.get("", response_model=list[RunSummary])
 def list_runs(
-    user_id: str,  # TODO: derive from auth token once auth is wired up
+    user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
 ):
     """List a user's runs as lightweight summaries. Pulls full rows then projects
@@ -163,8 +164,8 @@ def abandon_run(
 @router.delete("/{run_id}", status_code=204)
 def delete_run(
     run_id: str,
-    user_id: str,
     force: bool = False,
+    user_id: str = Depends(get_current_user_id),
     state: GameState = Depends(get_owned_run),
     users: UserRepo = Depends(get_user_repo),
 ):
