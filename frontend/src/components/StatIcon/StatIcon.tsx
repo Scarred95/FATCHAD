@@ -1,4 +1,5 @@
 import type { StatName } from '../../api/types';
+import { STAT_COLOR_VAR } from '../statMeta';
 import styles from './StatIcon.module.css';
 
 export type StatIconSize = 'sm' | 'md' | 'lg';
@@ -12,17 +13,9 @@ interface Props {
 
 const SIZE_PX: Record<StatIconSize, number> = { sm: 16, md: 24, lg: 40 };
 
-const STAT_COLOR: Record<StatName, string> = {
-  moneten: 'var(--color-stat-moneten)',
-  aura: 'var(--color-stat-aura)',
-  respekt: 'var(--color-stat-respekt)',
-  rizz: 'var(--color-stat-rizz)',
-  chaos: 'var(--color-stat-chaos)',
-};
-
 export default function StatIcon({ stat, size = 'md', color }: Props) {
   const px = SIZE_PX[size];
-  const fill = color ?? STAT_COLOR[stat];
+  const fill = color ?? STAT_COLOR_VAR[stat];
   return (
     <span
       className={styles.icon}

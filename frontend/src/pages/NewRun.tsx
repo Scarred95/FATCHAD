@@ -1,6 +1,8 @@
+/** New-run setup — starts a fresh run. Tutorial-skip toggle is a stub. */
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { errorMessage } from '../api/http';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './NewRun.module.css';
@@ -17,7 +19,7 @@ export default function NewRun() {
       const id = await create();
       nav(`/runs/${id}`);
     } catch (e) {
-      pushToast(errMsg(e), 'error');
+      pushToast(errorMessage(e, 'Konnte nicht starten'), 'error');
     }
   }
 
@@ -69,10 +71,4 @@ export default function NewRun() {
       </motion.div>
     </main>
   );
-}
-
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'detail' in e) return String((e as any).detail);
-  if (e instanceof Error) return e.message;
-  return 'Konnte nicht starten';
 }

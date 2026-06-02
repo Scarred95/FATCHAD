@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import styles from './Modal.module.css';
 
 interface Action {
@@ -17,14 +17,7 @@ interface Props {
 }
 
 export default function Modal({ open, title, body, actions, onClose }: Props) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   return (
     <AnimatePresence>

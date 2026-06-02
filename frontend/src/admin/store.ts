@@ -23,9 +23,9 @@
 import { create } from 'zustand';
 import {
   createCard, deleteCard, listCards, patchCard, replaceCard, toggleDeck,
-  AdminApiError, type AdminCard,
 } from '../api/admin';
-import { useToastStore } from '../stores/toastStore';
+import { errorMessage } from '../api/http';
+import { adminToast as toast } from './utils/toast';
 import { dropRecent, markRecent } from './utils/recents';
 import { ORPHAN_DECK, type Card } from './types';
 
@@ -49,16 +49,6 @@ function saveNodePositions(positions: Record<string, { x: number; y: number }>):
   } catch {
     /* quota / private mode — ignore */
   }
-}
-
-function toast(msg: string, variant: 'info' | 'warning' | 'error' = 'info'): void {
-  useToastStore.getState().push(msg, variant);
-}
-
-function errMessage(e: unknown): string {
-  if (e instanceof AdminApiError) return e.detail;
-  if (e instanceof Error) return e.message;
-  return String(e);
 }
 
 export interface ImportResult {
@@ -115,9 +105,9 @@ export const useAdminCardStore = create<State>()((set, get) => ({
       const list = await listCards({ limit: 1000 });
       const saved: Record<string, true> = {};
       for (const c of list) saved[c._id] = true;
-      set({ cards: list as Card[], saved, loaded: true });
+      set({ cards: list, saved, loaded: true });
     } catch (e) {
-      toast(`Karten konnten nicht geladen werden: ${errMessage(e)}`, 'error');
+      toast(`Karten konnten nicht geladen werden: ${errorMessage(e, String(e))}`, 'error');
       // Keep loaded=false so callers can decide to retry.
     }
   },
@@ -146,10 +136,10 @@ export const useAdminCardStore = create<State>()((set, get) => ({
 
     try {
       if (existsOnServer) {
-        await replaceCard(card._id, card as AdminCard);
+        await replaceCard(card._id, card);
         toast('Karte gespeichert', 'info');
       } else {
-        await createCard(card as AdminCard);
+        await createCard(card);
         toast('Karte erstellt', 'info');
       }
       set((s) => ({ saved: { ...s.saved, [card._id]: true } }));
@@ -158,7 +148,7 @@ export const useAdminCardStore = create<State>()((set, get) => ({
     } catch (e) {
       // Roll back the local change.
       set({ cards: before, saved: beforeSaved });
-      toast(`Speichern fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Speichern fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -186,7 +176,7 @@ export const useAdminCardStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ cards: before, saved: beforeSaved });
-      toast(`Löschen fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Löschen fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -201,14 +191,14 @@ export const useAdminCardStore = create<State>()((set, get) => ({
     set({ cards: [...before, clone] });
 
     try {
-      await createCard(clone as AdminCard);
+      await createCard(clone);
       set((s) => ({ saved: { ...s.saved, [newId]: true } }));
       markRecent(newId);
       toast('Karte dupliziert', 'info');
       return true;
     } catch (e) {
       set({ cards: before });
-      toast(`Duplizieren fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Duplizieren fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -229,7 +219,7 @@ export const useAdminCardStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ cards: before });
-      toast(`Status konnte nicht geändert werden: ${errMessage(e)}`, 'error');
+      toast(`Status konnte nicht geändert werden: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -254,7 +244,7 @@ export const useAdminCardStore = create<State>()((set, get) => ({
       return true;
     } catch (e) {
       set({ cards: before });
-      toast(`Deck-Toggle fehlgeschlagen: ${errMessage(e)}`, 'error');
+      toast(`Deck-Toggle fehlgeschlagen: ${errorMessage(e, String(e))}`, 'error');
       return false;
     }
   },
@@ -309,9 +299,9 @@ export const useAdminCardStore = create<State>()((set, get) => ({
     for (const op of ops) {
       try {
         if (op.kind === 'create') {
-          await createCard(op.card as AdminCard);
+          await createCard(op.card);
         } else {
-          await replaceCard(op.card._id, op.card as AdminCard);
+          await replaceCard(op.card._id, op.card);
         }
         savedUpdates[op.card._id] = true;
       } catch (e) {

@@ -1,8 +1,15 @@
 // Mirrors §2 of CARD_EDITOR_SPEC.md and DATA_SHAPES.md.
 // Field names match the backend Pydantic shape exactly — do not rename.
+//
+// Stat primitives re-exported from the gameplay types — single source of
+// truth. `StatKey` is the admin alias for `StatName`; `STAT_KEYS` reuses the
+// canonical `STAT_NAMES` order so the five stats are listed exactly once.
+import { STAT_NAMES } from '../api/types';
+import type { StatName, StatHint } from '../api/types';
 
-export type StatKey = 'moneten' | 'aura' | 'respekt' | 'rizz' | 'chaos';
-export const STAT_KEYS: StatKey[] = ['moneten', 'aura', 'respekt', 'rizz', 'chaos'];
+export type StatKey = StatName;
+export type { StatHint };
+export const STAT_KEYS: StatKey[] = [...STAT_NAMES];
 
 export const STAT_COLORS: Record<StatKey, string> = {
   moneten: '#facc15',
@@ -19,8 +26,6 @@ export const STAT_LABELS: Record<StatKey, string> = {
   rizz: 'Rizz',
   chaos: 'Chaos',
 };
-
-export type StatHint = 'up' | 'down' | 'unknown' | 'hidden';
 
 export interface StatRange {
   min?: number | null;

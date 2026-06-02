@@ -1,3 +1,4 @@
+import { STAT_NAMES } from '../../api/types';
 import type { StatHint, StatName } from '../../api/types';
 import HintIcon from './HintIcon';
 import styles from './HintList.module.css';
@@ -7,10 +8,8 @@ interface Props {
   align?: 'start' | 'center' | 'end';
 }
 
-const ORDER: StatName[] = ['moneten', 'aura', 'respekt', 'rizz', 'chaos'];
-
 export default function HintList({ hints, align = 'center' }: Props) {
-  const visible = ORDER
+  const visible = STAT_NAMES
     .filter((stat) => hints[stat] && hints[stat] !== 'hidden');
 
   if (visible.length === 0) return null;

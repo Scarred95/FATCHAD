@@ -1,8 +1,14 @@
+/**
+ * Run-over screen — ending banner, final-stat grid, share + new-run actions.
+ */
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getEndSummary } from '../api/client';
-import type { EndSummary, MainStatName, Stats } from '../api/types';
+import { errorMessage } from '../api/http';
+import { STAT_NAMES } from '../api/types';
+import type { EndSummary, Stats } from '../api/types';
+import { STAT_LABEL } from '../components/statMeta';
 import StatIcon from '../components/StatIcon/StatIcon';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useRunStore } from '../stores/runStore';
@@ -24,7 +30,7 @@ export default function EndScreen() {
     if (!runId) return;
     getEndSummary(runId, getUserId())
       .then(setSummary)
-      .catch((e) => setError(errMsg(e)));
+      .catch((e) => setError(errorMessage(e, 'Konnte nicht laden')));
   }, [runId]);
 
   async function newRun() {
@@ -33,7 +39,7 @@ export default function EndScreen() {
       const id = await createRun();
       nav(`/runs/${id}`);
     } catch (e) {
-      pushToast(errMsg(e), 'error');
+      pushToast(errorMessage(e, 'Konnte nicht laden'), 'error');
     }
   }
 
@@ -137,13 +143,7 @@ export default function EndScreen() {
 }
 
 function StatGrid({ stats }: { stats: Stats }) {
-  const rows: { stat: MainStatName | 'chaos'; value: number }[] = [
-    { stat: 'moneten', value: stats.moneten },
-    { stat: 'aura', value: stats.aura },
-    { stat: 'respekt', value: stats.respekt },
-    { stat: 'rizz', value: stats.rizz },
-    { stat: 'chaos', value: stats.chaos },
-  ];
+  const rows = STAT_NAMES.map((stat) => ({ stat, value: stats[stat] }));
   return (
     <div className={styles.statGrid}>
       {rows.map(({ stat, value }, i) => (
@@ -165,14 +165,6 @@ function StatGrid({ stats }: { stats: Stats }) {
 
 function formatShareText(s: EndSummary): string {
   const ending = s.ending_title ?? (s.status === 'abandoned' ? 'Aufgegeben' : 'Ende');
-  return `FATCHAD — ${ending}\nZüge: ${s.turns_survived} · Karten: ${s.cards_played}\n` +
-    `Moneten ${s.final_stats.moneten} · Aura ${s.final_stats.aura} · ` +
-    `Respekt ${s.final_stats.respekt} · Rizz ${s.final_stats.rizz} · ` +
-    `Chaos ${s.final_stats.chaos}`;
-}
-
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'detail' in e) return String((e as any).detail);
-  if (e instanceof Error) return e.message;
-  return 'Konnte nicht laden';
+  const statLine = STAT_NAMES.map((k) => `${STAT_LABEL[k]} ${s.final_stats[k]}`).join(' · ');
+  return `FATCHAD — ${ending}\nZüge: ${s.turns_survived} · Karten: ${s.cards_played}\n${statLine}`;
 }

@@ -86,3 +86,38 @@ account-data exposure. Marked TODO throughout the code.
 **Scope:** token verification middleware/dependency; replace the explicit
 `user_id` params in one pass; the `get_owned_run` dependency (see code clean-up
 D1) is the natural single seam to enforce ownership once auth lands.
+
+---
+
+## Player redraw-pool / unlocked-deck registry
+
+**What:** A reliable answer to "which decks are in this player's redraw pool?",
+plus an optional materialized `Profile.unlocked_decks: list[str]` cache for the
+gameplay hot path.
+
+**Why:** The source of truth already exists as per-user items —
+`DeckUnlock` (`PK=USER#<uid>`, `SK=UNLOCK#DECK#<name>`, carrying `unlocked_at`
+and `via_achievement`), written at profile creation for default decks and when
+an `Achievement.unlocks_deck` fires for earned ones. So the pool is already
+answerable with one `begins_with(SK, "UNLOCK#DECK#")` query on the user
+partition; what's missing is only a single convenient field if run-start can't
+afford that extra query.
+
+**Scope (why it's a feature, not a clean-up):**
+- Do NOT make a deck-id list the source of truth — a bare `[names]` array drops
+  the `unlocked_at` / `via_achievement` provenance and drifts the moment an
+  achievement→deck mapping changes in the catalog.
+- If (and only if) run-start needs the pool without a second query, add a
+  derived `Profile.unlocked_decks: list[str]` cache, written by the same Lambda
+  that writes the `UNLOCK#DECK#` items — the exact pattern already used for
+  `ProfileTotals` and `current_points`. It **must be rebuildable** from the
+  `UNLOCK#DECK#` items so the cache can never become the only copy.
+- Keep the three deck tiers in their correct homes:
+  - *Always-enabled* decks → global catalog config, never per-player.
+  - *Starter-deck* choice → per-run state, not the profile.
+  - *Achievement-unlocked* decks → the per-user registry above (the only tier
+    this entry touches).
+
+**Decision recorded:** the registry concept is endorsed (it's effectively
+already there); a materialized profile list is a *cache* justified only by a hot
+path, and must stay rebuildable from the unlock items.

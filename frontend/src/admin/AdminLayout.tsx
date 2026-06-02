@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminCardStore } from './store';
 import { useAdminEndingStore } from './endingStore';
-import { useAdminStore } from '../stores/adminStore';
+import { useAdminStore } from '../stores/adminAuthStore';
 import { useToastStore } from '../stores/toastStore';
 import admin from './admin.module.css';
 import styles from './AdminLayout.module.css';

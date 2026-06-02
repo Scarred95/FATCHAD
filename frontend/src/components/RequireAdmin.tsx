@@ -3,7 +3,7 @@
  *
  * Wrap any admin route element with <RequireAdmin>...</RequireAdmin>
  * (or use it as the `element` of a parent route with an <Outlet />).
- * If the adminStore doesn't have a confirmed admin session it kicks
+ * If the admin auth store doesn't have a confirmed admin session it kicks
  * the user back to the title screen.
  *
  * We also wait out the boot-time `validating` flag so a quick refresh
@@ -12,7 +12,7 @@
  */
 import { Navigate, Outlet } from 'react-router-dom';
 
-import { useAdminStore } from '../stores/adminStore';
+import { useAdminStore } from '../stores/adminAuthStore';
 
 interface Props {
   children?: React.ReactNode;

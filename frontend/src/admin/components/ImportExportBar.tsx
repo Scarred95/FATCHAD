@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import JSZip from 'jszip';
 import { cardArraySchema } from '../schema';
 import { decksOf, useAdminCardStore } from '../store';
+import { download } from '../utils/download';
+import { stripJsonComments } from '../utils/jsonc';
 import { serializeDeck } from '../utils/jsonOrder';
 import { slugify } from '../utils/slug';
 import type { Card } from '../types';
@@ -25,7 +27,7 @@ export function ImportExportBar() {
     for (const f of Array.from(files)) {
       try {
         const text = await f.text();
-        const json = JSON.parse(text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''));
+        const json = JSON.parse(stripJsonComments(text));
         const parsed = cardArraySchema.safeParse(json);
         if (!parsed.success) {
           errCount++;
@@ -112,15 +114,4 @@ export function ImportExportBar() {
       )}
     </div>
   );
-}
-
-export function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
