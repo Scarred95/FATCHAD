@@ -75,6 +75,14 @@ export function AdminSidebar({ onReload, onLogout }: Props) {
         </NavLink>
       </div>
 
+      <div className={styles.group}>
+        <span className={styles.groupLabel}>Debug</span>
+
+        <NavLink to="/admin/runs" className={navItem}>
+          <span className={styles.itemName}>Run-Inspektor</span>
+        </NavLink>
+      </div>
+
       <div className={styles.spacer} />
 
       <PublishPanel />

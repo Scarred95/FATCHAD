@@ -67,6 +67,94 @@
   border-radius: var(--radius-lg);
 }
 
+/* ─── Achievement unlock stack ───────────────────────────────────── */
+
+.achievements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.achHeader {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-stat-moneten);
+  margin-bottom: var(--space-1);
+}
+
+.achCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: left;
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 200, 80, 0.10), transparent 80%),
+    var(--color-bg-elevated);
+  border: 1px solid rgba(255, 200, 80, 0.32);
+  box-shadow: 0 0 32px rgba(255, 200, 80, 0.10);
+}
+
+.achIcon,
+.achIconFallback {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+.achIcon {
+  object-fit: cover;
+}
+
+.achIconFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-display-sm);
+  color: var(--color-stat-moneten);
+  background: var(--color-bg-base);
+}
+
+.achBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.achName {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-text);
+}
+
+.achDesc {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  line-height: var(--lh-body);
+}
+
+.achDeck {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-accent);
+  margin-top: 2px;
+}
+
+.achPoints {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-stat-moneten);
+  text-shadow: 0 0 16px rgba(240, 192, 64, 0.3);
+}
+
 .statGrid {
   display: flex;
   flex-direction: column;

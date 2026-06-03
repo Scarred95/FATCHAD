@@ -157,6 +157,13 @@ class HistoryEntry(BaseModel):
     event_id: str
     choice: int = Field(ge=0)
     turn: int = Field(ge=0)
+    # Post-effect stat snapshot for this turn — drives group-C achievement
+    # predicates (peak/trough/stay/swing) and the admin run-trail view.
+    # Optional (not a zero default) so entries written before this field
+    # existed read back as "no snapshot" rather than a phantom all-zero row,
+    # which would false-match trough/stay predicates on partially-migrated
+    # runs. Never surfaced to players — see HistoryDetailEntry.
+    stats: Optional[Stats] = None
 
 GameStatus = Literal["active", "ended", "abandoned"]
 
@@ -176,6 +183,10 @@ class GameState(BaseModel):
     rng_seed: int
     status: GameStatus = "active"
     ending: Optional[str] = None
+    # Achievement ids that fired when this run ended. Empty for active runs;
+    # stamped once by evaluate_achievements at finalize so the end-screen
+    # endpoint can rebuild the unlock list on every refresh.
+    newly_unlocked: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

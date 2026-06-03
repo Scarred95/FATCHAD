@@ -18,6 +18,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAdminAchievementStore } from '../achievementStore';
 import { useAdminDeckStore } from '../deckStore';
+import { useAdminCardStore, flagInventoryOf } from '../store';
+import { useAdminEndingStore } from '../endingStore';
+import {
+  PredicateBuilder,
+  cleanPayload,
+  predicateIssues,
+  type Payload,
+  type PredicateOptions,
+} from '../components/PredicateBuilder';
 import type { Achievement } from '../types';
 import admin from '../admin.module.css';
 import styles from './AchievementEditor.module.css';
@@ -36,6 +45,8 @@ export function AchievementEditorPage({ mode }: Props) {
   const upsert       = useAdminAchievementStore((s) => s.upsertAchievement);
   const remove       = useAdminAchievementStore((s) => s.removeAchievement);
   const decks        = useAdminDeckStore((s) => s.decks);
+  const cards        = useAdminCardStore((s) => s.cards);
+  const endings      = useAdminEndingStore((s) => s.endings);
 
   const existing = useMemo(
     () => (mode === 'edit' && routeId)
@@ -49,7 +60,10 @@ export function AchievementEditorPage({ mode }: Props) {
   const [description, setDescription] = useState<string>('');
   const [points, setPoints]         = useState<string>('0');
   const [critDesc, setCritDesc]     = useState<string>('');
-  const [critJson, setCritJson]     = useState<string>('{}');
+  const [payload, setPayload]       = useState<Payload>({});
+  const [payloadMode, setPayloadMode] = useState<'builder' | 'json'>('builder');
+  const [jsonDraft, setJsonDraft]   = useState<string>('{}');
+  const [jsonError, setJsonError]   = useState<string | null>(null);
   const [unlocksDeck, setUnlocks]   = useState<string>('');
   const [enabled, setEnabled]       = useState<boolean>(true);
   const [imageUrl, setImageUrl]     = useState<string>('');
@@ -64,7 +78,10 @@ export function AchievementEditorPage({ mode }: Props) {
     setDescription(existing.description ?? '');
     setPoints(String(existing.points ?? 0));
     setCritDesc(existing.criteria?.description ?? '');
-    setCritJson(JSON.stringify(existing.criteria?.payload ?? {}, null, 2));
+    const ep = existing.criteria?.payload;
+    setPayload(ep && typeof ep === 'object' && !Array.isArray(ep) ? (ep as Payload) : {});
+    setPayloadMode('builder');
+    setJsonError(null);
     setUnlocks(existing.unlocks_deck ?? '');
     setEnabled(existing.enabled !== false);
     setImageUrl(existing.image_url ?? '');
@@ -85,21 +102,20 @@ export function AchievementEditorPage({ mode }: Props) {
   const pointsError = !Number.isFinite(pointsNum) || !Number.isInteger(pointsNum)
     ? 'Punkte müssen eine ganze Zahl sein' : null;
 
-  const payloadParsed = useMemo<{ ok: true; value: Record<string, unknown> } | { ok: false; error: string }>(() => {
-    const raw = critJson.trim();
-    if (raw === '') return { ok: true, value: {} };
-    try {
-      const v = JSON.parse(raw) as unknown;
-      if (v === null || typeof v !== 'object' || Array.isArray(v)) {
-        return { ok: false, error: 'Payload muss ein JSON-Objekt sein' };
-      }
-      return { ok: true, value: v as Record<string, unknown> };
-    } catch (e) {
-      return { ok: false, error: `Ungültiges JSON: ${(e as Error).message}` };
-    }
-  }, [critJson]);
+  // Autocomplete sources for the predicate builder, derived from the live
+  // catalog stores (all preloaded at AdminLayout mount).
+  const predicateOptions = useMemo<PredicateOptions>(() => ({
+    flags: flagInventoryOf(cards),
+    endings: endings.map((e) => ({ id: e._id, title: e.title })),
+    cards: cards.map((c) => ({ id: c._id, title: c.title })),
+    categories: [...new Set(cards.map((c) => c.category).filter(Boolean))].sort(),
+    decks: decks.map((d) => d.name),
+  }), [cards, endings, decks]);
 
-  const payloadError = payloadParsed.ok ? null : payloadParsed.error;
+  // In builder mode the payload object is always valid; only raw JSON editing
+  // can produce a parse error that blocks save.
+  const payloadError = payloadMode === 'json' ? jsonError : null;
+  const payloadWarnings = useMemo(() => predicateIssues(payload), [payload]);
   const critDescError = !critDesc.trim() ? 'Kriterium-Beschreibung erforderlich' : null;
 
   const canSave = !idError && !nameError && !pointsError && !payloadError && !critDescError
@@ -107,15 +123,50 @@ export function AchievementEditorPage({ mode }: Props) {
 
   const onChange = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
 
+  const onPayloadChange = (p: Payload) => { setPayload(p); setDirty(true); };
+
+  // Builder → JSON: serialize the canonical object into the editable draft.
+  const enterJsonMode = () => {
+    setJsonDraft(JSON.stringify(payload, null, 2));
+    setJsonError(null);
+    setPayloadMode('json');
+  };
+
+  // JSON edits parse into the canonical object live; a parse error keeps the
+  // draft text but blocks save + the round-trip back to builder.
+  const onJsonChange = (raw: string) => {
+    setJsonDraft(raw);
+    setDirty(true);
+    const trimmed = raw.trim();
+    if (trimmed === '') { setPayload({}); setJsonError(null); return; }
+    try {
+      const v = JSON.parse(trimmed) as unknown;
+      if (v === null || typeof v !== 'object' || Array.isArray(v)) {
+        setJsonError('Payload muss ein JSON-Objekt sein');
+        return;
+      }
+      setPayload(v as Payload);
+      setJsonError(null);
+    } catch (e) {
+      setJsonError(`Ungültiges JSON: ${(e as Error).message}`);
+    }
+  };
+
+  // JSON → builder: only allowed once the draft parses cleanly.
+  const enterBuilderMode = () => {
+    if (jsonError) return;
+    setPayloadMode('builder');
+  };
+
   const buildRecord = (): Achievement | null => {
-    if (!payloadParsed.ok) return null;
+    if (payloadError) return null;
     return {
       _id: id.trim(),
       name: name.trim(),
       description: description.trim(),
       criteria: {
         description: critDesc.trim(),
-        payload: payloadParsed.value,
+        payload: cleanPayload(payload),
       },
       points: pointsNum,
       unlocks_deck: unlocksDeck.trim() ? unlocksDeck.trim() : null,
@@ -253,19 +304,53 @@ export function AchievementEditorPage({ mode }: Props) {
       </section>
 
       <section className={styles.section}>
-        <label className={styles.fieldLabel}>Kriterium — Payload (JSON)</label>
-        <textarea
-          className={`${styles.textarea} ${styles.mono}`}
-          rows={6}
-          value={critJson}
-          onChange={(e) => onChange(setCritJson)(e.target.value)}
-          spellCheck={false}
-          placeholder='{ "wins": 3, "min_chaos": 80 }'
-        />
+        <div className={styles.payloadHeader}>
+          <label className={styles.fieldLabel}>Kriterium — Bedingung</label>
+          {payloadMode === 'builder' ? (
+            <button
+              type="button"
+              className={admin.btnSecondary}
+              onClick={enterJsonMode}
+            >Experte: JSON ansehen</button>
+          ) : (
+            <button
+              type="button"
+              className={admin.btnSecondary}
+              disabled={!!jsonError}
+              onClick={enterBuilderMode}
+            >Zurück zum Builder</button>
+          )}
+        </div>
+
+        {payloadMode === 'builder' ? (
+          <PredicateBuilder
+            value={payload}
+            onChange={onPayloadChange}
+            options={predicateOptions}
+          />
+        ) : (
+          <textarea
+            className={`${styles.textarea} ${styles.mono}`}
+            rows={10}
+            value={jsonDraft}
+            onChange={(e) => onJsonChange(e.target.value)}
+            spellCheck={false}
+            placeholder='{ "type": "min_stat", "stat": "chaos", "value": 80 }'
+          />
+        )}
+
         {payloadError && <div className={styles.fieldError}>{payloadError}</div>}
+        {payloadWarnings.length > 0 && (
+          <div className={styles.fieldHint}>
+            Unvollständig (feuert serverseitig nicht):
+            <ul className={styles.warnList}>
+              {payloadWarnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
         <div className={styles.fieldHint}>
-          Opaker Block für den Achievement-Lambda. Muss ein JSON-Objekt sein,
-          Inhalt wird hier nicht geprüft.
+          Bedingungstyp wählen und Felder ausfüllen. „Verknüpfung“
+          (UND/ODER/NICHT) verschachtelt weitere Bedingungen.
         </div>
       </section>
 

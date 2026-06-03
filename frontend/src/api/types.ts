@@ -86,6 +86,18 @@ export interface RunSummary {
   updated_at: string;
 }
 
+/** An achievement that fired because of this run, joined against the live
+ *  catalog at summary time. Stale (deleted) ids drop out server-side. */
+export interface UnlockedAchievement {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  /** Deck name granted alongside the achievement, or null. */
+  unlocks_deck: string | null;
+  image_url: string | null;
+}
+
 export interface EndSummary {
   ending: string | null;
   /** Title from the Ending doc, denormalised at summary time. Null when
@@ -96,6 +108,9 @@ export interface EndSummary {
   turns_survived: number;
   final_stats: Stats;
   cards_played: number;
+  /** Achievements this run earned (re-derived from the run row each call, so
+   *  a refresh re-renders the same set). Empty when nothing fired. */
+  newly_unlocked: UnlockedAchievement[];
 }
 
 /** Server-joined history row — `GameState.history` enriched with card data.

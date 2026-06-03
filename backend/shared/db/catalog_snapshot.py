@@ -14,7 +14,7 @@ import json
 
 from shared.db.ddb import catalog_bucket, catalog_table, s3_client
 from shared.db.keys import catalog_pointer_key
-from shared.schemas import Ending, Event
+from shared.schemas import Achievement, Ending, Event
 
 
 # Module-global cache. Reset on cold start; refreshed on pointer bump.
@@ -31,10 +31,17 @@ class CatalogSnapshot:
     (`get_card` not `get_by_id`) since one snapshot holds both cards and endings.
     """
 
-    def __init__(self, version: str, cards: list[Event], endings: list[Ending]):
+    def __init__(
+        self,
+        version: str,
+        cards: list[Event],
+        endings: list[Ending],
+        achievements: list[Achievement],
+    ):
         self.version = version
         self._cards: dict[str, Event] = {c.id: c for c in cards}
         self._endings: dict[str, Ending] = {e.id: e for e in endings}
+        self._achievements: dict[str, Achievement] = {a.id: a for a in achievements}
         # Pre-compute defaults once so new-run creation doesn't refilter.
         self._default_ending_ids: list[str] = [
             e.id for e in endings if e.default and e.enabled
@@ -76,6 +83,19 @@ class CatalogSnapshot:
         """Old EndingRepo.list_default_ids — pre-filtered to enabled."""
         return list(self._default_ending_ids)
 
+    # --- Achievement access --------------------------------------------
+
+    def get_achievement(self, ach_id: str) -> Achievement | None:
+        return self._achievements.get(ach_id)
+
+    def get_achievements(self) -> list[Achievement]:
+        """All published achievements (publisher strips disabled at publish).
+
+        Order is insertion order from the bundle — predicates run finalize-time
+        so admin priority isn't a concept here; the engine evaluates each in
+        turn and the user ends up with whatever matches."""
+        return list(self._achievements.values())
+
 
 # =============================================================================
 # Read-through cache
@@ -102,8 +122,13 @@ def get_current_snapshot() -> CatalogSnapshot:
 
     cards = [Event.model_validate(c) for c in data.get("cards", [])]
     endings = [Ending.model_validate(e) for e in data.get("endings", [])]
+    achievements = [
+        Achievement.model_validate(a) for a in data.get("achievements", [])
+    ]
 
-    _cached = CatalogSnapshot(version=version, cards=cards, endings=endings)
+    _cached = CatalogSnapshot(
+        version=version, cards=cards, endings=endings, achievements=achievements,
+    )
     _cached_version = version
     return _cached
 

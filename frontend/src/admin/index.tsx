@@ -33,6 +33,7 @@ import { CardsIndex } from './pages/CardsIndex';
 import { DeckEditorPage } from './pages/DeckEditor';
 import { AchievementsIndex } from './pages/AchievementsIndex';
 import { AchievementEditorPage } from './pages/AchievementEditor';
+import { RunInspector } from './pages/RunInspector';
 
 export { AdminLayout } from './AdminLayout';
 export { DecksIndex } from './pages/DecksIndex';
@@ -47,6 +48,7 @@ export { CardsIndex } from './pages/CardsIndex';
 export { DeckEditorPage } from './pages/DeckEditor';
 export { AchievementsIndex } from './pages/AchievementsIndex';
 export { AchievementEditorPage } from './pages/AchievementEditor';
+export { RunInspector } from './pages/RunInspector';
 
 /**
  * Children for the /admin route. Spread these into a parent route whose
@@ -69,6 +71,8 @@ export const adminChildRoutes: RouteObject[] = [
   { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
   { path: 'categories', element: <CategoriesIndex /> },
   { path: 'suggestions', element: <SuggestionsIndex /> },
+  { path: 'runs', element: <RunInspector /> },
+  { path: 'runs/:userId/:runId', element: <RunInspector /> },
 ];
 
 /**

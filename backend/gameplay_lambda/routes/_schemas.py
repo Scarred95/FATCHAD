@@ -117,10 +117,26 @@ class HistoryDetailEntry(BaseModel):
     triggered_ending: str | None = None
 
 
+class UnlockedAchievement(BaseModel):
+    """Per-achievement payload for the end-screen toast/banner stack. Built
+    from catalog at /summary time so a deleted achievement just drops out of
+    the list (no orphan rendering)."""
+    id: str
+    name: str
+    description: str = ""
+    points: int = 0
+    unlocks_deck: str | None = None
+    image_url: str | None = None
+
+
 class EndSummary(BaseModel):
     """End-of-run stats for the game-over screen. ending_title/description are
     denormalised from the Ending doc so the recap needs no second fetch; both
-    are None for an abandoned run or an ending id that no longer resolves."""
+    are None for an abandoned run or an ending id that no longer resolves.
+
+    newly_unlocked is reconstructed from `GameState.newly_unlocked` (ids
+    stamped at finalize) joined against the live catalog — survives refresh,
+    re-renders the same banner stack."""
     ending: str | None
     ending_title: str | None
     ending_description: str | None
@@ -128,3 +144,4 @@ class EndSummary(BaseModel):
     turns_survived: int
     final_stats: Stats
     cards_played: int
+    newly_unlocked: list[UnlockedAchievement] = []

@@ -15,11 +15,13 @@ from shared.db.ddb import user_table
 from shared.db.keys import (
     RunStatus,
     UserSk,
+    user_achievement_key,
+    user_deck_unlock_key,
     user_pk,
     user_profile_key,
     user_run_key,
 )
-from shared.schemas import GameState, Profile
+from shared.schemas import GameState, Profile, UserAchievement
 
 
 # =============================================================================
@@ -283,6 +285,99 @@ class UserRepo:
 
         # Drop the guest PROFILE row regardless of branch.
         self._t.delete_item(Key=user_profile_key(guest_user_id))
+
+    # -------------------------------------------------------------------------
+    # Achievements
+    # -------------------------------------------------------------------------
+
+    def list_user_achievements(self, user_id: str) -> list[str]:
+        """Return all achievement ids the user has already unlocked.
+
+        Used by evaluate_achievements as a prefilter so we don't re-grade
+        achievements they already own. ProjectionExpression keeps the row size
+        down — the run-finalize path is hot, and we only need ids."""
+        ids: list[str] = []
+        kwargs = {
+            "KeyConditionExpression":
+                Key("PK").eq(user_pk(user_id))
+                & Key("SK").begins_with(UserSk.ACH_PREFIX),
+            "ProjectionExpression": "achievement_id",
+        }
+        while True:
+            resp = self._t.query(**kwargs)
+            for item in resp.get("Items", []):
+                aid = item.get("achievement_id")
+                if aid:
+                    ids.append(aid)
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+        return ids
+
+    def unlock_achievement(
+        self,
+        user_id: str,
+        ach_id: str,
+        points: int,
+        unlocks_deck: str | None = None,
+    ) -> bool:
+        """Idempotently grant an achievement.
+
+        Sequenced sync writes (matches insert_run's pattern; no TransactWrite
+        because the resource layer doesn't expose it cleanly):
+          1. Conditional put of ACH#<id> — `attribute_not_exists(PK)` makes
+             this idempotent against a TOCTOU double-eval race.
+          2. Only if (1) wrote a new row: bump profile.current_points +
+             totals.achievements_unlocked + updated_at.
+          3. Only if `unlocks_deck`: write the UNLOCK#DECK#<name> row. Plain
+             put — overwriting a default-grant row is harmless.
+
+        Returns True if newly unlocked, False if the user already had it.
+        Doing the counter bump AFTER the conditional put is the whole point:
+        a second concurrent call short-circuits in step 1 and never
+        double-counts.
+        """
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+
+        ach_key = user_achievement_key(user_id, ach_id)
+        ua = UserAchievement(achievement_id=ach_id, unlocked_at=now)
+        try:
+            self._t.put_item(
+                Item=_model_to_item(ua, ach_key["PK"], ach_key["SK"]),
+                ConditionExpression="attribute_not_exists(PK)",
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                return False
+            raise
+
+        self._t.update_item(
+            Key=user_profile_key(user_id),
+            UpdateExpression=(
+                "SET updated_at = :now "
+                "ADD current_points :p, totals.achievements_unlocked :one"
+            ),
+            ExpressionAttributeValues={
+                ":p": points,
+                ":one": 1,
+                ":now": now_iso,
+            },
+        )
+
+        if unlocks_deck:
+            dk = user_deck_unlock_key(user_id, unlocks_deck)
+            self._t.put_item(Item={
+                "PK": dk["PK"],
+                "SK": dk["SK"],
+                "deck_name": unlocks_deck,
+                "unlocked_at": now_iso,
+                "via_achievement": ach_id,
+            })
+
+        return True
 
     def list_runs_for_user(self, user_id: str) -> list[GameState]:
         """All runs for a user, any status: one Query (SK begins_with RUN#)

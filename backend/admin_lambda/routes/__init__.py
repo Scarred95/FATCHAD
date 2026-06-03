@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 
 from shared.auth import require_admin, router as auth_router
 
-from admin_lambda.routes import achievements, cards, decks, endings, publish
+from admin_lambda.routes import achievements, cards, decks, endings, publish, runs
 
 router = APIRouter(
     prefix="/admin",
@@ -21,5 +21,6 @@ router.include_router(cards.router, prefix="/cards")
 router.include_router(decks.router, prefix="/decks")
 router.include_router(endings.router, prefix="/endings")
 router.include_router(achievements.router, prefix="/achievements")
+router.include_router(runs.router, prefix="/runs")
 router.include_router(publish.router, prefix="/publish")
 router.include_router(auth_router, prefix="/auth")

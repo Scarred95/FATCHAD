@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getEndSummary } from '../api/client';
 import { errorMessage } from '../api/http';
 import { STAT_NAMES } from '../api/types';
-import type { EndSummary, Stats } from '../api/types';
+import type { EndSummary, Stats, UnlockedAchievement } from '../api/types';
 import { STAT_LABEL } from '../components/statMeta';
 import StatIcon from '../components/StatIcon/StatIcon';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
@@ -100,6 +100,10 @@ export default function EndScreen() {
         </motion.p>
       )}
 
+      {summary.newly_unlocked.length > 0 && (
+        <AchievementStack items={summary.newly_unlocked} />
+      )}
+
       <motion.div
         className={styles.summary}
         initial={{ opacity: 0, y: 16 }}
@@ -138,6 +142,44 @@ export default function EndScreen() {
         onClose={() => setHistoryOpen(false)}
       />
     </main>
+  );
+}
+
+function AchievementStack({ items }: { items: UnlockedAchievement[] }) {
+  return (
+    <motion.section
+      className={styles.achievements}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.8 }}
+    >
+      <span className={styles.achHeader}>
+        {items.length === 1 ? 'Achievement freigeschaltet' : 'Achievements freigeschaltet'}
+      </span>
+      {items.map((a, i) => (
+        <motion.div
+          key={a.id}
+          className={styles.achCard}
+          initial={{ opacity: 0, scale: 0.92, x: -10 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          transition={{ duration: 0.45, delay: 0.95 + i * 0.12, ease: 'easeOut' }}
+        >
+          {a.image_url ? (
+            <img className={styles.achIcon} src={a.image_url} alt="" />
+          ) : (
+            <span className={styles.achIconFallback} aria-hidden>★</span>
+          )}
+          <div className={styles.achBody}>
+            <span className={styles.achName}>{a.name}</span>
+            {a.description && <span className={styles.achDesc}>{a.description}</span>}
+            {a.unlocks_deck && (
+              <span className={styles.achDeck}>Deck freigeschaltet: {a.unlocks_deck}</span>
+            )}
+          </div>
+          {a.points > 0 && <span className={styles.achPoints}>+{a.points}</span>}
+        </motion.div>
+      ))}
+    </motion.section>
   );
 }
 

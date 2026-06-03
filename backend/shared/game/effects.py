@@ -57,9 +57,16 @@ def apply_choice(
     # 4. Deck additions from this choice.
     new_state = apply_deck_additions(new_state, choice.adds_to_deck, rng)
 
-    # 5. History + turn counter.
+    # 5. History + turn counter. Snapshot the post-effect stats onto the entry
+    #    (model_copy so a later turn's mutation can't alias it) — this is the
+    #    per-turn trail group-C achievements + the admin run view read back.
     new_state.history.append(
-        HistoryEntry(event_id=card.id, choice=choice_index, turn=new_state.turn)
+        HistoryEntry(
+            event_id=card.id,
+            choice=choice_index,
+            turn=new_state.turn,
+            stats=new_state.stats.model_copy(),
+        )
     )
     new_state.turn += 1
 

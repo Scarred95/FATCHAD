@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.db.user_repo import RunConflict, UserRepo
+from shared.game.achievements import evaluate_achievements
 from shared.game.deck import draw_eligible_card
 from shared.schemas import Effects, GameState
 
@@ -61,6 +62,9 @@ def create_run(
         # Engine sentinel, not an Ending doc — the run never really started.
         state.status = "ended"
         state.ending = "softlock_no_cards"
+        # A softlock can still satisfy turn/stat-based criteria; grade it.
+        unlocked = evaluate_achievements(state, user_id, catalog, users)
+        state.newly_unlocked = [a.id for a in unlocked]
 
     try:
         users.insert_run(state)

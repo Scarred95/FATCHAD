@@ -102,6 +102,21 @@
   color: var(--color-text-faint);
 }
 
+.payloadHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.warnList {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .checkboxRow {
   display: inline-flex;
   align-items: center;

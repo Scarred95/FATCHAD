@@ -16,6 +16,7 @@ import { getAccessToken, useAuthStore } from '../stores/authStore';
 import { ApiError, http } from './http';
 import { ADMIN_API_BASE } from './config';
 import type { Achievement, AchievementCriteria, Card, Deck, DeckUnlockRule, Ending } from '../admin/types';
+import type { GameStatus, Stats } from './types';
 
 /* ─── Request/response types (HTTP-layer only) ─────────────────── */
 
@@ -253,6 +254,45 @@ export const deleteAchievement = (achId: string) =>
 // Re-export so consumers can import the criteria shape from the API barrel
 // when they're already pulling other types from here.
 export type { AchievementCriteria };
+
+/* ─── Run inspection (debug) endpoints ─────────────────────────── */
+
+/** One history row from the admin run view. Unlike the player-facing
+ *  `HistoryEntry`, this carries the per-turn post-effect stat snapshot
+ *  (`stats`) used by group-C achievement predicates. `null` for turns
+ *  recorded before the snapshot field existed. */
+export interface AdminRunHistoryEntry {
+  event_id: string;
+  choice: number;
+  turn: number;
+  stats: Stats | null;
+}
+
+/** Full run document as returned by GET /admin/runs/:user/:run/history.
+ *  Read-only debugging view — mirrors backend GameState. */
+export interface AdminRunView {
+  _id: string;
+  user_id: string;
+  deck: string[];
+  flags: string[];
+  stats: Stats;
+  history: AdminRunHistoryEntry[];
+  turn: number;
+  status: GameStatus;
+  ending: string | null;
+  active_endings: string[];
+  /** Achievement ids this run granted at finalize. Empty for active runs. */
+  newly_unlocked: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fetch a run's full state + per-turn stat trail for debugging. Needs the
+ *  owning user id (run rows are partitioned under USER#<uid>; no run_id GSI). */
+export const getRunHistory = (userId: string, runId: string) =>
+  request<AdminRunView>(
+    `/runs/${encodeURIComponent(userId)}/${encodeURIComponent(runId)}/history`,
+  );
 
 /* ─── Publish endpoints ────────────────────────────────────────── */
 
