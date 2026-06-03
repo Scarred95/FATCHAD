@@ -1,3 +1,14 @@
+/**
+ * Ending editor — painted to match the section pattern (PR-F8).
+ *
+ * Header: display title + mono crumb ("← Endings · <id>") + dirty pulse +
+ * action buttons (delete / save). Body: two-column grid of local .section
+ * panels (Stammdaten · Bedingungen · Probleme · Referenzen).
+ *
+ * Behaviour is unchanged: same auto-slug, same lock-on-saved id, same
+ * dirty tracker, same validation gating, same referrer scan, same delete
+ * confirm modal.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAdminEndingStore, referencesToEnding } from '../endingStore';
@@ -26,11 +37,6 @@ function emptyEnding(): Ending {
   };
 }
 
-/**
- * Create / edit a single Ending. The id is locked once the record exists
- * server-side — same contract as the card editor, since changing an id
- * would orphan every `triggers_ending` / `unlocks_endings` reference.
- */
 export function EndingEditorPage({ mode }: Props) {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
@@ -125,8 +131,14 @@ export function EndingEditorPage({ mode }: Props) {
             {mode === 'new' ? 'Neues Ending' : ending.title || ending._id || 'Ending bearbeiten'}
           </h1>
           <p className={styles.sub}>
-            <Link to="/admin/endings">← Zurück zur Liste</Link>
-            {dirty && <span style={{ marginLeft: 12, opacity: 0.8 }}>• ungespeichert</span>}
+            <Link to="/admin/endings">← Endings</Link>
+            {ending._id && <span>· {ending._id}</span>}
+            {dirty && (
+              <span className={styles.dirty}>
+                <span className={styles.dirtyDot} aria-hidden />
+                ungespeichert
+              </span>
+            )}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -154,15 +166,15 @@ export function EndingEditorPage({ mode }: Props) {
 
       <div className={styles.grid}>
         {/* ─── Left column: core fields ─────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div className={`${admin.panel} ${styles.panel}`}>
-            <h2 className={styles.panelTitle}>Stammdaten</h2>
+        <div className={styles.col}>
+          <section className={styles.section}>
+            <header className={styles.sectionHead}>Stammdaten</header>
 
             <div className={styles.field}>
-              <label className={admin.fieldLabel} htmlFor="ending-title">Titel</label>
+              <label className={styles.fieldLabel} htmlFor="ending-title">Titel</label>
               <input
                 id="ending-title"
-                className={admin.fieldInput}
+                className={styles.input}
                 value={ending.title}
                 onChange={(e) => patch('title', e.target.value)}
                 placeholder="z.B. Welt erstarrt"
@@ -170,10 +182,10 @@ export function EndingEditorPage({ mode }: Props) {
             </div>
 
             <div className={styles.field}>
-              <label className={admin.fieldLabel} htmlFor="ending-id">ID</label>
+              <label className={styles.fieldLabel} htmlFor="ending-id">ID</label>
               <input
                 id="ending-id"
-                className={admin.fieldInput}
+                className={`${styles.input} ${styles.mono}`}
                 value={ending._id}
                 disabled={isLocked}
                 onChange={(e) => {
@@ -184,16 +196,16 @@ export function EndingEditorPage({ mode }: Props) {
               />
               <span className={styles.hint}>
                 {isLocked
-                  ? 'ID ist gespeichert und nicht mehr änderbar (referenzielle Integrität).'
-                  : 'Lowercase, snake_case. Wird in Karten als triggers_ending / unlocks_endings / removes_endings referenziert.'}
+                  ? 'ID gespeichert — Änderung würde Referenzen zerbrechen.'
+                  : 'lowercase · snake_case · referenziert von triggers/unlocks/removes_endings'}
               </span>
             </div>
 
             <div className={styles.field}>
-              <label className={admin.fieldLabel} htmlFor="ending-desc">Beschreibung</label>
+              <label className={styles.fieldLabel} htmlFor="ending-desc">Beschreibung</label>
               <textarea
                 id="ending-desc"
-                className={admin.fieldInput}
+                className={styles.textarea}
                 rows={4}
                 value={ending.description}
                 onChange={(e) => patch('description', e.target.value)}
@@ -203,21 +215,21 @@ export function EndingEditorPage({ mode }: Props) {
 
             <div className={styles.priorityRow}>
               <div className={styles.field}>
-                <label className={admin.fieldLabel} htmlFor="ending-priority">Priorität</label>
+                <label className={styles.fieldLabel} htmlFor="ending-priority">Priorität</label>
                 <input
                   id="ending-priority"
                   type="number"
-                  className={admin.fieldInput}
+                  className={`${styles.input} ${styles.mono}`}
                   value={ending.priority ?? 100}
                   onChange={(e) => patch('priority', Number(e.target.value))}
                 />
-                <span className={styles.hint}>Niedriger = wird zuerst geprüft, wenn mehrere matchen.</span>
+                <span className={styles.hint}>niedriger = zuerst geprüft</span>
               </div>
               <div className={styles.field}>
-                <label className={admin.fieldLabel} htmlFor="ending-image">Bild-URL (optional)</label>
+                <label className={styles.fieldLabel} htmlFor="ending-image">Bild-URL</label>
                 <input
                   id="ending-image"
-                  className={admin.fieldInput}
+                  className={styles.input}
                   value={ending.image_url ?? ''}
                   onChange={(e) => patch('image_url', e.target.value || null)}
                   placeholder="https://…"
@@ -243,36 +255,38 @@ export function EndingEditorPage({ mode }: Props) {
                 Aktiviert
               </label>
             </div>
-          </div>
+          </section>
 
-          <div className={`${admin.panel} ${styles.panel}`}>
-            <h2 className={styles.panelTitle}>Bedingungen</h2>
+          <section className={styles.section}>
+            <header className={styles.sectionHead}>Bedingungen</header>
             <EndingRequirementsEditor
               value={ending.requires ?? {}}
               onChange={patchRequires}
               flagSuggestions={flagSuggestions}
             />
-          </div>
+          </section>
         </div>
 
         {/* ─── Right column: validation + referrers ─────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div className={styles.col}>
           {errors.length > 0 && (
-            <div className={`${admin.panel} ${styles.panel}`}>
-              <h2 className={styles.panelTitle}>Probleme</h2>
+            <section className={`${styles.section} ${styles.problems}`}>
+              <header className={styles.sectionHead}>Probleme ({errors.length})</header>
               {errors.map((msg, i) => (
                 <div key={i} className={styles.error}>• {msg}</div>
               ))}
-            </div>
+            </section>
           )}
 
-          <div className={`${admin.panel} ${styles.panel}`}>
-            <h2 className={styles.panelTitle}>
-              Referenzen aus Karten ({refs.triggers + refs.unlocks + refs.removes})
-            </h2>
-            <span className={styles.hint}>
-              triggers: {refs.triggers} · unlocks: {refs.unlocks} · removes: {refs.removes}
-            </span>
+          <section className={styles.section}>
+            <header className={styles.sectionHead}>
+              Referenzen · {refs.triggers + refs.unlocks + refs.removes}
+            </header>
+            <div className={styles.refsMeta}>
+              <span>triggers {refs.triggers}</span>
+              <span>unlocks {refs.unlocks}</span>
+              <span>removes {refs.removes}</span>
+            </div>
             {referrers.length === 0 ? (
               <div className={styles.refsEmpty}>
                 {ending._id
@@ -293,7 +307,7 @@ export function EndingEditorPage({ mode }: Props) {
                 ))}
               </div>
             )}
-          </div>
+          </section>
         </div>
       </div>
 

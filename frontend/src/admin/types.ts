@@ -127,6 +127,49 @@ export interface Ending {
   image_url?: string | null;
 }
 
+/**
+ * Deck record (PK=DECK, SK=<name>) — owns the deck's name, description,
+ * enabled flag and unlock rule. Cards link via card.deck_name; gameplay
+ * effective-enabled = card.enabled AND deck.enabled. Timestamps come from
+ * the server.
+ */
+export interface DeckUnlockRule {
+  kind: 'default' | 'achievement';
+  achievement_id?: string | null;
+}
+
+export interface Deck {
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  unlock_rule?: DeckUnlockRule;
+  /** ISO 8601, server-stamped. */
+  created_at?: string;
+  /** ISO 8601, server-stamped. */
+  updated_at?: string;
+}
+
+/**
+ * Achievement record (PK=ACH, SK=<id>). Earning one optionally writes a
+ * UNLOCK#DECK#<name> item for the user. `criteria.payload` is opaque
+ * v1 — the achievement Lambda owns its shape.
+ */
+export interface AchievementCriteria {
+  description: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface Achievement {
+  _id: string;
+  name: string;
+  description?: string;
+  criteria: AchievementCriteria;
+  points?: number;
+  unlocks_deck?: string | null;
+  enabled?: boolean;
+  image_url?: string | null;
+}
+
 export const STAT_DOMAIN: Record<StatKey, { min: number; max: number }> = {
   moneten: { min: 0, max: 100 },
   aura: { min: 0, max: 100 },

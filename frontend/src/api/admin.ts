@@ -15,7 +15,7 @@
 import { getAccessToken, useAuthStore } from '../stores/authStore';
 import { ApiError, http } from './http';
 import { ADMIN_API_BASE } from './config';
-import type { Card, Ending } from '../admin/types';
+import type { Achievement, AchievementCriteria, Card, Deck, DeckUnlockRule, Ending } from '../admin/types';
 
 /* ─── Request/response types (HTTP-layer only) ─────────────────── */
 
@@ -149,4 +149,129 @@ export const patchEnding = (endingId: string, payload: PatchEndingPayload) =>
 export const deleteEnding = (endingId: string) =>
   request<void>(`/endings/${encodeURIComponent(endingId)}`, {
     method: 'DELETE',
+  });
+
+/* ─── Deck endpoints ───────────────────────────────────────────── */
+
+/** Create payload — timestamps minted server-side. Backend matches
+ *  `CreateDeckRequest` in `admin_lambda/routes/decks.py`. */
+export interface CreateDeckPayload {
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  unlock_rule?: DeckUnlockRule;
+}
+
+/** Replace payload — `name` comes from the URL, timestamps are stamped. */
+export interface ReplaceDeckPayload {
+  description?: string;
+  enabled?: boolean;
+  unlock_rule?: DeckUnlockRule;
+}
+
+/** PATCH payload — partial update; updated_at refreshes any time. */
+export type PatchDeckPayload = Partial<ReplaceDeckPayload>;
+
+export const listDecks = (opts: { limit?: number; skip?: number } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+  if (opts.skip !== undefined) q.set('skip', String(opts.skip));
+  const qs = q.toString();
+  return request<Deck[]>(`/decks${qs ? `?${qs}` : ''}`);
+};
+
+export const getDeck = (deckName: string) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`);
+
+export const createDeck = (payload: CreateDeckPayload) =>
+  request<Deck>('/decks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const replaceDeck = (deckName: string, payload: ReplaceDeckPayload) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const patchDeck = (deckName: string, payload: PatchDeckPayload) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteDeck = (deckName: string) =>
+  request<void>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'DELETE',
+  });
+
+/* ─── Achievement endpoints ────────────────────────────────────── */
+
+/** Fields PATCH accepts — same as backend's PatchAchievementRequest. */
+export type PatchAchievementPayload = Partial<
+  Pick<Achievement,
+    'name' | 'description' | 'criteria' | 'points'
+    | 'unlocks_deck' | 'enabled' | 'image_url'
+  >
+>;
+
+export const listAchievements = (opts: { limit?: number; skip?: number } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+  if (opts.skip !== undefined) q.set('skip', String(opts.skip));
+  const qs = q.toString();
+  return request<Achievement[]>(`/achievements${qs ? `?${qs}` : ''}`);
+};
+
+export const getAchievement = (achId: string) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`);
+
+export const createAchievement = (ach: Achievement) =>
+  request<Achievement>('/achievements', {
+    method: 'POST',
+    body: JSON.stringify(ach),
+  });
+
+export const replaceAchievement = (achId: string, ach: Achievement) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(ach),
+  });
+
+export const patchAchievement = (achId: string, payload: PatchAchievementPayload) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteAchievement = (achId: string) =>
+  request<void>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'DELETE',
+  });
+
+// Re-export so consumers can import the criteria shape from the API barrel
+// when they're already pulling other types from here.
+export type { AchievementCriteria };
+
+/* ─── Publish endpoints ────────────────────────────────────────── */
+
+/** Mirrors backend `CatalogPointer` — the "what is currently live?" item.
+ *  `null` from getCurrentPointer means no publish has happened yet. */
+export interface CatalogPointer {
+  version: string;
+  /** ISO 8601 timestamp string from the backend. */
+  published_at: string;
+}
+
+/** Returns the currently live catalog pointer, or null before the first publish. */
+export const getCurrentPointer = () =>
+  request<CatalogPointer | null>('/publish/current');
+
+/** Snapshots the working catalog as a new published version.
+ *  `version` is optional — backend mints a UTC timestamp when omitted. */
+export const publishCatalog = (version?: string) =>
+  request<CatalogPointer>('/publish', {
+    method: 'POST',
+    body: JSON.stringify(version ? { version } : {}),
   });

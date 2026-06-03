@@ -42,6 +42,18 @@ const EndingsIndex = lazy(() =>
 const EndingEditorPage = lazy(() =>
   import('./admin').then((m) => ({ default: m.EndingEditorPage })),
 );
+const CardsIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.CardsIndex })),
+);
+const DeckEditorPage = lazy(() =>
+  import('./admin').then((m) => ({ default: m.DeckEditorPage })),
+);
+const AchievementsIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.AchievementsIndex })),
+);
+const AchievementEditorPage = lazy(() =>
+  import('./admin').then((m) => ({ default: m.AchievementEditorPage })),
+);
 
 const adminFallback = (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-faint)' }}>
@@ -89,9 +101,15 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <DecksIndex /> },
           { path: 'decks/:name', element: <DeckDetail /> },
+          { path: 'decks-edit/new', element: <DeckEditorPage mode="new" /> },
+          { path: 'decks-edit/:name', element: <DeckEditorPage mode="edit" /> },
           { path: 'graph', element: <GraphView /> },
+          { path: 'cards', element: <CardsIndex /> },
           { path: 'cards/new', element: <CardEditorPage mode="new" /> },
           { path: 'cards/:id', element: <CardEditorPage mode="edit" /> },
+          { path: 'achievements', element: <AchievementsIndex /> },
+          { path: 'achievements/new', element: <AchievementEditorPage mode="new" /> },
+          { path: 'achievements/:id', element: <AchievementEditorPage mode="edit" /> },
           { path: 'endings', element: <EndingsIndex /> },
           { path: 'endings/new', element: <EndingEditorPage mode="new" /> },
           { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },

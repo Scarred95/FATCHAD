@@ -4,54 +4,61 @@
   gap: var(--space-4);
 }
 
-.crumbs {
+.header {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: var(--fs-body-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.crumbLink {
+.heading {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1;
+}
+
+.sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sub a {
   color: var(--color-text-dim);
   text-decoration: none;
 }
 
-.crumbLink:hover { color: var(--color-text); }
-
-.crumbFaint {
-  color: var(--color-text-faint);
-  text-decoration: none;
-  font-size: var(--fs-body-xs);
-}
-
-.crumbFaint:hover { color: var(--color-text-dim); }
-
-.divider {
-  color: var(--color-text-faint);
+.sub a:hover {
+  color: var(--color-accent);
 }
 
 .crumbId {
   color: var(--color-text);
-  font-family: 'Menlo', 'Monaco', monospace;
-  font-size: var(--fs-body-xs);
 }
 
 .actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .dirty {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-body-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-loose);
   color: var(--color-accent);
-  margin-right: var(--space-2);
 }
 
 .dirtyDot {
@@ -87,10 +94,27 @@
   gap: var(--space-4);
 }
 
+.sectionHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-bg-overlay);
+  margin: 0;
+}
+
 .previewSection {
   padding: var(--space-4);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.previewHead {
+  align-self: stretch;
 }
 
 .referrers {

@@ -1,8 +1,10 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
+
+/* ─── Header (display title + mono crumb + actions) ───────────────── */
 
 .header {
   display: flex;
@@ -13,17 +15,55 @@
 }
 
 .heading {
-  font-size: var(--fs-display-md);
   font-family: var(--font-display);
+  font-size: 2rem;
   letter-spacing: var(--tracking-display);
   color: var(--color-text);
   margin: 0;
+  line-height: 1;
 }
 
 .sub {
-  margin: 4px 0 0;
-  font-size: var(--fs-body-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sub a {
   color: var(--color-text-dim);
+  text-decoration: none;
+}
+
+.sub a:hover {
+  color: var(--color-accent);
+}
+
+.dirty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent);
+}
+
+.dirtyDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+  animation: dirtyPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dirtyPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .headerActions {
@@ -32,6 +72,8 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ─── Grid + panels ───────────────────────────────────────────────── */
 
 .grid {
   display: grid;
@@ -46,26 +88,85 @@
   }
 }
 
-.panel {
-  padding: var(--space-3);
+.col {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.panelTitle {
-  font-size: var(--fs-body-sm);
-  font-family: var(--font-display);
-  letter-spacing: var(--tracking-display);
-  color: var(--color-text-dim);
-  margin: 0 0 4px;
-  text-transform: uppercase;
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-lg);
 }
+
+.sectionHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-bg-overlay);
+}
+
+/* ─── Fields ──────────────────────────────────────────────────────── */
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  background: var(--color-bg-base);
+  color: var(--color-text);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  outline: none;
+  transition: border-color var(--dur-quick);
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: var(--color-accent);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.priorityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
 }
 
 .checkboxRow {
@@ -77,22 +178,41 @@
 .checkboxLabel {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: var(--fs-body-sm);
   color: var(--color-text);
   cursor: pointer;
 }
 
-.priorityRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-3);
+.hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
 }
 
-.hint {
-  font-size: var(--fs-body-xs);
+/* ─── Right column ────────────────────────────────────────────────── */
+
+.problems {
+  border-color: rgba(255, 68, 68, 0.4);
+  background: rgba(255, 68, 68, 0.06);
+}
+
+.error {
+  color: #ffb0b0;
+  font-size: var(--fs-body-sm);
+}
+
+.refsMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
   color: var(--color-text-faint);
-  margin-top: 2px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .refList {
@@ -104,31 +224,35 @@
 .refItem {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   font-size: var(--fs-body-sm);
-  color: var(--color-text-dim);
+  color: var(--color-text);
   background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
   text-decoration: none;
+  transition: border-color var(--dur-quick), background var(--dur-quick);
 }
 
 .refItem:hover {
-  color: var(--color-text);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 .refKind {
-  font-size: var(--fs-body-xs);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
   color: var(--color-text-faint);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-text-faint);
 }
 
 .refsEmpty {
   font-size: var(--fs-body-sm);
-  color: var(--color-text-faint);
-  font-style: italic;
-}
-
-.error {
-  color: var(--color-danger, #ef4444);
-  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
 }

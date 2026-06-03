@@ -1,5 +1,16 @@
+/**
+ * Card graph — restyled chrome (PR-F7).
+ *
+ * Canvas, edges, drag-persist, focus-mode, swimlane layout, and
+ * FlagInspector are UNCHANGED. Only the surrounding chrome is updated:
+ *
+ *   • SectionToolbar replaces the bespoke header/breadcrumb.
+ *   • Filter chips (fChip pattern) replace the inline checkboxes/buttons
+ *     for adds/flag toggles, clear-focus, show-all-decks, and reset-layout.
+ *   • Sidebar boxes get the shared section card styling (display title,
+ *     mono section header, accent on hover).
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import ReactFlow, {
   Background, Controls, MiniMap,
   type Edge, type Node, type EdgeMarker, MarkerType,
@@ -10,7 +21,7 @@ import { cardsInDeck, decksOf, useAdminCardStore } from '../store';
 import { buildGraph, colourForDeck } from '../utils/graph';
 import { CardNode, type CardNodeData } from '../components/CardNode';
 import { FlagInspector } from '../components/FlagInspector';
-import admin from '../admin.module.css';
+import { SectionToolbar } from '../components/SectionToolbar';
 import styles from './GraphView.module.css';
 
 const nodeTypes = { card: CardNode };
@@ -159,6 +170,10 @@ export function GraphView() {
   }, [cards]);
 
   const anyHidden = hiddenDecks.size > 0;
+  const draggedCount = Object.keys(nodePositions).length;
+  const addsCount = graph.edges.filter((e) => e.kind === 'adds').length;
+  const flagsCount = graph.edges.filter((e) => e.kind === 'flag').length;
+
   const toggleDeckHidden = (deckKey: string) => {
     setHiddenDecks((prev) => {
       const next = new Set(prev);
@@ -182,49 +197,68 @@ export function GraphView() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.toolbar}>
-        <div className={styles.left}>
-          <Link to="/admin" className={styles.crumbLink}>← Decks</Link>
-          <h1 className={styles.heading}>Card graph</h1>
-          <span className={styles.stats}>
-            {cards.length} cards · {graph.edges.filter((e) => e.kind === 'adds').length} adds · {graph.edges.filter((e) => e.kind === 'flag').length} flag links
-          </span>
-        </div>
-        <div className={styles.right}>
-          <label className={styles.toggle}>
-            <input type="checkbox" checked={showAdds} onChange={(e) => setShowAdds(e.target.checked)} />
-            <span>adds_to_deck</span>
-          </label>
-          <label className={styles.toggle}>
-            <input type="checkbox" checked={showFlags} onChange={(e) => setShowFlags(e.target.checked)} />
-            <span>flag links (dashed)</span>
-          </label>
-          {selected && (
-            <button onClick={() => setSelected(null)} className={admin.btnSecondary}>Clear focus</button>
-          )}
-          {anyHidden && (
-            <button
-              onClick={() => setHiddenDecks(new Set())}
-              className={admin.btnSecondary}
-              title={`${hiddenDecks.size} deck(s) hidden`}
-            >Show all decks</button>
-          )}
+      <SectionToolbar
+        title="Graph"
+        count={cards.length}
+        noun="Karten"
+      />
+
+      <div className={styles.filterRow}>
+        <span className={styles.filterLabel}>Kanten</span>
+        <button
+          type="button"
+          className={`${styles.fChip} ${showAdds ? styles.fChipOn : ''}`}
+          onClick={() => setShowAdds((v) => !v)}
+          title="adds_to_deck-Kanten ein-/ausblenden"
+        >
+          adds ({addsCount})
+        </button>
+        <button
+          type="button"
+          className={`${styles.fChip} ${showFlags ? styles.fChipOn : ''}`}
+          onClick={() => setShowFlags((v) => !v)}
+          title="Flag-Verbindungen ein-/ausblenden"
+        >
+          flags ({flagsCount})
+        </button>
+
+        <span className={styles.spacer} />
+
+        {selected && (
           <button
-            onClick={() => {
-              if (Object.keys(nodePositions).length === 0) return;
-              if (confirm('Reset all dragged positions to auto-layout?')) clearNodePositions();
-            }}
-            className={admin.btnSecondary}
-            disabled={Object.keys(nodePositions).length === 0}
-            title={`${Object.keys(nodePositions).length} card(s) have manual positions`}
-          >Reset layout</button>
-        </div>
+            type="button"
+            className={styles.fChip}
+            onClick={() => setSelected(null)}
+          >fokus aufheben</button>
+        )}
+        {anyHidden && (
+          <button
+            type="button"
+            className={styles.fChip}
+            onClick={() => setHiddenDecks(new Set())}
+            title={`${hiddenDecks.size} Deck(s) ausgeblendet`}
+          >alle Decks zeigen</button>
+        )}
+        <button
+          type="button"
+          className={styles.fChip}
+          disabled={draggedCount === 0}
+          onClick={() => {
+            if (draggedCount === 0) return;
+            if (confirm('Alle gezogenen Positionen zurücksetzen?')) clearNodePositions();
+          }}
+          title={`${draggedCount} Karte(n) mit manueller Position`}
+        >layout reset ({draggedCount})</button>
       </div>
 
       <div className={styles.grid}>
-        <div className={`${admin.panel} ${styles.canvas}`}>
+        <div className={styles.canvas}>
           {cards.length === 0 ? (
-            <div className={styles.empty}>No cards loaded.</div>
+            <div className={styles.empty}>
+              <div className={styles.emptyGlyph}>—</div>
+              <h2 className={styles.emptyTitle}>Keine Karten</h2>
+              <p className={styles.emptySub}>Lade zuerst Karten, dann erscheint hier der Graph.</p>
+            </div>
           ) : (
             <ReactFlow
               nodes={nodes}
@@ -253,90 +287,97 @@ export function GraphView() {
         </div>
 
         <aside className={styles.sidebar}>
-          <div className={`${admin.panel} ${styles.box}`}>
-            <div className={admin.fieldLabel}>Decks</div>
-            {decks.map((d) => {
-              const deckKey = d || '__orphans__';
-              const list = cardsInDeck(cards, deckKey);
-              const enabledCount = list.filter((c) => c.enabled !== false).length;
-              const allEnabled = enabledCount === list.length && list.length > 0;
-              const allDisabled = enabledCount === 0 && list.length > 0;
-              const isBusy = bulkBusy === deckKey;
-              const flip = async (enabled: boolean) => {
-                if (isBusy) return;
-                setBulkBusy(deckKey);
-                await setDeckEnabled(deckKey, enabled);
-                setBulkBusy(null);
-              };
-              // hiddenDecks is keyed by raw deck_name (`''` for orphans),
-              // matching the `visibleCards` filter, *not* the canonical
-              // '__orphans__' deckKey used by setDeckEnabled.
-              const hidden = hiddenDecks.has(d);
-              return (
-                <div key={deckKey} className={`${styles.deckRow} ${hidden ? styles.deckRowHidden : ''}`}>
-                  <span
-                    className={styles.swatch}
-                    style={{ background: colourForDeck(d) }}
-                  />
-                  <span className={styles.deckName}>{d || '(orphan)'}</span>
-                  <span className={styles.deckCount}>
-                    {enabledCount}/{list.length}
+          <section className={styles.box}>
+            <header className={styles.boxHead}>Decks</header>
+            <div className={styles.boxBody}>
+              {decks.map((d) => {
+                const deckKey = d || '__orphans__';
+                const list = cardsInDeck(cards, deckKey);
+                const enabledCount = list.filter((c) => c.enabled !== false).length;
+                const allEnabled = enabledCount === list.length && list.length > 0;
+                const allDisabled = enabledCount === 0 && list.length > 0;
+                const isBusy = bulkBusy === deckKey;
+                const flip = async (enabled: boolean) => {
+                  if (isBusy) return;
+                  setBulkBusy(deckKey);
+                  await setDeckEnabled(deckKey, enabled);
+                  setBulkBusy(null);
+                };
+                // hiddenDecks is keyed by raw deck_name (`''` for orphans),
+                // matching the `visibleCards` filter, *not* the canonical
+                // '__orphans__' deckKey used by setDeckEnabled.
+                const hidden = hiddenDecks.has(d);
+                return (
+                  <div key={deckKey} className={`${styles.deckRow} ${hidden ? styles.deckRowHidden : ''}`}>
+                    <span
+                      className={styles.swatch}
+                      style={{ background: colourForDeck(d) }}
+                    />
+                    <span className={styles.deckName}>{d || '(orphan)'}</span>
+                    <span className={styles.deckCount}>
+                      {enabledCount}/{list.length}
+                    </span>
+                    <button
+                      className={styles.deckMiniBtn}
+                      title={hidden ? 'Im Graph einblenden' : 'Im Graph ausblenden'}
+                      aria-pressed={hidden}
+                      onClick={() => toggleDeckHidden(d)}
+                    >{hidden ? '🙈' : '👁'}</button>
+                    <button
+                      className={styles.deckMiniBtn}
+                      disabled={isBusy || allEnabled || list.length === 0}
+                      title="Alle Karten in diesem Deck aktivieren"
+                      onClick={() => void flip(true)}
+                    >on</button>
+                    <button
+                      className={styles.deckMiniBtn}
+                      disabled={isBusy || allDisabled || list.length === 0}
+                      title="Alle Karten in diesem Deck deaktivieren"
+                      onClick={() => void flip(false)}
+                    >off</button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className={styles.box}>
+            <header className={styles.boxHead}>Flags</header>
+            <p className={styles.boxHint}>hover markiert · klick inspiziert</p>
+            <div className={styles.boxBody}>
+              {flagList.length === 0 && <div className={styles.flagsEmpty}>Keine Flags in Verwendung.</div>}
+              {flagList.map((f) => (
+                <button
+                  key={f.flag}
+                  type="button"
+                  onMouseEnter={() => setHoveredFlag(f.flag)}
+                  onMouseLeave={() => setHoveredFlag(null)}
+                  onClick={() => { setInspectorFlag(f.flag); setInspectorOpen(true); }}
+                  className={hoveredFlag === f.flag ? styles.flagRowActive : styles.flagRow}
+                >
+                  <span className={styles.flagName}>{f.flag}</span>
+                  <span className={styles.flagCounts}>
+                    set:{f.setters} req:{f.requirers}
                   </span>
-                  <button
-                    className={styles.deckHideBtn}
-                    title={hidden ? 'Im Graph einblenden' : 'Im Graph ausblenden'}
-                    aria-pressed={hidden}
-                    onClick={() => toggleDeckHidden(d)}
-                  >{hidden ? '🙈' : '👁'}</button>
-                  <button
-                    className={styles.deckBulkBtn}
-                    disabled={isBusy || allEnabled || list.length === 0}
-                    title="Alle Karten in diesem Deck aktivieren"
-                    onClick={() => void flip(true)}
-                  >on</button>
-                  <button
-                    className={styles.deckBulkBtn}
-                    disabled={isBusy || allDisabled || list.length === 0}
-                    title="Alle Karten in diesem Deck deaktivieren"
-                    onClick={() => void flip(false)}
-                  >off</button>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className={`${admin.panel} ${styles.box}`}>
-            <div className={admin.fieldLabel}>Flags (hover to highlight · click to inspect)</div>
-            {flagList.length === 0 && <div className={styles.flagsEmpty}>No flags in use.</div>}
-            {flagList.map((f) => (
-              <button
-                key={f.flag}
-                type="button"
-                onMouseEnter={() => setHoveredFlag(f.flag)}
-                onMouseLeave={() => setHoveredFlag(null)}
-                onClick={() => { setInspectorFlag(f.flag); setInspectorOpen(true); }}
-                className={hoveredFlag === f.flag ? styles.flagRowActive : styles.flagRow}
-              >
-                <span className={styles.flagName}>{f.flag}</span>
-                <span className={styles.flagCounts}>
-                  set:{f.setters} req:{f.requirers}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className={`${admin.panel} ${styles.legend}`}>
-            <div className={admin.fieldLabel}>Legend</div>
-            <div className={styles.legendRow}>
-              <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#38bdf8" strokeWidth="2" /></svg>
-              <span>adds_to_deck</span>
+                </button>
+              ))}
             </div>
-            <div className={styles.legendRow}>
-              <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#71717a" strokeWidth="2" strokeDasharray="4 3" /></svg>
-              <span>flag link (setter → requirer)</span>
+          </section>
+
+          <section className={styles.box}>
+            <header className={styles.boxHead}>Legende</header>
+            <div className={styles.boxBody}>
+              <div className={styles.legendRow}>
+                <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#38bdf8" strokeWidth="2" /></svg>
+                <span>adds_to_deck</span>
+              </div>
+              <div className={styles.legendRow}>
+                <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#71717a" strokeWidth="2" strokeDasharray="4 3" /></svg>
+                <span>flag link (setter → requirer)</span>
+              </div>
+              <p className={styles.boxHint}>Klick auf eine Karte fokussiert ihre Nachbarschaft.</p>
             </div>
-            <div className={styles.legendHint}>Click a card to focus its neighbourhood.</div>
-          </div>
+          </section>
         </aside>
       </div>
 

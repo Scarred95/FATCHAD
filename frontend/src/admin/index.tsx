@@ -29,6 +29,10 @@ import { EndingsIndex } from './pages/EndingsIndex';
 import { EndingEditorPage } from './pages/EndingEditor';
 import { CategoriesIndex } from './pages/CategoriesIndex';
 import { SuggestionsIndex } from './pages/SuggestionsIndex';
+import { CardsIndex } from './pages/CardsIndex';
+import { DeckEditorPage } from './pages/DeckEditor';
+import { AchievementsIndex } from './pages/AchievementsIndex';
+import { AchievementEditorPage } from './pages/AchievementEditor';
 
 export { AdminLayout } from './AdminLayout';
 export { DecksIndex } from './pages/DecksIndex';
@@ -39,6 +43,10 @@ export { EndingsIndex } from './pages/EndingsIndex';
 export { EndingEditorPage } from './pages/EndingEditor';
 export { CategoriesIndex } from './pages/CategoriesIndex';
 export { SuggestionsIndex } from './pages/SuggestionsIndex';
+export { CardsIndex } from './pages/CardsIndex';
+export { DeckEditorPage } from './pages/DeckEditor';
+export { AchievementsIndex } from './pages/AchievementsIndex';
+export { AchievementEditorPage } from './pages/AchievementEditor';
 
 /**
  * Children for the /admin route. Spread these into a parent route whose
@@ -47,9 +55,15 @@ export { SuggestionsIndex } from './pages/SuggestionsIndex';
 export const adminChildRoutes: RouteObject[] = [
   { index: true, element: <DecksIndex /> },
   { path: 'decks/:name', element: <DeckDetail /> },
+  { path: 'decks-edit/new', element: <DeckEditorPage mode="new" /> },
+  { path: 'decks-edit/:name', element: <DeckEditorPage mode="edit" /> },
   { path: 'graph', element: <GraphView /> },
+  { path: 'cards', element: <CardsIndex /> },
   { path: 'cards/new', element: <CardEditorPage mode="new" /> },
   { path: 'cards/:id', element: <CardEditorPage mode="edit" /> },
+  { path: 'achievements', element: <AchievementsIndex /> },
+  { path: 'achievements/new', element: <AchievementEditorPage mode="new" /> },
+  { path: 'achievements/:id', element: <AchievementEditorPage mode="edit" /> },
   { path: 'endings', element: <EndingsIndex /> },
   { path: 'endings/new', element: <EndingEditorPage mode="new" /> },
   { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
