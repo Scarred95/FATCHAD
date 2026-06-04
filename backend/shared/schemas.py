@@ -338,6 +338,20 @@ class UserAchievement(BaseModel):
 
 
 # =============================================================================
+# User data: admin directory entry (PK = USERS#all, SK = USER#<uid>)
+# =============================================================================
+
+class DirectoryEntry(BaseModel):
+    """A row in the admin user directory. One per real (non-guest) account,
+    written at profile creation so the admin Users view can enumerate every
+    player with a single Query. Holds just enough to list + search; live
+    points/stats come from the profile on the detail page."""
+    user_id: str
+    display_name: str
+    created_at: datetime
+
+
+# =============================================================================
 # User data: leaderboard entries (PK = LB#<scope>, SK = SCORE#<padded>#<uid>)
 # =============================================================================
 

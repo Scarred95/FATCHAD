@@ -80,7 +80,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--space-3);
   text-align: left;
@@ -106,12 +106,6 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-faint);
-}
-
-.pts {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-dim);
 }
 
 .manualRow {

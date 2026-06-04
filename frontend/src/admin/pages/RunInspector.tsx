@@ -7,8 +7,8 @@
  *
  * A run row lives under USER#<uid> with no run_id GSI, so lookup needs both a
  * user id and a run id. To avoid typing opaque ids the page offers:
- *   1. a player search (from the points leaderboard) that resolves a name to
- *      a user_id — plus a manual user_id field for scoreless/guest accounts;
+ *   1. a player search (from the user directory) that resolves a name to a
+ *      user_id — plus a manual user_id field for guest accounts not listed;
  *   2. a run-picker listing that user's runs, click to inspect.
  * The selection is mirrored into the URL (/admin/runs/:userId/:runId) so the
  * view stays linkable, and route params auto-load on mount.
@@ -28,7 +28,7 @@ export function RunInspector() {
   const { userId: routeUser, runId: routeRun } = useParams<{ userId: string; runId: string }>();
   const nav = useNavigate();
 
-  // Player directory (leaderboard-sourced) + search.
+  // Player directory (every real account) + search.
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [playerQuery, setPlayerQuery] = useState('');
   const [manualId, setManualId] = useState('');
@@ -129,7 +129,7 @@ export function RunInspector() {
           />
           <div className={styles.playerList}>
             {players.length === 0 ? (
-              <span className={styles.muted}>Keine Spieler mit Punktestand gefunden.</span>
+              <span className={styles.muted}>Noch keine Spieler registriert.</span>
             ) : filteredPlayers.length === 0 ? (
               <span className={styles.muted}>Keine Treffer.</span>
             ) : (
@@ -142,7 +142,6 @@ export function RunInspector() {
                 >
                   <span className={styles.playerName}>{p.display_name}</span>
                   <span className={styles.playerId}>{p.user_id}</span>
-                  <span className={styles.playerPts}>{p.points} P</span>
                 </button>
               ))
             )}

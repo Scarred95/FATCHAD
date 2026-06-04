@@ -113,6 +113,26 @@ def user_run_key(user_id: str, status: RunStatus, run_id: str) -> DdbKey:
 
 
 # =============================================================================
+# fatchad_user_data — admin user directory (PK = "USERS#all")
+# =============================================================================
+#
+# A flat "every real player" partition so the admin Users view can enumerate
+# accounts with one Query instead of a table scan. Written once at profile
+# creation for REAL (non-guest) accounts only — guests are skipped on purpose,
+# so they never leave a row here and guest cleanup needs no directory delete.
+
+DIRECTORY_PK = "USERS#all"
+
+
+def directory_pk() -> str:
+    return DIRECTORY_PK
+
+
+def directory_user_key(user_id: str) -> DdbKey:
+    return {"PK": DIRECTORY_PK, "SK": f"USER#{user_id}"}
+
+
+# =============================================================================
 # fatchad_user_data — leaderboards (PK = "LB#<scope>")
 # =============================================================================
 

@@ -5,8 +5,9 @@ run, and which achievements they've earned (resolved against the working-copy
 catalog so names/points show even before a publish). The single-run deep-dive
 lives in runs.py (the Run-Inspektor); a run row here links into it.
 
-The directory is leaderboard-sourced (PK=LB#points), so it only lists players
-who have a recorded score. The per-user routes work for any user_id, so guests
+The directory is sourced from the USERS#all partition (written at profile
+creation for real accounts), so it lists every real player — guests are
+excluded by design. The per-user routes work for any user_id, so guests
 reachable by id still resolve via the manual-id path in the UI.
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -23,11 +24,10 @@ router = APIRouter()
 
 
 class PlayerSummary(BaseModel):
-    """One directory row. Sourced from the points leaderboard, so `points` is
-    that user's best recorded score."""
+    """One directory row — a real player. Live stats (points etc.) come from
+    the per-user detail route, not the listing."""
     user_id: str
     display_name: str
-    points: int
 
 
 class AchievementRow(BaseModel):
@@ -56,12 +56,11 @@ class UserDetail(BaseModel):
 
 @router.get("", response_model=list[PlayerSummary])
 def list_users(users: UserRepo = Depends(get_user_repo)):
-    """Players known to the points leaderboard, best-score first. Not a full
-    directory — scoreless users (e.g. guests who never finished a run) won't
-    appear, but they're still reachable by id via the detail route."""
+    """Every real player, alphabetical. Guests are excluded by design but stay
+    reachable by id via the detail route (manual-id path in the UI)."""
     return [
-        PlayerSummary(user_id=p.user_id, display_name=p.display_name, points=p.score)
-        for p in users.list_players()
+        PlayerSummary(user_id=p.user_id, display_name=p.display_name)
+        for p in users.list_directory()
     ]
 
 

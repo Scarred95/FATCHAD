@@ -287,12 +287,12 @@ export interface AdminRunView {
   updated_at: string;
 }
 
-/** A player as surfaced by the run-inspector picker. Sourced from the points
- *  leaderboard, so only users with a recorded score appear. */
+/** A player as surfaced by the directory (run-inspector + users picker).
+ *  Sourced from the USERS#all partition — every real account, guests excluded.
+ *  Live stats live on the detail view, not the listing. */
 export interface PlayerSummary {
   user_id: string;
   display_name: string;
-  points: number;
 }
 
 /** A lightweight run row for the per-user run-picker (no deck/history). */
@@ -336,8 +336,9 @@ export interface UserDetail {
   achievements: UserAchievementRow[];
 }
 
-/** Player directory, best-score first. Feeds the user lookup + run-inspector
- *  name search. Leaderboard-sourced — scoreless users won't appear. */
+/** Player directory, alphabetical. Feeds the user lookup + run-inspector
+ *  name search. Sourced from USERS#all — every real account, guests excluded
+ *  (still reachable by id via the detail route). */
 export const listPlayers = () =>
   request<PlayerSummary[]>('/users');
 

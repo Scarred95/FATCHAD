@@ -1,7 +1,7 @@
 /**
- * Users — admin directory. Search a player (leaderboard-sourced) and open
- * their detail view; or jump straight to any user_id (guests not on the
- * leaderboard). The detail page (UserDetail) shows stats, runs and
+ * Users — admin directory. Search a player (every real account) and open
+ * their detail view; or jump straight to any user_id (e.g. a guest, who is
+ * not in the directory). The detail page (UserDetail) shows stats, runs and
  * achievements; individual runs deep-link into the Run-Inspektor.
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -49,8 +49,7 @@ export function UsersIndex() {
         <h1 className={styles.heading}>Users</h1>
         <p className={styles.sub}>
           Spieler suchen und Profil, Runs &amp; Achievements einsehen.
-          Liste stammt aus der Punkte-Bestenliste — Spieler ohne Punktestand
-          per User-ID direkt öffnen.
+          Liste enthält alle echten Accounts — Gäste per User-ID direkt öffnen.
         </p>
       </header>
 
@@ -72,7 +71,7 @@ export function UsersIndex() {
           {!loaded ? (
             <span className={styles.muted}>Lädt…</span>
           ) : players.length === 0 ? (
-            <span className={styles.muted}>Keine Spieler mit Punktestand gefunden.</span>
+            <span className={styles.muted}>Noch keine Spieler registriert.</span>
           ) : filtered.length === 0 ? (
             <span className={styles.muted}>Keine Treffer.</span>
           ) : (
@@ -85,7 +84,6 @@ export function UsersIndex() {
               >
                 <span className={styles.name}>{p.display_name}</span>
                 <span className={styles.id}>{p.user_id}</span>
-                <span className={styles.pts}>{p.points} P</span>
               </button>
             ))
           )}

@@ -15,14 +15,15 @@ from shared.db.ddb import user_table
 from shared.db.keys import (
     RunStatus,
     UserSk,
-    leaderboard_pk,
+    directory_pk,
+    directory_user_key,
     user_achievement_key,
     user_deck_unlock_key,
     user_pk,
     user_profile_key,
     user_run_key,
 )
-from shared.schemas import GameState, LbEntry, Profile, UserAchievement
+from shared.schemas import DirectoryEntry, GameState, Profile, UserAchievement
 
 
 # =============================================================================
@@ -420,29 +421,41 @@ class UserRepo:
             kwargs["ExclusiveStartKey"] = lek
         return [GameState.model_validate(_item_to_dict(i)) for i in items]
 
-    def list_players(self) -> list[LbEntry]:
-        """All known players, derived from the points leaderboard (one Query on
-        PK=LB#points). Deduped by user_id keeping the highest score, since a
-        stale old-score SK can linger if a writer's delete-old step didn't land.
+    # -------------------------------------------------------------------------
+    # Admin user directory (PK = USERS#all)
+    # -------------------------------------------------------------------------
 
-        Only surfaces users who have posted a points score — enough for the
-        admin run-picker (a user being debugged has finished a run), but it is
-        NOT a full user directory: guests / scoreless accounts won't appear.
+    def put_directory_entry(self, user_id: str, display_name: str) -> None:
+        """Add a real (non-guest) account to the admin user directory.
+
+        Called once at profile creation (Cognito PostConfirmation). Plain put so
+        a re-fire just refreshes the row; guests are deliberately never written
+        here, so the directory stays a clean list of real players and guest
+        cleanup needs no directory delete.
         """
-        items: list[dict] = []
-        kwargs = {"KeyConditionExpression": Key("PK").eq(leaderboard_pk("points"))}
+        from datetime import datetime, timezone
+        entry = DirectoryEntry(
+            user_id=user_id,
+            display_name=display_name,
+            created_at=datetime.now(timezone.utc),
+        )
+        key = directory_user_key(user_id)
+        self._t.put_item(Item=_model_to_item(entry, key["PK"], key["SK"]))
+
+    def list_directory(self) -> list[DirectoryEntry]:
+        """Every real player, one Query on PK=USERS#all, sorted by name.
+
+        Full directory of real accounts (guests excluded by design). Backs the
+        admin Users view + run-inspector name search.
+        """
+        rows: list[DirectoryEntry] = []
+        kwargs = {"KeyConditionExpression": Key("PK").eq(directory_pk())}
         while True:
             resp = self._t.query(**kwargs)
-            items.extend(resp.get("Items", []))
+            for item in resp.get("Items", []):
+                rows.append(DirectoryEntry.model_validate(_item_to_dict(item)))
             lek = resp.get("LastEvaluatedKey")
             if not lek:
                 break
             kwargs["ExclusiveStartKey"] = lek
-
-        best: dict[str, LbEntry] = {}
-        for raw in items:
-            entry = LbEntry.model_validate(_item_to_dict(raw))
-            prev = best.get(entry.user_id)
-            if prev is None or entry.score > prev.score:
-                best[entry.user_id] = entry
-        return sorted(best.values(), key=lambda e: e.score, reverse=True)
+        return sorted(rows, key=lambda e: e.display_name.lower())
