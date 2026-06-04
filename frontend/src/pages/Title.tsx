@@ -75,6 +75,12 @@ export default function Title() {
         >
           Fortsetzen
         </button>
+        <button
+          className={styles.btnSecondary}
+          onClick={() => nav('/achievements')}
+        >
+          Errungenschaften
+        </button>
         <Link to="/about" className={styles.btnText}>
           Über FATCHAD
         </Link>
