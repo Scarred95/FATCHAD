@@ -124,6 +124,16 @@ export interface HistoryDetailEntry {
   triggered_ending: string | null;
 }
 
+export interface EarnedAchievement {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  unlocks_deck: string | null;
+  image_url: string | null;
+  unlocked_at: string;
+}
+
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: boolean;

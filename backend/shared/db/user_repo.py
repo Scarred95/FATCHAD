@@ -15,11 +15,13 @@ from shared.db.ddb import user_table
 from shared.db.keys import (
     RunStatus,
     UserSk,
+    user_achievement_key,
+    user_deck_unlock_key,
     user_pk,
     user_profile_key,
     user_run_key,
 )
-from shared.schemas import GameState, Profile
+from shared.schemas import Achievement, DeckUnlock, GameState, Profile, UserAchievement
 
 
 # =============================================================================
@@ -216,6 +218,87 @@ class UserRepo:
         )
         prefix_len = len(UserSk.UNLOCK_DECK_PREFIX)
         return [item["SK"][prefix_len:] for item in resp.get("Items", [])]
+
+    # -------------------------------------------------------------------------
+    # Achievements
+    # -------------------------------------------------------------------------
+
+    def list_earned_achievement_ids(self, user_id: str) -> set[str]:
+        """Return the set of achievement ids the user has already unlocked.
+        Used by the evaluator — only needs ids, not full objects."""
+        pk = user_pk(user_id)
+        resp = self._t.query(
+            KeyConditionExpression=Key("PK").eq(pk)
+                & Key("SK").begins_with(UserSk.ACH_PREFIX),
+            ProjectionExpression="SK",
+        )
+        prefix_len = len(UserSk.ACH_PREFIX)
+        return {item["SK"][prefix_len:] for item in resp.get("Items", [])}
+
+    def list_earned_achievements(self, user_id: str) -> list[UserAchievement]:
+        """Return full UserAchievement records (with unlocked_at) for display."""
+        pk = user_pk(user_id)
+        resp = self._t.query(
+            KeyConditionExpression=Key("PK").eq(pk)
+                & Key("SK").begins_with(UserSk.ACH_PREFIX),
+        )
+        return [
+            UserAchievement.model_validate(_item_to_dict(i))
+            for i in resp.get("Items", [])
+        ]
+
+    def award_achievement(self, user_id: str, ach: Achievement) -> bool:
+        """Write a UserAchievement item for the user. Idempotent — silently
+        skips if the user already earned this achievement. Returns True when
+        newly awarded, False when it was already present.
+
+        Side effects when newly awarded:
+          - Writes a DeckUnlock item if ach.unlocks_deck is set.
+          - Increments profile.achievements_unlocked and profile.current_points.
+        """
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        earned = UserAchievement(
+            achievement_id=ach.id,
+            unlocked_at=now,
+        )
+        key = user_achievement_key(user_id, ach.id)
+        try:
+            self._t.put_item(
+                Item=_model_to_item(earned, key["PK"], key["SK"]),
+                ConditionExpression="attribute_not_exists(PK)",
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                return False
+            raise
+
+        if ach.unlocks_deck:
+            unlock = DeckUnlock(
+                deck_name=ach.unlocks_deck,
+                unlocked_at=now,
+                via_achievement=ach.id,
+            )
+            dk = user_deck_unlock_key(user_id, ach.unlocks_deck)
+            self._t.put_item(Item=_model_to_item(unlock, dk["PK"], dk["SK"]))
+
+        self._increment_profile_achievement(user_id, ach.points)
+        return True
+
+    def _increment_profile_achievement(self, user_id: str, points: int) -> None:
+        """Atomically bump achievements_unlocked and current_points on the
+        profile. Uses UpdateItem so we never overwrite a concurrent write."""
+        self._t.update_item(
+            Key=user_profile_key(user_id),
+            UpdateExpression=(
+                "SET totals.achievements_unlocked = "
+                "    if_not_exists(totals.achievements_unlocked, :zero) + :one, "
+                "    current_points = "
+                "    if_not_exists(current_points, :zero) + :pts"
+            ),
+            ExpressionAttributeValues={":one": 1, ":pts": points, ":zero": 0},
+        )
 
     # -------------------------------------------------------------------------
     # Bulk delete — wipe an entire user's partition (guest cleanup)

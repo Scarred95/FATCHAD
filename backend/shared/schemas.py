@@ -248,12 +248,15 @@ class Deck(BaseModel):
 # Catalog: Achievement schema (fatchad_catalog, PK=ACH, SK=<id>)
 # =============================================================================
 
+AchievementKind = Literal["ending_reached", "turns_survived"]
+
+
 class AchievementCriteria(BaseModel):
-    """Free-form criteria payload for v1. No DSL yet — until a few achievements
-    exist we don't know which predicates we need. A Lambda reads this blob plus
-    run history and decides; typed predicates replace `description` later."""
-    description: str
-    payload: dict = Field(default_factory=dict)
+    """Typed criteria for v1. `ending_reached` fires when the run ends on a
+    specific ending id; `turns_survived` fires when turn count >= min_turns."""
+    kind: AchievementKind
+    ending_id: Optional[str] = None   # ending_reached
+    min_turns: Optional[int] = None   # turns_survived
 
 
 class Achievement(BaseModel):

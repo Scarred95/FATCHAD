@@ -14,7 +14,7 @@ import json
 
 from shared.db.ddb import catalog_bucket, catalog_table, s3_client
 from shared.db.keys import catalog_pointer_key
-from shared.schemas import Deck, Ending, Event
+from shared.schemas import Achievement, Deck, Ending, Event
 
 
 # Module-global cache. Reset on cold start; refreshed on pointer bump.
@@ -31,11 +31,19 @@ class CatalogSnapshot:
     (`get_card` not `get_by_id`) since one snapshot holds both cards and endings.
     """
 
-    def __init__(self, version: str, cards: list[Event], endings: list[Ending], decks: list[Deck] | None = None):
+    def __init__(
+        self,
+        version: str,
+        cards: list[Event],
+        endings: list[Ending],
+        decks: list[Deck] | None = None,
+        achievements: list[Achievement] | None = None,
+    ):
         self.version = version
         self._cards: dict[str, Event] = {c.id: c for c in cards}
         self._endings: dict[str, Ending] = {e.id: e for e in endings}
         self._decks: dict[str, Deck] = {d.name: d for d in (decks or [])}
+        self._achievements: dict[str, Achievement] = {a.id: a for a in (achievements or [])}
         # Pre-compute defaults once so new-run creation doesn't refilter.
         self._default_ending_ids: list[str] = [
             e.id for e in endings if e.default and e.enabled
@@ -77,6 +85,14 @@ class CatalogSnapshot:
         """Old EndingRepo.list_default_ids — pre-filtered to enabled."""
         return list(self._default_ending_ids)
 
+    # --- Achievement access ---------------------------------------------
+
+    def get_achievement(self, ach_id: str) -> Achievement | None:
+        return self._achievements.get(ach_id)
+
+    def list_achievements(self) -> list[Achievement]:
+        return list(self._achievements.values())
+
     # --- Deck access ----------------------------------------------------
 
     def get_deck(self, name: str) -> Deck | None:
@@ -116,11 +132,18 @@ def get_current_snapshot() -> CatalogSnapshot:
     obj = s3_client().get_object(Bucket=catalog_bucket(), Key=bundle_key)
     data = json.loads(obj["Body"].read())
 
-    cards   = [Event.model_validate(c) for c in data.get("cards", [])]
-    endings = [Ending.model_validate(e) for e in data.get("endings", [])]
-    decks   = [Deck.model_validate(d)  for d in data.get("decks", [])]
+    cards        = [Event.model_validate(c)       for c in data.get("cards", [])]
+    endings      = [Ending.model_validate(e)      for e in data.get("endings", [])]
+    decks        = [Deck.model_validate(d)        for d in data.get("decks", [])]
+    achievements = [Achievement.model_validate(a) for a in data.get("achievements", [])]
 
-    _cached = CatalogSnapshot(version=version, cards=cards, endings=endings, decks=decks)
+    _cached = CatalogSnapshot(
+        version=version,
+        cards=cards,
+        endings=endings,
+        decks=decks,
+        achievements=achievements,
+    )
     _cached_version = version
     return _cached
 

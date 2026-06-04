@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.db.user_repo import StaleRunWrite, UserRepo
+from shared.game.achievements import evaluate_new_achievements
 from shared.game.deck import draw_eligible_card, draw_with_refill_retry
 from shared.game.effects import apply_choice
 from shared.schemas import GameState
@@ -79,9 +80,10 @@ def submit_choice(
     new_state = apply_choice(state, current_card, payload.choice_index, catalog)
 
     try:
-        # Ending hit — save and return without a next card.
+        # Ending hit — save, evaluate achievements, return without a next card.
         if new_state.status != "active":
             users.update_run(new_state, prior_status=prior_status)
+            _process_run_end(new_state, users, catalog)
             return TurnResponse(state=new_state, next_card=None)
 
         # Piggyback the next card; same refill safety net.
@@ -97,6 +99,20 @@ def submit_choice(
         state=new_state,
         next_card=CardResponse.from_event(next_card) if next_card else None,
     )
+
+
+def _process_run_end(
+    state: GameState,
+    users: UserRepo,
+    catalog: CatalogSnapshot,
+) -> None:
+    """Evaluate and award achievements after a run ends. Fire-and-forget from
+    the caller's perspective — a failure here should not fail the turn response,
+    but we let exceptions propagate so CloudWatch catches them."""
+    earned = users.list_earned_achievement_ids(state.user_id)
+    new_achievements = evaluate_new_achievements(state, catalog, earned)
+    for ach in new_achievements:
+        users.award_achievement(state.user_id, ach)
 
 
 @router.get("/{run_id}/summary", response_model=EndSummary)

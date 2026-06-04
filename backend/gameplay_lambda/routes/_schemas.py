@@ -124,6 +124,19 @@ class HistoryDetailEntry(BaseModel):
     triggered_ending: str | None = None
 
 
+class EarnedAchievementResponse(BaseModel):
+    """Public achievement fields joined with when the user earned it.
+    Criteria are intentionally omitted so players can't reverse-engineer
+    unlock conditions from the API response."""
+    id: str
+    name: str
+    description: str
+    points: int
+    unlocks_deck: str | None
+    image_url: str | None
+    unlocked_at: datetime
+
+
 class EndSummary(BaseModel):
     """End-of-run stats for the game-over screen. ending_title/description are
     denormalised from the Ending doc so the recap needs no second fetch; both
