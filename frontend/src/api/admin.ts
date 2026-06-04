@@ -287,6 +287,68 @@ export interface AdminRunView {
   updated_at: string;
 }
 
+/** A player as surfaced by the run-inspector picker. Sourced from the points
+ *  leaderboard, so only users with a recorded score appear. */
+export interface PlayerSummary {
+  user_id: string;
+  display_name: string;
+  points: number;
+}
+
+/** A lightweight run row for the per-user run-picker (no deck/history). */
+export interface RunSummaryRow {
+  run_id: string;
+  status: GameStatus;
+  turn: number;
+  ending: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An earned achievement on the user-detail view, joined against the catalog. */
+export interface UserAchievementRow {
+  id: string;
+  name: string;
+  points: number;
+  unlocks_deck: string | null;
+  unlocked_at: string | null;
+  /** True when the id no longer resolves in the working-copy catalog. */
+  orphaned: boolean;
+}
+
+/** Lifetime counters from the user's profile. */
+export interface UserTotals {
+  runs_started: number;
+  runs_completed: number;
+  runs_abandoned: number;
+  achievements_unlocked: number;
+}
+
+/** Aggregate user view — profile/stats + every run + earned achievements. */
+export interface UserDetail {
+  user_id: string;
+  display_name: string;
+  current_points: number;
+  totals: UserTotals;
+  created_at: string | null;
+  updated_at: string | null;
+  runs: RunSummaryRow[];
+  achievements: UserAchievementRow[];
+}
+
+/** Player directory, best-score first. Feeds the user lookup + run-inspector
+ *  name search. Leaderboard-sourced — scoreless users won't appear. */
+export const listPlayers = () =>
+  request<PlayerSummary[]>('/users');
+
+/** Full aggregate for one user: profile/stats, runs, earned achievements. */
+export const getUserDetail = (userId: string) =>
+  request<UserDetail>(`/users/${encodeURIComponent(userId)}`);
+
+/** Every run for a user (any status), newest first — the run-picker list. */
+export const listUserRuns = (userId: string) =>
+  request<RunSummaryRow[]>(`/runs/${encodeURIComponent(userId)}`);
+
 /** Fetch a run's full state + per-turn stat trail for debugging. Needs the
  *  owning user id (run rows are partitioned under USER#<uid>; no run_id GSI). */
 export const getRunHistory = (userId: string, runId: string) =>

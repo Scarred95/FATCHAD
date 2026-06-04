@@ -27,25 +27,150 @@
   max-width: 640px;
 }
 
-/* ─── lookup form ──────────────────────────────────────────────── */
+/* ─── pickers (player + run) ───────────────────────────────────── */
 
-.form {
+.pickerCard {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-text-faint);
   border-radius: var(--radius-md);
 }
 
-.field {
+.playerList,
+.runList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.playerRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--dur-quick), background var(--dur-quick);
+}
+
+.playerRow:hover {
+  border-color: var(--color-accent);
+}
+
+.playerName {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+}
+
+.playerId {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.playerPts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.runRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--dur-quick);
+}
+
+.runRow:hover {
+  border-color: var(--color-accent);
+}
+
+.runMeta {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-overlay);
+  color: var(--color-text-dim);
+}
+
+.st_active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+}
+
+.st_ended {
+  background: rgba(74, 222, 128, 0.15);
+  color: #86efac;
+}
+
+.st_abandoned {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}
+
+.manualRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: 4px;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-bg-overlay);
+}
+
+.manualField {
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1;
   min-width: 220px;
+}
+
+.selectedBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-md);
+}
+
+.selectedMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selectedMeta strong {
+  color: var(--color-text);
+  margin-right: 8px;
 }
 
 .fieldLabel {

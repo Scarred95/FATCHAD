@@ -78,6 +78,10 @@ export function AdminSidebar({ onReload, onLogout }: Props) {
       <div className={styles.group}>
         <span className={styles.groupLabel}>Debug</span>
 
+        <NavLink to="/admin/users" className={navItem}>
+          <span className={styles.itemName}>Users</span>
+        </NavLink>
+
         <NavLink to="/admin/runs" className={navItem}>
           <span className={styles.itemName}>Run-Inspektor</span>
         </NavLink>

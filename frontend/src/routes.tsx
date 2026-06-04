@@ -57,6 +57,12 @@ const AchievementEditorPage = lazy(() =>
 const RunInspector = lazy(() =>
   import('./admin').then((m) => ({ default: m.RunInspector })),
 );
+const UsersIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.UsersIndex })),
+);
+const UserDetail = lazy(() =>
+  import('./admin').then((m) => ({ default: m.UserDetail })),
+);
 
 const adminFallback = (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-faint)' }}>
@@ -118,6 +124,8 @@ export const router = createBrowserRouter([
           { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
           { path: 'runs', element: <RunInspector /> },
           { path: 'runs/:userId/:runId', element: <RunInspector /> },
+          { path: 'users', element: <UsersIndex /> },
+          { path: 'users/:userId', element: <UserDetail /> },
         ],
       },
     ],

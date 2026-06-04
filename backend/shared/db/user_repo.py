@@ -15,13 +15,14 @@ from shared.db.ddb import user_table
 from shared.db.keys import (
     RunStatus,
     UserSk,
+    leaderboard_pk,
     user_achievement_key,
     user_deck_unlock_key,
     user_pk,
     user_profile_key,
     user_run_key,
 )
-from shared.schemas import GameState, Profile, UserAchievement
+from shared.schemas import GameState, LbEntry, Profile, UserAchievement
 
 
 # =============================================================================
@@ -315,6 +316,26 @@ class UserRepo:
             kwargs["ExclusiveStartKey"] = lek
         return ids
 
+    def list_user_achievement_rows(self, user_id: str) -> list[UserAchievement]:
+        """Full earned-achievement rows (incl. unlocked_at) for the admin user
+        view. Unlike list_user_achievements (ids only, hot finalize path), this
+        keeps the whole item so the admin can see when each was granted."""
+        rows: list[UserAchievement] = []
+        kwargs = {
+            "KeyConditionExpression":
+                Key("PK").eq(user_pk(user_id))
+                & Key("SK").begins_with(UserSk.ACH_PREFIX),
+        }
+        while True:
+            resp = self._t.query(**kwargs)
+            for item in resp.get("Items", []):
+                rows.append(UserAchievement.model_validate(_item_to_dict(item)))
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+        return rows
+
     def unlock_achievement(
         self,
         user_id: str,
@@ -398,3 +419,30 @@ class UserRepo:
                 break
             kwargs["ExclusiveStartKey"] = lek
         return [GameState.model_validate(_item_to_dict(i)) for i in items]
+
+    def list_players(self) -> list[LbEntry]:
+        """All known players, derived from the points leaderboard (one Query on
+        PK=LB#points). Deduped by user_id keeping the highest score, since a
+        stale old-score SK can linger if a writer's delete-old step didn't land.
+
+        Only surfaces users who have posted a points score — enough for the
+        admin run-picker (a user being debugged has finished a run), but it is
+        NOT a full user directory: guests / scoreless accounts won't appear.
+        """
+        items: list[dict] = []
+        kwargs = {"KeyConditionExpression": Key("PK").eq(leaderboard_pk("points"))}
+        while True:
+            resp = self._t.query(**kwargs)
+            items.extend(resp.get("Items", []))
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+
+        best: dict[str, LbEntry] = {}
+        for raw in items:
+            entry = LbEntry.model_validate(_item_to_dict(raw))
+            prev = best.get(entry.user_id)
+            if prev is None or entry.score > prev.score:
+                best[entry.user_id] = entry
+        return sorted(best.values(), key=lambda e: e.score, reverse=True)

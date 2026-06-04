@@ -5,13 +5,20 @@
  * plus the per-turn stat trail (history[].stats) that group-C predicates read
  * — the snapshot the player-facing history endpoint deliberately omits.
  *
- * A run row lives under USER#<uid> with no run_id GSI, so lookup needs both
- * the user id and the run id. The route accepts them as optional params
- * (/admin/runs/:userId/:runId) and otherwise falls back to a manual form.
+ * A run row lives under USER#<uid> with no run_id GSI, so lookup needs both a
+ * user id and a run id. To avoid typing opaque ids the page offers:
+ *   1. a player search (from the points leaderboard) that resolves a name to
+ *      a user_id — plus a manual user_id field for scoreless/guest accounts;
+ *   2. a run-picker listing that user's runs, click to inspect.
+ * The selection is mirrored into the URL (/admin/runs/:userId/:runId) so the
+ * view stays linkable, and route params auto-load on mount.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getRunHistory, type AdminRunView } from '../../api/admin';
+import {
+  getRunHistory, listPlayers, listUserRuns,
+  type AdminRunView, type PlayerSummary, type RunSummaryRow,
+} from '../../api/admin';
 import { errorMessage } from '../../api/http';
 import { STAT_KEYS, STAT_LABELS } from '../types';
 import admin from '../admin.module.css';
@@ -21,40 +28,80 @@ export function RunInspector() {
   const { userId: routeUser, runId: routeRun } = useParams<{ userId: string; runId: string }>();
   const nav = useNavigate();
 
-  const [userId, setUserId] = useState(routeUser ?? '');
-  const [runId, setRunId] = useState(routeRun ?? '');
+  // Player directory (leaderboard-sourced) + search.
+  const [players, setPlayers] = useState<PlayerSummary[]>([]);
+  const [playerQuery, setPlayerQuery] = useState('');
+  const [manualId, setManualId] = useState('');
+
+  // Selected user + their runs.
+  const [selectedUser, setSelectedUser] = useState<string | null>(routeUser ?? null);
+  const [runs, setRuns] = useState<RunSummaryRow[]>([]);
+  const [runsBusy, setRunsBusy] = useState(false);
+
+  // Loaded run history.
   const [run, setRun] = useState<AdminRunView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async (u: string, r: string) => {
-    const uid = u.trim();
-    const rid = r.trim();
-    if (!uid || !rid) return;
+  // Load the player directory once.
+  useEffect(() => {
+    listPlayers()
+      .then(setPlayers)
+      .catch((e) => setError(errorMessage(e, 'Spielerliste konnte nicht geladen werden')));
+  }, []);
+
+  // When a user is selected, load their runs.
+  useEffect(() => {
+    if (!selectedUser) { setRuns([]); return; }
+    setRunsBusy(true);
+    listUserRuns(selectedUser)
+      .then(setRuns)
+      .catch((e) => setError(errorMessage(e, 'Runs konnten nicht geladen werden')))
+      .finally(() => setRunsBusy(false));
+  }, [selectedUser]);
+
+  // Auto-load the full history when both ids are in the route.
+  useEffect(() => {
+    if (!routeUser || !routeRun) { setRun(null); return; }
     setBusy(true);
     setError(null);
-    try {
-      const data = await getRunHistory(uid, rid);
-      setRun(data);
-    } catch (e) {
-      setRun(null);
-      setError(errorMessage(e, 'Run konnte nicht geladen werden'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Auto-load when both ids arrive via the route.
-  useEffect(() => {
-    if (routeUser && routeRun) void load(routeUser, routeRun);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getRunHistory(routeUser, routeRun)
+      .then(setRun)
+      .catch((e) => { setRun(null); setError(errorMessage(e, 'Run konnte nicht geladen werden')); })
+      .finally(() => setBusy(false));
   }, [routeUser, routeRun]);
 
-  const onSubmit = (e: FormEvent) => {
+  const displayName = useMemo(() => {
+    if (!selectedUser) return null;
+    return players.find((p) => p.user_id === selectedUser)?.display_name ?? null;
+  }, [players, selectedUser]);
+
+  const filteredPlayers = useMemo(() => {
+    const q = playerQuery.trim().toLowerCase();
+    if (!q) return players.slice(0, 8);
+    return players
+      .filter((p) =>
+        p.display_name.toLowerCase().includes(q) || p.user_id.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [players, playerQuery]);
+
+  const pickUser = (uid: string) => {
+    setError(null);
+    setSelectedUser(uid);
+    setRun(null);
+    // Drop any run from the URL; keep the page on the picker for this user.
+    nav(`/admin/runs`, { replace: true });
+  };
+
+  const onManualSubmit = (e: FormEvent) => {
     e.preventDefault();
-    // Push the ids into the URL so the view is linkable; the effect loads.
-    nav(`/admin/runs/${encodeURIComponent(userId.trim())}/${encodeURIComponent(runId.trim())}`);
-    void load(userId, runId);
+    const uid = manualId.trim();
+    if (uid) pickUser(uid);
+  };
+
+  const pickRun = (runId: string) => {
+    if (!selectedUser) return;
+    nav(`/admin/runs/${encodeURIComponent(selectedUser)}/${encodeURIComponent(runId)}`);
   };
 
   return (
@@ -67,40 +114,109 @@ export function RunInspector() {
         </p>
       </header>
 
-      <form className={styles.form} onSubmit={onSubmit}>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>User-ID</label>
+      {/* ── Step 1: pick a player ─────────────────────────────── */}
+      {!selectedUser ? (
+        <section className={styles.pickerCard}>
+          <label className={styles.fieldLabel}>Spieler suchen</label>
           <input
             className={styles.input}
             type="text"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="z.B. cognito-sub oder guest_…"
+            value={playerQuery}
+            onChange={(e) => setPlayerQuery(e.target.value)}
+            placeholder="Name oder User-ID…"
             spellCheck={false}
+            autoFocus
           />
+          <div className={styles.playerList}>
+            {players.length === 0 ? (
+              <span className={styles.muted}>Keine Spieler mit Punktestand gefunden.</span>
+            ) : filteredPlayers.length === 0 ? (
+              <span className={styles.muted}>Keine Treffer.</span>
+            ) : (
+              filteredPlayers.map((p) => (
+                <button
+                  key={p.user_id}
+                  type="button"
+                  className={styles.playerRow}
+                  onClick={() => pickUser(p.user_id)}
+                >
+                  <span className={styles.playerName}>{p.display_name}</span>
+                  <span className={styles.playerId}>{p.user_id}</span>
+                  <span className={styles.playerPts}>{p.points} P</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          <form className={styles.manualRow} onSubmit={onManualSubmit}>
+            <div className={styles.manualField}>
+              <label className={styles.fieldLabel}>…oder User-ID direkt (Gäste o. ä.)</label>
+              <input
+                className={styles.input}
+                type="text"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                placeholder="cognito-sub oder guest_…"
+                spellCheck={false}
+              />
+            </div>
+            <button type="submit" className={admin.btnSecondary} disabled={!manualId.trim()}>
+              Übernehmen
+            </button>
+          </form>
+        </section>
+      ) : (
+        <div className={styles.selectedBar}>
+          <div className={styles.selectedMeta}>
+            <span className={styles.metaLabel}>Spieler</span>
+            <span>
+              {displayName ? <strong>{displayName}</strong> : null}
+              <code className={styles.mono}>{selectedUser}</code>
+            </span>
+          </div>
+          <button
+            type="button"
+            className={admin.btnSecondary}
+            onClick={() => { setSelectedUser(null); setRun(null); nav('/admin/runs', { replace: true }); }}
+          >
+            Spieler wechseln
+          </button>
         </div>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>Run-ID</label>
-          <input
-            className={styles.input}
-            type="text"
-            value={runId}
-            onChange={(e) => setRunId(e.target.value)}
-            placeholder="run_…"
-            spellCheck={false}
-          />
-        </div>
-        <button
-          type="submit"
-          className={admin.btnPrimary}
-          disabled={busy || !userId.trim() || !runId.trim()}
-        >
-          {busy ? 'Lädt…' : 'Laden'}
-        </button>
-      </form>
+      )}
+
+      {/* ── Step 2: pick a run ────────────────────────────────── */}
+      {selectedUser && !run && (
+        <section className={styles.pickerCard}>
+          <label className={styles.fieldLabel}>Run wählen</label>
+          {runsBusy ? (
+            <span className={styles.muted}>Lädt…</span>
+          ) : runs.length === 0 ? (
+            <span className={styles.muted}>Keine Runs für diesen Spieler.</span>
+          ) : (
+            <div className={styles.runList}>
+              {runs.map((r) => (
+                <button
+                  key={r.run_id}
+                  type="button"
+                  className={styles.runRow}
+                  onClick={() => pickRun(r.run_id)}
+                >
+                  <code className={styles.mono}>{r.run_id}</code>
+                  <span className={`${styles.badge} ${styles[`st_${r.status}`] ?? ''}`}>{r.status}</span>
+                  <span className={styles.runMeta}>Zug {r.turn}</span>
+                  <span className={styles.runMeta}>{r.ending ?? '—'}</span>
+                  <span className={styles.runMeta}>{fmtDate(r.created_at)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {error && <div className={styles.error}>{error}</div>}
+      {busy && <div className={styles.muted}>Run wird geladen…</div>}
 
+      {/* ── Step 3: the run ───────────────────────────────────── */}
       {run && (
         <>
           <section className={styles.metaCard}>
