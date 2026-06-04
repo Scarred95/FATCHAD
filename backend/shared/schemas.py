@@ -176,6 +176,10 @@ class GameState(BaseModel):
     rng_seed: int
     status: GameStatus = "active"
     ending: Optional[str] = None
+    # Deck names the player chose at run creation. Empty = legacy run (all
+    # generic-category cards eligible). When set, the refill pool is limited
+    # to cards whose deck_name is in this list.
+    selected_deck_names: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -195,6 +199,7 @@ class GameState(BaseModel):
         starting_stats: Stats | None = None,
         starting_deck: list[str] | None = None,
         starting_endings: list[str] | None = None,
+        selected_deck_names: list[str] | None = None,
     ) -> "GameState":
         """Factory for a fresh run with sensible defaults."""
         now = datetime.now(timezone.utc)
@@ -205,6 +210,7 @@ class GameState(BaseModel):
             active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
+            selected_deck_names=selected_deck_names or [],
             created_at=now,
             updated_at=now,
         )
@@ -231,6 +237,9 @@ class Deck(BaseModel):
     description: str = ""
     enabled: bool = True
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
+    # The first card drawn when a run starts with this deck selected.
+    # Chains the deck's storyline via adds_to_deck, just like the tutorial.
+    starting_card_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

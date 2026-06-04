@@ -24,7 +24,7 @@ interface RunStore {
   error: string | null;
 
   loadRun: (runId: string) => Promise<void>;
-  createRun: () => Promise<string>;
+  createRun: (selectedDecks: string[]) => Promise<string>;
   submitChoice: (index: number) => Promise<GameState | null>;
   abandonRun: () => Promise<void>;
   exitRun: () => void;
@@ -67,10 +67,10 @@ export const useRunStore = create<RunStore>((set, get) => ({
     }
   },
 
-  async createRun() {
+  async createRun(selectedDecks) {
     set({ isLoading: true, error: null });
     try {
-      const { state, next_card } = await api.createRun();
+      const { state, next_card } = await api.createRun(selectedDecks);
       set({
         state,
         currentCard: next_card,

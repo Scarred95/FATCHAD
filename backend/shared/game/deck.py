@@ -254,10 +254,19 @@ def _gather_candidate_pool(
     state: GameState,
     catalog: CatalogSnapshot,
 ) -> list[Event]:
-    """Eligible refill candidates from the generic categories. Excludes
-    weight<=0 (questline/ending opt-outs) and important cards (those only
-    enter via adds_to_deck, never at random)."""
-    cards = catalog.cards_by_categories(GENERIC_CATEGORIES)
+    """Eligible refill candidates for the deck.
+
+    When the run has selected_deck_names, draws only from those decks.
+    Falls back to GENERIC_CATEGORIES for runs started before deck selection
+    existed (empty list = legacy run).
+
+    Excludes weight<=0 (questline/ending opt-outs) and important cards
+    (those only enter via adds_to_deck, never at random).
+    """
+    if state.selected_deck_names:
+        cards = catalog.cards_by_deck_names(state.selected_deck_names)
+    else:
+        cards = catalog.cards_by_categories(GENERIC_CATEGORIES)
     return [
         c for c in cards
         if c.weight > 0 and not c.important and is_eligible(c, state)

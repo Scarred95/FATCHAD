@@ -25,6 +25,7 @@ from gameplay_lambda.routes._deps import (
 )
 from gameplay_lambda.routes._schemas import (
     CardResponse,
+    CreateRunRequest,
     HistoryDetailEntry,
     RunSummary,
     TurnResponse,
@@ -32,26 +33,40 @@ from gameplay_lambda.routes._schemas import (
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
-# Tutorial chains itself via adds_to_deck — seeding the whole list would
-# duplicate every card and clog the deck. One entry is enough.
-_STARTER_DECK = ["evt_tut_01_awakening"]
+# Fallback seed when no decks are selected or a selected deck has no
+# starting_card_id. Tutorial chains itself via adds_to_deck.
+_TUTORIAL_SEED = "evt_tut_01_awakening"
 
 
 @router.post("", response_model=TurnResponse, status_code=201)
 def create_run(
+    payload: CreateRunRequest = None,
     user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Start a new run. Returns state + first card so the client needs one request."""
+    selected = (payload.selected_decks if payload else []) or []
+
+    # Build starting deck from each selected deck's seed card.
+    # Fall back to the tutorial seed if no deck provides a starting card.
+    starting_deck: list[str] = []
+    for deck_name in selected:
+        deck = catalog.get_deck(deck_name)
+        if deck and deck.starting_card_id:
+            starting_deck.append(deck.starting_card_id)
+    if not starting_deck:
+        starting_deck = [_TUTORIAL_SEED]
+
     # Snapshot the default ending ids into the run — from here the set lives in
     # the savestate, so admin edits to defaults won't change in-flight runs.
     state = GameState.new_run(
         run_id=GameState.generate_id(),
         user_id=user_id,
         rng_seed=random.randint(0, 2**31 - 1),
-        starting_deck=list(_STARTER_DECK),
+        starting_deck=starting_deck,
         starting_endings=catalog.default_ending_ids(),
+        selected_deck_names=selected,
     )
 
     # Peek the first card before saving — if nothing's playable, end the run

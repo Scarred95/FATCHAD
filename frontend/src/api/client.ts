@@ -15,6 +15,7 @@
 import { getAccessToken } from '../stores/authStore';
 import type {
   CardResponse,
+  DeckInfo,
   EndSummary,
   GameState,
   HealthResponse,
@@ -94,9 +95,14 @@ export const getCurrentCatalog = () =>
 
 /* ─── Run lifecycle ────────────────────────────────────────────── */
 
-export const createRun = () =>
+export const getAvailableDecks = () =>
+  request<DeckInfo[]>('/decks/available');
+
+export const createRun = (selectedDecks: string[]) =>
   request<TurnResponse>('/runs', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selected_decks: selectedDecks }),
   });
 
 export const listRuns = () =>

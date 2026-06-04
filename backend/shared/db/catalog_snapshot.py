@@ -14,7 +14,7 @@ import json
 
 from shared.db.ddb import catalog_bucket, catalog_table, s3_client
 from shared.db.keys import catalog_pointer_key
-from shared.schemas import Ending, Event
+from shared.schemas import Deck, Ending, Event
 
 
 # Module-global cache. Reset on cold start; refreshed on pointer bump.
@@ -31,10 +31,11 @@ class CatalogSnapshot:
     (`get_card` not `get_by_id`) since one snapshot holds both cards and endings.
     """
 
-    def __init__(self, version: str, cards: list[Event], endings: list[Ending]):
+    def __init__(self, version: str, cards: list[Event], endings: list[Ending], decks: list[Deck] | None = None):
         self.version = version
         self._cards: dict[str, Event] = {c.id: c for c in cards}
         self._endings: dict[str, Ending] = {e.id: e for e in endings}
+        self._decks: dict[str, Deck] = {d.name: d for d in (decks or [])}
         # Pre-compute defaults once so new-run creation doesn't refilter.
         self._default_ending_ids: list[str] = [
             e.id for e in endings if e.default and e.enabled
@@ -76,6 +77,21 @@ class CatalogSnapshot:
         """Old EndingRepo.list_default_ids — pre-filtered to enabled."""
         return list(self._default_ending_ids)
 
+    # --- Deck access ----------------------------------------------------
+
+    def get_deck(self, name: str) -> Deck | None:
+        return self._decks.get(name)
+
+    def list_decks(self) -> list[Deck]:
+        return list(self._decks.values())
+
+    def cards_by_deck_names(self, deck_names: list[str]) -> list[Event]:
+        """All cards whose deck_name is in the given set."""
+        if not deck_names:
+            return []
+        names = set(deck_names)
+        return [c for c in self._cards.values() if c.deck_name in names]
+
 
 # =============================================================================
 # Read-through cache
@@ -100,10 +116,11 @@ def get_current_snapshot() -> CatalogSnapshot:
     obj = s3_client().get_object(Bucket=catalog_bucket(), Key=bundle_key)
     data = json.loads(obj["Body"].read())
 
-    cards = [Event.model_validate(c) for c in data.get("cards", [])]
+    cards   = [Event.model_validate(c) for c in data.get("cards", [])]
     endings = [Ending.model_validate(e) for e in data.get("endings", [])]
+    decks   = [Deck.model_validate(d)  for d in data.get("decks", [])]
 
-    _cached = CatalogSnapshot(version=version, cards=cards, endings=endings)
+    _cached = CatalogSnapshot(version=version, cards=cards, endings=endings, decks=decks)
     _cached_version = version
     return _cached
 

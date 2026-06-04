@@ -199,6 +199,25 @@ class UserRepo:
         return False
 
     # -------------------------------------------------------------------------
+    # Deck unlocks
+    # -------------------------------------------------------------------------
+
+    def list_unlocked_decks(self, user_id: str) -> list[str]:
+        """Return deck names the user has explicitly unlocked via achievements.
+
+        Does NOT include default decks (those are always available regardless
+        of this list). Returns an empty list if no unlocks exist yet.
+        """
+        pk = user_pk(user_id)
+        resp = self._t.query(
+            KeyConditionExpression=Key("PK").eq(pk)
+                & Key("SK").begins_with(UserSk.UNLOCK_DECK_PREFIX),
+            ProjectionExpression="SK",
+        )
+        prefix_len = len(UserSk.UNLOCK_DECK_PREFIX)
+        return [item["SK"][prefix_len:] for item in resp.get("Items", [])]
+
+    # -------------------------------------------------------------------------
     # Bulk delete — wipe an entire user's partition (guest cleanup)
     # -------------------------------------------------------------------------
 

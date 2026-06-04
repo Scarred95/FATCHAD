@@ -30,6 +30,14 @@ export interface ChoicePreview {
   hints: Partial<Record<StatName, StatHint>>;
 }
 
+export interface DeckInfo {
+  name: string;
+  description: string;
+  unlocked: boolean;
+  is_default: boolean;
+  has_starting_card: boolean;
+}
+
 export interface CardResponse {
   id: string;
   title: string;
