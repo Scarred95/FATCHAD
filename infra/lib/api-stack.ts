@@ -170,6 +170,11 @@ export class FatchadApiStack extends cdk.Stack {
     });
 
     catalogTable.grantReadWriteData(this.adminFn);
+    // Read-only on user data: the admin lookup views (Users directory, per-user
+    // detail, Run-Inspektor) Query profiles/runs/achievements but never mutate
+    // them. Without this the admin Lambda has USER_TABLE in its env but no IAM
+    // access, so those routes 500 with AccessDenied.
+    userTable.grantReadData(this.adminFn);
     // Publish endpoint writes new bundle versions; never overwrites or deletes.
     this.catalogBucket.grantPut(this.adminFn);
     // Admin needs to read the pointer for "what's currently published".
