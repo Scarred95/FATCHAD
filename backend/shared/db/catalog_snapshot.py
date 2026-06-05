@@ -133,6 +133,29 @@ class CatalogSnapshot:
         turn and the user ends up with whatever matches."""
         return list(self._achievements.values())
 
+    # --- Achievement access ---------------------------------------------
+
+    def get_achievement(self, ach_id: str) -> Achievement | None:
+        return self._achievements.get(ach_id)
+
+    def list_achievements(self) -> list[Achievement]:
+        return list(self._achievements.values())
+
+    # --- Deck access ----------------------------------------------------
+
+    def get_deck(self, name: str) -> Deck | None:
+        return self._decks.get(name)
+
+    def list_decks(self) -> list[Deck]:
+        return list(self._decks.values())
+
+    def cards_by_deck_names(self, deck_names: list[str]) -> list[Event]:
+        """All cards whose deck_name is in the given set."""
+        if not deck_names:
+            return []
+        names = set(deck_names)
+        return [c for c in self._cards.values() if c.deck_name in names]
+
 
 # =============================================================================
 # Read-through cache
@@ -157,16 +180,17 @@ def get_current_snapshot() -> CatalogSnapshot:
     obj = s3_client().get_object(Bucket=catalog_bucket(), Key=bundle_key)
     data = json.loads(obj["Body"].read())
 
-    cards = [Event.model_validate(c) for c in data.get("cards", [])]
-    endings = [Ending.model_validate(e) for e in data.get("endings", [])]
-    achievements = [
-        Achievement.model_validate(a) for a in data.get("achievements", [])
-    ]
-    decks = [Deck.model_validate(d) for d in data.get("decks", [])]
+    cards        = [Event.model_validate(c)       for c in data.get("cards", [])]
+    endings      = [Ending.model_validate(e)      for e in data.get("endings", [])]
+    decks        = [Deck.model_validate(d)        for d in data.get("decks", [])]
+    achievements = [Achievement.model_validate(a) for a in data.get("achievements", [])]
 
     _cached = CatalogSnapshot(
-        version=version, cards=cards, endings=endings,
-        achievements=achievements, decks=decks,
+        version=version,
+        cards=cards,
+        endings=endings,
+        decks=decks,
+        achievements=achievements,
     )
     _cached_version = version
     return _cached

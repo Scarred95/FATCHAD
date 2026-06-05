@@ -41,54 +41,25 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 # Tutorial chains itself via adds_to_deck — seeding the whole list would
 # duplicate every card and clog the deck. One entry is enough.
-_TUTORIAL_STARTER = ["evt_tut_01_awakening"]
+_STARTER_DECK = ["evt_tut_01_awakening"]
 
 
 @router.post("", response_model=TurnResponse, status_code=201)
 def create_run(
-    body: CreateRunRequest | None = None,
     user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
 ):
     """Start a new run. Returns state + first card so the client needs one request."""
-    opts = body or CreateRunRequest()
-
-    # One seeded RNG for the whole creation (deck shuffle + initial refill), and
-    # stored so the run replays deterministically.
-    rng_seed = random.randint(0, 2**31 - 1)
-    rng = random.Random(rng_seed)
-
-    # Resolve which decks feed the run. The 'catch': no explicit selection →
-    # every default-unlocked deck (until the deck-selector ships).
-    resolved = opts.deck_ids or catalog.default_deck_names()
-    if len(resolved) < MIN_RUN_DECKS:
-        raise HTTPException(409, "Nicht genügend Decks ausgewählt, um einen Run zu starten.")
-
-    # Tutorial is excluded from the random pool (it has its own seeded path).
-    deck_ids = [d for d in resolved if d != TUTORIAL_DECK_NAME]
-    redraw_deck = build_run_deck(deck_ids, catalog, rng)
-    if len(redraw_deck) < MIN_RUN_REDRAW_CARDS:
-        raise HTTPException(409, "Nicht genügend ziehbare Karten, um einen Run zu starten.")
-
-    # Snapshot the run's ending set into the savestate — globals plus the
-    # selected decks' default endings, minus deck removals. From here the set
-    # lives in the run, so admin edits to defaults won't change in-flight runs.
+    # Snapshot the default ending ids into the run — from here the set lives in
+    # the savestate, so admin edits to defaults won't change in-flight runs.
     state = GameState.new_run(
         run_id=GameState.generate_id(),
         user_id=user_id,
-        rng_seed=rng_seed,
-        starting_deck=list(_TUTORIAL_STARTER) if opts.tutorial else [],
-        starting_endings=catalog.active_ending_ids_for_run(deck_ids),
-        deck_ids=deck_ids,
-        redraw_deck=redraw_deck,
+        rng_seed=random.randint(0, 2**31 - 1),
+        starting_deck=list(_STARTER_DECK),
+        starting_endings=catalog.default_ending_ids(),
     )
-
-    # Tutorial runs draw the scripted starter first; non-tutorial runs have an
-    # empty live deck, so seed it now from the redraw pool (force past the
-    # threshold) before peeking.
-    if not opts.tutorial:
-        state = refill_deck_if_needed(state, catalog, force=True, rng=rng)
 
     # Peek the first card before saving — if nothing's playable, end the run
     # up-front so we write the final state in a single DDB round-trip.

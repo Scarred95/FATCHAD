@@ -226,6 +226,7 @@ class GameState(BaseModel):
             active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
+            selected_deck_names=selected_deck_names or [],
             created_at=now,
             updated_at=now,
         )
@@ -255,6 +256,9 @@ class Deck(BaseModel):
     # Ending ids this deck strips from a run's active set when selected — the
     # deck's explicit opt-out, applied even against global/deck default endings.
     removes_endings: list[str] = Field(default_factory=list)
+    # The first card drawn when a run starts with this deck selected.
+    # Chains the deck's storyline via adds_to_deck, just like the tutorial.
+    starting_card_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -263,12 +267,15 @@ class Deck(BaseModel):
 # Catalog: Achievement schema (fatchad_catalog, PK=ACH, SK=<id>)
 # =============================================================================
 
+AchievementKind = Literal["ending_reached", "turns_survived"]
+
+
 class AchievementCriteria(BaseModel):
-    """Free-form criteria payload for v1. No DSL yet — until a few achievements
-    exist we don't know which predicates we need. A Lambda reads this blob plus
-    run history and decides; typed predicates replace `description` later."""
-    description: str
-    payload: dict = Field(default_factory=dict)
+    """Typed criteria for v1. `ending_reached` fires when the run ends on a
+    specific ending id; `turns_survived` fires when turn count >= min_turns."""
+    kind: AchievementKind
+    ending_id: Optional[str] = None   # ending_reached
+    min_turns: Optional[int] = None   # turns_survived
 
 
 class Achievement(BaseModel):

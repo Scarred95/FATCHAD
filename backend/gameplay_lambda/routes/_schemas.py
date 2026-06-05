@@ -15,6 +15,13 @@ from shared.views import public_card_dict
 # Requests
 # =============================================================================
 
+class CreateRunRequest(BaseModel):
+    # Deck names the player wants active in this run. Empty = all generic
+    # categories (legacy behaviour). The backend validates that each name
+    # exists in the catalog and is available to the user.
+    selected_decks: list[str] = Field(default_factory=list, min_length=1, max_length=3)
+
+
 class ChoiceRequest(BaseModel):
     choice_index: int = Field(ge=0)
     # Current turn the client thinks the run is on. Required — guards against
@@ -138,6 +145,7 @@ class UnlockedAchievement(BaseModel):
     points: int = 0
     unlocks_deck: str | None = None
     image_url: str | None = None
+    unlocked_at: datetime
 
 
 # =============================================================================

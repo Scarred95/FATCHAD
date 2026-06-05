@@ -22,11 +22,27 @@ router = APIRouter(prefix="/decks", tags=["decks"])
 def list_available_decks(
     user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
-    catalog: CatalogSnapshot = Depends(get_catalog),
+    catalog: CatalogSnapshot = Depends(get_catalog),  
 ):
-    """Decks this player can choose from on the new-run screen."""
-    unlocked = set(users.list_unlocked_deck_names(user_id))
-    return [
-        DeckOption(name=d.name, description=d.description)
-        for d in catalog.available_decks(unlocked)
-    ]
+    """Return all enabled decks with unlock status for the calling user.
+    
+    - Default decks are always unlocked (no achievement required).
+    - Achievement-gated decks are only included when the user has the
+      matching UNLOCK#DECK#<name> item in DynamoDB.
+    - Decks without a starting_card_id are included but marked accordingly
+      so the frontend can disable or hide them until content is ready.
+    """
+    unlocked_names = set(users.list_unlocked_decks(user_id))
+
+    result: list[DeckOption] = []
+    for deck in catalog.list_decks():
+        is_default = deck.unlock_rule.kind == "default"
+        unlocked = is_default or deck.name in unlocked_names
+        if not unlocked:
+            continue  # achievement-gated and not yet earned — hide entirely
+        result.append(DeckOption(
+            name=deck.name,
+            description=deck.description,
+        ))
+
+    return result

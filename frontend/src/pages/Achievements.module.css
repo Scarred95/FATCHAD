@@ -83,6 +83,35 @@
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.skeleton {
+  height: 88px;
+}
+
+.card {
+  padding: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-color: rgba(255, 200, 80, 0.2);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: border-color var(--dur-quick);
+}
+
+.card:hover {
+  border-color: rgba(255, 200, 80, 0.45);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
 }
 
 .name {
@@ -91,6 +120,13 @@
   letter-spacing: var(--tracking-display);
   text-transform: uppercase;
   color: var(--color-text);
+  color: var(--color-stat-moneten);
+}
+
+.points {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-dim);
+  white-space: nowrap;
 }
 
 .desc {
@@ -109,6 +145,20 @@
 .unlockedAt {
   font-size: var(--fs-body-xs);
   color: var(--color-text-faint);
+  margin: 0;
+}
+
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.unlock {
+  font-size: var(--fs-body-xs);
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: var(--tracking-loose);
 }
@@ -132,4 +182,37 @@
 
 .tile[data-unlocked='true'] .points {
   color: var(--color-accent);
+}
+.date {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  margin-left: auto;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  opacity: 0.4;
+  filter: grayscale(0.6);
+}
+
+.emptyText {
+  color: var(--color-text-dim);
+  line-height: var(--lh-body);
+}
+
+.error {
+  padding: var(--space-3);
+  color: var(--color-danger);
+  text-align: center;
+  font-size: var(--fs-body-sm);
 }

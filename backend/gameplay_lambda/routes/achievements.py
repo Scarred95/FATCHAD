@@ -22,7 +22,6 @@ from gameplay_lambda.routes._schemas import AchievementView, UnlockedAchievement
 
 router = APIRouter(prefix="/achievements", tags=["achievements"])
 
-
 @router.get("", response_model=list[AchievementView])
 def list_achievements(
     catalog: CatalogSnapshot = Depends(get_catalog),
@@ -35,7 +34,6 @@ def list_achievements(
         for a in catalog.get_achievements()
         if not a.hidden
     ]
-
 
 @router.get("/unlocked", response_model=list[UnlockedAchievementView])
 def list_unlocked_achievements(

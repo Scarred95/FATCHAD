@@ -164,4 +164,9 @@ export const getEndSummary = (runId: string) =>
 export const getHistory = (runId: string) =>
   request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
 
+/* ─── Achievements ─────────────────────────────────────────────── */
+
+export const getEarnedAchievements = () =>
+  request<EarnedAchievement[]>('/achievements/earned');
+
 export { ApiError };

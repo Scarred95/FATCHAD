@@ -10,6 +10,9 @@ import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './NewRun.module.css';
 
+const MIN_DECKS = 1;
+const MAX_DECKS = 3;
+
 export default function NewRun() {
   const nav = useNavigate();
   const create = useRunStore((s) => s.createRun);
@@ -54,6 +57,7 @@ export default function NewRun() {
   }
 
   async function start() {
+    if (selected.size < MIN_DECKS) return;
     try {
       const id = await create({
         tutorial: !skipTutorial,
@@ -64,6 +68,8 @@ export default function NewRun() {
       pushToast(errorMessage(e, 'Konnte nicht starten'), 'error');
     }
   }
+
+  const canStart = selected.size >= MIN_DECKS && !isLoading && !decksLoading;
 
   return (
     <main className={`page ${styles.page}`}>
@@ -112,7 +118,7 @@ export default function NewRun() {
         <button
           className={styles.start}
           onClick={start}
-          disabled={isLoading}
+          disabled={!canStart}
         >
           {isLoading ? 'Startet…' : "Los geht's"}
         </button>

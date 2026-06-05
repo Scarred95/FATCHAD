@@ -52,6 +52,28 @@
 .deckButton {
   display: flex;
   align-items: center;
+}
+.deckHint {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+.deckLoading {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+.deckList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.deckToggle {
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-elevated);
@@ -206,6 +228,42 @@
   .deckGrid {
     grid-template-columns: 1fr;
   }
+  .deckToggle {
+    color: var(--color-text-dim);
+    font-size: var(--fs-body-sm);
+    cursor: pointer;
+    transition: border-color var(--dur-instant);
+  }
+}
+
+.deckToggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.deckSelected {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.deckDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.deckName {
+  font-weight: 600;
+  flex: 1;
+}
+
+.deckDesc {
+  display: block;
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  margin-top: 2px;
 }
 
 .actions {

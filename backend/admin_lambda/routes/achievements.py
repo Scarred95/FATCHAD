@@ -1,9 +1,5 @@
 # admin_lambda/routes/achievements.py
-"""Achievement CRUD — mirrors cards.py / endings.py shape.
-
-Achievements have no timestamps on the model (unlike Deck), so the request
-shapes look like endings: full document in, full document out.
-"""
+"""Achievement CRUD — mirrors endings.py shape."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -71,7 +67,7 @@ class PatchAchievementRequest(BaseModel):
     name:         str | None = Field(default=None, min_length=1)
     description:  str | None = None
     criteria:     AchievementCriteria | None = None
-    points:       int | None = None
+    points:       int | None = Field(default=None, ge=0)
     unlocks_deck: str | None = None
     enabled:      bool | None = None
     hint:         str | None = None

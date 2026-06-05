@@ -30,6 +30,14 @@ export interface ChoicePreview {
   hints: Partial<Record<StatName, StatHint>>;
 }
 
+export interface DeckInfo {
+  name: string;
+  description: string;
+  unlocked: boolean;
+  is_default: boolean;
+  has_starting_card: boolean;
+}
+
 export interface CardResponse {
   id: string;
   title: string;
@@ -129,6 +137,16 @@ export interface HistoryDetailEntry {
   sets_flags: string[];
   clears_flags: string[];
   triggered_ending: string | null;
+}
+
+export interface EarnedAchievement {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  unlocks_deck: string | null;
+  image_url: string | null;
+  unlocked_at: string;
 }
 
 export interface HealthResponse {
