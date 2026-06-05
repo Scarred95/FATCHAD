@@ -17,6 +17,7 @@ import type {
   AchievementView,
   CardResponse,
   DeckOption,
+  EarnedAchievement,
   EndSummary,
   GameState,
   HealthResponse,

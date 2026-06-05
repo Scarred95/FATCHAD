@@ -226,7 +226,6 @@ class GameState(BaseModel):
             active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
-            selected_deck_names=selected_deck_names or [],
             created_at=now,
             updated_at=now,
         )
@@ -267,15 +266,13 @@ class Deck(BaseModel):
 # Catalog: Achievement schema (fatchad_catalog, PK=ACH, SK=<id>)
 # =============================================================================
 
-AchievementKind = Literal["ending_reached", "turns_survived"]
-
-
 class AchievementCriteria(BaseModel):
-    """Typed criteria for v1. `ending_reached` fires when the run ends on a
-    specific ending id; `turns_survived` fires when turn count >= min_turns."""
-    kind: AchievementKind
-    ending_id: Optional[str] = None   # ending_reached
-    min_turns: Optional[int] = None   # turns_survived
+    """Free-form criteria payload for v1. No DSL yet — the evaluator in
+    shared.game.achievements reads `payload` (a typed-predicate blob carrying a
+    `type` key) plus run history and decides. `description` is the admin-facing
+    note. Matched by the admin editor and the predicate evaluator alike."""
+    description: str
+    payload: dict = Field(default_factory=dict)
 
 
 class Achievement(BaseModel):

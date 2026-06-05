@@ -19,8 +19,8 @@ STAT_NAMES = ("moneten", "aura", "respekt", "rizz", "chaos")
 
 # ----- New game setup -----
 TUTORIAL_DECK_NAME = "Tutorial"
-MIN_RUN_DECKS = 3
-MIN_RUN_REDRAW_CARDS = 13
+MIN_RUN_DECKS = 2
+MIN_RUN_REDRAW_CARDS = 12
 
 # Tutorial cards share this ID prefix (evt_tut_01_*..evt_tut_10_*). While any
 # tutorial card is still sitting in the deck, refill is held off so the

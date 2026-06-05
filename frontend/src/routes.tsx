@@ -16,7 +16,6 @@ import Welcome from './pages/Welcome';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
-import Achievements from './pages/Achievements';
 import RequireAuth from './components/RequireAuth';
 import RequireAdmin from './components/RequireAdmin';
 
@@ -100,7 +99,6 @@ export const router = createBrowserRouter([
           { path: 'runs/new', element: <NewRun /> },
           { path: 'runs/:runId', element: <Game /> },
           { path: 'runs/:runId/end', element: <EndScreen /> },
-          { path: 'achievements', element: <Achievements /> },
         ],
       },
       {

@@ -10,8 +10,7 @@ import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './NewRun.module.css';
 
-const MIN_DECKS = 1;
-const MAX_DECKS = 3;
+const MIN_DECKS = 2;
 
 export default function NewRun() {
   const nav = useNavigate();

@@ -91,7 +91,6 @@ def submit_choice(
             )
             new_state.newly_unlocked = [a.id for a in unlocked]
             users.update_run(new_state, prior_status=prior_status)
-            _process_run_end(new_state, users, catalog)
             return TurnResponse(state=new_state, next_card=None)
 
         # Piggyback the next card; same refill safety net.
@@ -107,20 +106,6 @@ def submit_choice(
         state=new_state,
         next_card=CardResponse.from_event(next_card) if next_card else None,
     )
-
-
-def _process_run_end(
-    state: GameState,
-    users: UserRepo,
-    catalog: CatalogSnapshot,
-) -> None:
-    """Evaluate and award achievements after a run ends. Fire-and-forget from
-    the caller's perspective — a failure here should not fail the turn response,
-    but we let exceptions propagate so CloudWatch catches them."""
-    earned = users.list_earned_achievement_ids(state.user_id)
-    new_achievements = evaluate_new_achievements(state, catalog, earned)
-    for ach in new_achievements:
-        users.award_achievement(state.user_id, ach)
 
 
 @router.get("/{run_id}/summary", response_model=EndSummary)

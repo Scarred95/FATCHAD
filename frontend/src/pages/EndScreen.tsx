@@ -4,7 +4,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getEarnedAchievements, getEndSummary } from '../api/client';
+import { getEndSummary } from '../api/client';
 import { errorMessage } from '../api/http';
 import { STAT_NAMES } from '../api/types';
 import type { EndSummary, Stats, UnlockedAchievement } from '../api/types';
@@ -22,7 +22,6 @@ export default function EndScreen() {
   const exitRun = useRunStore((s) => s.exitRun);
   const createRun = useRunStore((s) => s.createRun);
   const [summary, setSummary] = useState<EndSummary | null>(null);
-  const [achievements, setAchievements] = useState<EarnedAchievement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -31,9 +30,6 @@ export default function EndScreen() {
     getEndSummary(runId)
       .then(setSummary)
       .catch((e) => setError(errorMessage(e, 'Konnte nicht laden')));
-    getEarnedAchievements()
-      .then(setAchievements)
-      .catch(() => { /* achievements sind optional — Fehler still ignorieren */ });
   }, [runId]);
 
   async function newRun() {
@@ -127,41 +123,6 @@ export default function EndScreen() {
           </div>
         </dl>
       </motion.div>
-
-      {achievements.length > 0 && (
-        <motion.div
-          className={styles.achievements}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.3 }}
-        >
-          <h2 className={styles.achievementsTitle}>Errungenschaften</h2>
-          <ul className={styles.achievementList}>
-            {achievements.map((ach, i) => (
-              <motion.li
-                key={ach.id}
-                className={styles.achievementItem}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, delay: 1.4 + i * 0.07 }}
-              >
-                <div className={styles.achievementTop}>
-                  <span className={styles.achievementName}>{ach.name}</span>
-                  <span className={styles.achievementPoints}>+{ach.points} Pkt.</span>
-                </div>
-                {ach.description && (
-                  <p className={styles.achievementDesc}>{ach.description}</p>
-                )}
-                {ach.unlocks_deck && (
-                  <p className={styles.achievementUnlock}>
-                    Freischalten: {ach.unlocks_deck}
-                  </p>
-                )}
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
-      )}
 
       <motion.div
         className={styles.actions}

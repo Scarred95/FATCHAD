@@ -24,8 +24,6 @@ def create_app() -> FastAPI:
     app.include_router(guest.router)
     app.include_router(account.router)
     app.include_router(runs.router)
-    app.include_router(decks.router)
-    app.include_router(achievements.router)
     app.include_router(gameplay.router)
     return app
 

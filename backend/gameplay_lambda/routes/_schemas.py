@@ -16,10 +16,14 @@ from shared.views import public_card_dict
 # =============================================================================
 
 class CreateRunRequest(BaseModel):
-    # Deck names the player wants active in this run. Empty = all generic
-    # categories (legacy behaviour). The backend validates that each name
-    # exists in the catalog and is available to the user.
-    selected_decks: list[str] = Field(default_factory=list, min_length=1, max_length=3)
+    """Options for starting a run. Both fields optional so a bare POST still
+    works — defaults give a tutorial run over all default-unlocked decks."""
+    # Whether to play the scripted tutorial intro (seeds the tutorial starter
+    # card and holds off refill until it finishes).
+    tutorial: bool = True
+    # Decks to draw from. None/empty → the 'catch': all default-unlocked decks.
+    # The deck-selector on the new-run screen populates this explicitly.
+    deck_ids: list[str] | None = None
 
 
 class ChoiceRequest(BaseModel):
@@ -27,17 +31,6 @@ class ChoiceRequest(BaseModel):
     # Current turn the client thinks the run is on. Required — guards against
     # double-applying the same choice when a client retries. Mismatch → 409.
     expected_turn: int = Field(ge=0)
-
-
-class CreateRunRequest(BaseModel):
-    """Options for starting a run. Both fields optional so a bare POST still
-    works — defaults give a tutorial run over all default-unlocked decks."""
-    # Whether to play the scripted tutorial intro (seeds the tutorial starter
-    # card and holds off refill until it finishes).
-    tutorial: bool = True
-    # Decks to draw from. None/empty → the 'catch': all default-unlocked decks.
-    # The future deck-selector populates this explicitly.
-    deck_ids: list[str] | None = None
 
 
 # =============================================================================
