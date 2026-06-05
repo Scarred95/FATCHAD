@@ -1,0 +1,135 @@
+.page {
+  padding-bottom: var(--space-7);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-5) 0;
+  text-align: center;
+}
+
+.summaryMain {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  letter-spacing: var(--tracking-display);
+  color: var(--color-accent);
+}
+
+.summarySub {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton {
+  height: 72px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: var(--fs-body-sm);
+  padding: var(--space-7) 0;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+}
+
+.tile[data-unlocked='true'] {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.tile[data-unlocked='false'] {
+  opacity: 0.7;
+}
+
+.icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-overlay);
+  font-size: 1.1rem;
+}
+
+.icon[data-unlocked='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.desc {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  line-height: var(--lh-body);
+}
+
+.hint {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-faint);
+  font-style: italic;
+  line-height: var(--lh-body);
+}
+
+.unlockedAt {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+}
+
+.deckTag {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-overlay);
+  color: var(--color-stat-rizz);
+  font-size: var(--fs-body-xs);
+}
+
+.points {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-text-dim);
+}
+
+.tile[data-unlocked='true'] .points {
+  color: var(--color-accent);
+}

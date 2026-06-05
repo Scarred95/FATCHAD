@@ -47,6 +47,167 @@
   font-size: var(--fs-body-xs);
 }
 
+/* ─── Deck picker trigger ──────────────────────────────────────── */
+
+.deckButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--fs-body-sm);
+  text-align: left;
+  transition: border-color var(--dur-quick), transform var(--dur-instant);
+}
+
+.deckButton span {
+  flex: 1;
+}
+
+.deckButton:hover {
+  border-color: var(--color-accent);
+}
+
+.deckButton:active {
+  transform: scale(0.99);
+}
+
+.deckCount {
+  color: var(--color-text-faint);
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+}
+
+/* ─── Deck picker modal ────────────────────────────────────────── */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 480px;
+  max-height: 80dvh;
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+}
+
+.dialogTitle {
+  font-size: var(--fs-display-md);
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+}
+
+.dialogHint {
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+  margin-bottom: var(--space-5);
+  line-height: var(--lh-body);
+}
+
+.dialogEmpty {
+  color: var(--color-text-faint);
+  font-size: var(--fs-body-sm);
+  padding: var(--space-5) 0;
+  text-align: center;
+}
+
+.deckGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.deckTile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-bg-base);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: border-color var(--dur-quick), box-shadow var(--dur-quick),
+    transform var(--dur-instant);
+}
+
+.deckTile:hover {
+  border-color: var(--color-text-dim);
+}
+
+.deckTile:active {
+  transform: scale(0.98);
+}
+
+.deckTile[data-selected='true'] {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.deckTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.deckDesc {
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-xs);
+  line-height: var(--lh-body);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
+.dialogDone {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  border-radius: var(--radius-md);
+  transition: transform var(--dur-instant);
+}
+
+.dialogDone:hover {
+  box-shadow: var(--shadow-glow);
+}
+
+.dialogDone:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 420px) {
+  .deckGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .actions {
   display: flex;
   flex-direction: column;

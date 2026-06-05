@@ -9,9 +9,10 @@
  *               (changing it would orphan every card pointing at it; the
  *               backend doesn't support rename in one shot).
  *
- * Fields: name (only when new), description, enabled, unlock_rule.
- * Unlock rule: a radio between "Standard" (kind=default) and
- * "Achievement" (kind=achievement, requires achievement_id).
+ * Fields: name (only when new), description, enabled, unlock_rule,
+ * removes_endings. Unlock rule: a radio between "Standard" (kind=default) and
+ * "Achievement" (kind=achievement, requires achievement_id). removes_endings
+ * is a checkbox list of endings this deck strips from a run when selected.
  *
  * Pattern matches CardEditor / EndingEditor: dirty tracking, blocked save
  * while invalid, danger zone with delete (edit mode only).
@@ -20,6 +21,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAdminDeckStore } from '../deckStore';
 import { useAdminCardStore, cardsInDeck } from '../store';
+import { useAdminEndingStore } from '../endingStore';
 import type { DeckUnlockRule } from '../types';
 import admin from '../admin.module.css';
 import styles from './DeckEditor.module.css';
@@ -40,6 +42,7 @@ export function DeckEditorPage({ mode }: Props) {
   const replaceDeck = useAdminDeckStore((s) => s.replaceDeck);
   const removeDeck  = useAdminDeckStore((s) => s.removeDeck);
   const cards       = useAdminCardStore((s) => s.cards);
+  const endings     = useAdminEndingStore((s) => s.endings);
 
   // Seed form state from URL/existing record.
   const existing = useMemo(
@@ -56,6 +59,7 @@ export function DeckEditorPage({ mode }: Props) {
   const [enabled, setEnabled]         = useState<boolean>(true);
   const [unlockKind, setUnlockKind]   = useState<DeckUnlockRule['kind']>('default');
   const [achievementId, setAchId]     = useState<string>('');
+  const [removesEndings, setRemoves]  = useState<string[]>([]);
   const [dirty, setDirty]             = useState<boolean>(false);
   const [busy, setBusy]               = useState<boolean>(false);
 
@@ -68,6 +72,7 @@ export function DeckEditorPage({ mode }: Props) {
     setEnabled(existing.enabled !== false);
     setUnlockKind(existing.unlock_rule?.kind ?? 'default');
     setAchId(existing.unlock_rule?.achievement_id ?? '');
+    setRemoves(existing.removes_endings ?? []);
     setDirty(false);
   }, [mode, existing]);
 
@@ -91,6 +96,24 @@ export function DeckEditorPage({ mode }: Props) {
 
   const onChange = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
 
+  const toggleRemove = (id: string) => {
+    setRemoves((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    setDirty(true);
+  };
+
+  // Endings sorted for a stable picker; deck-removal also drops orphan ids that
+  // no longer exist as endings so the saved list can be cleaned up by re-saving.
+  const sortedEndings = useMemo(
+    () => [...endings].sort((a, b) => a._id.localeCompare(b._id)),
+    [endings],
+  );
+  const orphanRemovals = useMemo(
+    () => removesEndings.filter((id) => !endings.some((e) => e._id === id)),
+    [removesEndings, endings],
+  );
+
   const buildUnlock = (): DeckUnlockRule => unlockKind === 'achievement'
     ? { kind: 'achievement', achievement_id: achievementId.trim() }
     : { kind: 'default' };
@@ -105,6 +128,7 @@ export function DeckEditorPage({ mode }: Props) {
           description: description.trim(),
           enabled,
           unlock_rule: buildUnlock(),
+          removes_endings: removesEndings,
         });
         if (created) {
           setDirty(false);
@@ -115,6 +139,7 @@ export function DeckEditorPage({ mode }: Props) {
           description: description.trim(),
           enabled,
           unlock_rule: buildUnlock(),
+          removes_endings: removesEndings,
         });
         if (saved) setDirty(false);
       }
@@ -256,6 +281,36 @@ export function DeckEditorPage({ mode }: Props) {
               spellCheck={false}
             />
             {unlockError && <div className={styles.fieldError}>{unlockError}</div>}
+          </div>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <label className={styles.fieldLabel}>Endings entfernen</label>
+        <div className={styles.fieldHint}>
+          Endings, die dieses Deck aus einem Run streicht — auch globale oder
+          Deck-Defaults. Greift sobald das Deck gewählt ist.
+        </div>
+        {sortedEndings.length === 0 ? (
+          <div className={styles.fieldHint}>Keine Endings geladen.</div>
+        ) : (
+          <div className={styles.radioRow}>
+            {sortedEndings.map((e) => (
+              <label key={e._id} className={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={removesEndings.includes(e._id)}
+                  onChange={() => toggleRemove(e._id)}
+                />
+                <span>{e.title || e._id} <code>{e._id}</code></span>
+              </label>
+            ))}
+          </div>
+        )}
+        {orphanRemovals.length > 0 && (
+          <div className={styles.fieldError}>
+            Unbekannte Ending-IDs (werden beim Speichern beibehalten):{' '}
+            {orphanRemovals.join(', ')}
           </div>
         )}
       </section>

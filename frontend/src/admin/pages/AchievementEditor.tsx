@@ -66,6 +66,8 @@ export function AchievementEditorPage({ mode }: Props) {
   const [jsonError, setJsonError]   = useState<string | null>(null);
   const [unlocksDeck, setUnlocks]   = useState<string>('');
   const [enabled, setEnabled]       = useState<boolean>(true);
+  const [hint, setHint]             = useState<string>('');
+  const [hidden, setHidden]         = useState<boolean>(false);
   const [imageUrl, setImageUrl]     = useState<string>('');
   const [dirty, setDirty]           = useState<boolean>(false);
   const [busy, setBusy]             = useState<boolean>(false);
@@ -84,6 +86,8 @@ export function AchievementEditorPage({ mode }: Props) {
     setJsonError(null);
     setUnlocks(existing.unlocks_deck ?? '');
     setEnabled(existing.enabled !== false);
+    setHint(existing.hint ?? '');
+    setHidden(existing.hidden === true);
     setImageUrl(existing.image_url ?? '');
     setDirty(false);
   }, [mode, existing]);
@@ -171,6 +175,8 @@ export function AchievementEditorPage({ mode }: Props) {
       points: pointsNum,
       unlocks_deck: unlocksDeck.trim() ? unlocksDeck.trim() : null,
       enabled,
+      hint: hint.trim(),
+      hidden,
       image_url: imageUrl.trim() ? imageUrl.trim() : null,
     };
   };
@@ -278,6 +284,21 @@ export function AchievementEditorPage({ mode }: Props) {
           onChange={(e) => onChange(setDescription)(e.target.value)}
           placeholder="Spielertext — wird im Profil angezeigt."
         />
+      </section>
+
+      <section className={styles.section}>
+        <label className={styles.fieldLabel}>Hinweis</label>
+        <textarea
+          className={styles.textarea}
+          rows={2}
+          value={hint}
+          onChange={(e) => onChange(setHint)(e.target.value)}
+          placeholder="Spieler-Hinweis, wie man es freischaltet — bei versteckten ohne Wirkung."
+        />
+        <div className={styles.fieldHint}>
+          Wird bei noch nicht freigeschalteten, nicht-versteckten Achievements
+          angezeigt. Das Kriterium selbst verlässt den Server nie.
+        </div>
       </section>
 
       <section className={styles.section}>
@@ -395,6 +416,14 @@ export function AchievementEditorPage({ mode }: Props) {
             onChange={(e) => onChange(setEnabled)(e.target.checked)}
           />
           <span>aktiv (deaktivierte Achievements werden nicht ausgewertet)</span>
+        </label>
+        <label className={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            checked={hidden}
+            onChange={(e) => onChange(setHidden)(e.target.checked)}
+          />
+          <span>versteckt (erst nach Freischalten sichtbar — Hinweis wird nicht gezeigt)</span>
         </label>
       </section>
 

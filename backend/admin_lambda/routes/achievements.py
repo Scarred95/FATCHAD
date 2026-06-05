@@ -74,6 +74,8 @@ class PatchAchievementRequest(BaseModel):
     points:       int | None = None
     unlocks_deck: str | None = None
     enabled:      bool | None = None
+    hint:         str | None = None
+    hidden:       bool | None = None
     image_url:    str | None = None
 
 

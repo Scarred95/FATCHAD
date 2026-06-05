@@ -109,6 +109,23 @@ body.chaosExtreme::before {
   50%      { transform: translateY(2px); opacity: 1; }
 }
 
+/* ── Display preferences (settingsStore → data-attrs on <html>) ──────────
+   reducedMotion kills all animation/transition; noGlitch only silences the
+   decorative glitch/scanline effects. */
+html[data-reduced-motion='true'] *,
+html[data-reduced-motion='true'] *::before,
+html[data-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+html[data-no-glitch='true'] body.chaosExtreme::before {
+  display: none !important;
+}
+/* Module-scoped glitch effects (e.g. the Title logo) opt in via :global()
+   rules in their own .module.css keyed on this same attribute. */
+
 .sr-only {
   position: absolute;
   width: 1px;

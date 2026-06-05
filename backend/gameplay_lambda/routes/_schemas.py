@@ -22,6 +22,17 @@ class ChoiceRequest(BaseModel):
     expected_turn: int = Field(ge=0)
 
 
+class CreateRunRequest(BaseModel):
+    """Options for starting a run. Both fields optional so a bare POST still
+    works — defaults give a tutorial run over all default-unlocked decks."""
+    # Whether to play the scripted tutorial intro (seeds the tutorial starter
+    # card and holds off refill until it finishes).
+    tutorial: bool = True
+    # Decks to draw from. None/empty → the 'catch': all default-unlocked decks.
+    # The future deck-selector populates this explicitly.
+    deck_ids: list[str] | None = None
+
+
 # =============================================================================
 # Guest sessions
 # =============================================================================
@@ -127,6 +138,44 @@ class UnlockedAchievement(BaseModel):
     points: int = 0
     unlocks_deck: str | None = None
     image_url: str | None = None
+
+
+# =============================================================================
+# Deck / achievement catalog responses (player-facing)
+# =============================================================================
+
+class DeckOption(BaseModel):
+    """A deck a player may pick on the new-run screen. Just a label — unlock
+    rules stay server-side (the endpoint only ever returns unlocked decks)."""
+    name: str
+    description: str = ""
+
+
+class AchievementView(BaseModel):
+    """Client-facing achievement label. Criteria stay server-side; `hint` is the
+    deliberate, player-safe nudge. Hidden achievements are filtered out by the
+    listing route until earned."""
+    id: str
+    name: str
+    description: str = ""
+    hint: str = ""
+    points: int = 0
+    unlocks_deck: str | None = None
+    image_url: str | None = None
+
+    @classmethod
+    def from_achievement(cls, ach) -> "AchievementView":
+        return cls(
+            id=ach.id, name=ach.name, description=ach.description,
+            hint=ach.hint, points=ach.points,
+            unlocks_deck=ach.unlocks_deck, image_url=ach.image_url,
+        )
+
+
+class UnlockedAchievementView(AchievementView):
+    """An achievement the caller has earned — adds when it was unlocked. Hidden
+    achievements DO appear here once earned (the reveal-on-unlock pattern)."""
+    unlocked_at: datetime
 
 
 class EndSummary(BaseModel):

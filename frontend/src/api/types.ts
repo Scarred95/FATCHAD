@@ -136,6 +136,32 @@ export interface HealthResponse {
   db: boolean;
 }
 
+/** A deck the player may pick on the new-run screen. Returned by GET /decks —
+ *  default-unlocked ∪ the caller's achievement-unlocked decks (Tutorial excluded). */
+export interface DeckOption {
+  name: string;
+  description: string;
+}
+
+/** Client-facing achievement label from GET /achievements. Criteria stay
+ *  server-side; `hint` is the player-safe nudge. Hidden ones are filtered out
+ *  by the listing route until earned. */
+export interface AchievementView {
+  id: string;
+  name: string;
+  description: string;
+  hint: string;
+  points: number;
+  unlocks_deck: string | null;
+  image_url: string | null;
+}
+
+/** An achievement the caller has earned (GET /achievements/unlocked) — adds
+ *  when it was unlocked. Hidden-but-earned achievements appear here. */
+export interface UnlockedAchievementView extends AchievementView {
+  unlocked_at: string;
+}
+
 /** Player-safe catalog bundle served by GET /catalog/current.
  *  Mirrors `publisher.py`'s `_dump_*_public` output. Cards reuse the
  *  stripped `CardResponse` shape (no weight/requires/effects). */

@@ -187,6 +187,12 @@ class GameState(BaseModel):
     # stamped once by evaluate_achievements at finalize so the end-screen
     # endpoint can rebuild the unlock list on every refresh.
     newly_unlocked: list[str] = Field(default_factory=list)
+    # Decks this run draws from (Tutorial excluded), snapshotted at creation so
+    # admin deck edits don't change an in-flight run.
+    deck_ids: list[str] = Field(default_factory=list)
+    # Materialized candidate-id pool refill samples from. Persists for the whole
+    # run and is never emptied — refill reads it, it isn't consumed.
+    redraw_deck: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -206,6 +212,8 @@ class GameState(BaseModel):
         starting_stats: Stats | None = None,
         starting_deck: list[str] | None = None,
         starting_endings: list[str] | None = None,
+        deck_ids: list[str] | None = None,
+        redraw_deck: list[str] | None = None,
     ) -> "GameState":
         """Factory for a fresh run with sensible defaults."""
         now = datetime.now(timezone.utc)
@@ -213,6 +221,8 @@ class GameState(BaseModel):
             _id=run_id,
             user_id=user_id,
             deck=starting_deck or [],
+            deck_ids=deck_ids or [],
+            redraw_deck=redraw_deck or [],
             active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
@@ -242,6 +252,9 @@ class Deck(BaseModel):
     description: str = ""
     enabled: bool = True
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
+    # Ending ids this deck strips from a run's active set when selected — the
+    # deck's explicit opt-out, applied even against global/deck default endings.
+    removes_endings: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -270,6 +283,11 @@ class Achievement(BaseModel):
     # unlocks" without a separate unlock-rules table.
     unlocks_deck: Optional[str] = None
     enabled: bool = True
+    # Player-facing hint on how to earn this — shown next to locked achievements.
+    hint: str = ""
+    # Hidden achievements aren't listed to the client until the player earns
+    # them (then they surface in the unlocked list). Admin always sees them.
+    hidden: bool = False
     image_url: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)

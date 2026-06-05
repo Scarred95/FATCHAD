@@ -1,0 +1,118 @@
+.page {
+  padding-bottom: var(--space-7);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 var(--space-7);
+  text-align: center;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  border: var(--border-accent);
+  margin-bottom: var(--space-2);
+}
+
+.name {
+  font-size: var(--fs-display-md);
+  color: var(--color-text);
+}
+
+.email {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+}
+
+.badge {
+  margin-top: var(--space-1);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  background: var(--color-bg-overlay);
+  color: var(--color-text-dim);
+}
+
+.badge[data-kind='admin'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.guestNote {
+  margin-top: var(--space-2);
+  max-width: 32ch;
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  line-height: var(--lh-body);
+}
+
+.sectionTitle {
+  font-size: var(--fs-body-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-dim);
+  margin-bottom: var(--space-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.statSkeleton {
+  height: 76px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+}
+
+.statCard[data-accent='true'] {
+  border-color: var(--color-accent);
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: var(--fs-display-md);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.statCard[data-accent='true'] .statValue {
+  color: var(--color-accent);
+}
+
+.statLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+@media (max-width: 360px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

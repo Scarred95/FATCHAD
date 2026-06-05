@@ -8,6 +8,9 @@ import NewRun from './pages/NewRun';
 import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import Achievements from './pages/Achievements';
 import RouteError from './pages/RouteError';
 import Welcome from './pages/Welcome';
 import Login from './pages/Login';
@@ -89,6 +92,9 @@ export const router = createBrowserRouter([
         element: <RequireAuth />,
         children: [
           { index: true, element: <Title /> },
+          { path: 'profile', element: <Profile /> },
+          { path: 'settings', element: <Settings /> },
+          { path: 'achievements', element: <Achievements /> },
           { path: 'runs', element: <RunList /> },
           { path: 'runs/new', element: <NewRun /> },
           { path: 'runs/:runId', element: <Game /> },

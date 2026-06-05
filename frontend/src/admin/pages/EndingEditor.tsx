@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAdminEndingStore, referencesToEnding } from '../endingStore';
 import { useAdminCardStore, flagInventoryOf } from '../store';
+import { useAdminDeckStore } from '../deckStore';
 import { EndingRequirementsEditor } from '../components/EndingRequirementsEditor';
 import Modal from '../../components/Modal/Modal';
 import type { Ending, EndingRequirements } from '../types';
@@ -33,6 +34,7 @@ function emptyEnding(): Ending {
     requires: {},
     default: false,
     enabled: true,
+    deck_name: null,
     image_url: null,
   };
 }
@@ -45,6 +47,7 @@ export function EndingEditorPage({ mode }: Props) {
   const upsertEnding = useAdminEndingStore((s) => s.upsertEnding);
   const removeEnding = useAdminEndingStore((s) => s.removeEnding);
   const cards = useAdminCardStore((s) => s.cards);
+  const decks = useAdminDeckStore((s) => s.decks);
 
   const initial = useMemo<Ending>(() => {
     if (mode === 'new') return emptyEnding();
@@ -65,6 +68,15 @@ export function EndingEditorPage({ mode }: Props) {
   }, [ending.title, mode, idTouched]);
 
   const flagSuggestions = useMemo(() => flagInventoryOf(cards), [cards]);
+  // Deck names to offer. Include the ending's current deck_name even when no
+  // deck record exists for it (shadow deck) so the selection isn't lost.
+  const deckOptions = useMemo(() => {
+    const names = decks.map((d) => d.name);
+    if (ending.deck_name && !names.includes(ending.deck_name)) {
+      names.push(ending.deck_name);
+    }
+    return names.sort((a, b) => a.localeCompare(b));
+  }, [decks, ending.deck_name]);
   const isLocked = mode === 'edit' && !!saved[ending._id];
 
   const refs = useMemo(() => referencesToEnding(ending._id, cards), [ending._id, cards]);
@@ -235,6 +247,24 @@ export function EndingEditorPage({ mode }: Props) {
                   placeholder="https://…"
                 />
               </div>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="ending-deck">Deck</label>
+              <select
+                id="ending-deck"
+                className={styles.input}
+                value={ending.deck_name ?? ''}
+                onChange={(e) => patch('deck_name', e.target.value || null)}
+              >
+                <option value="">— global (immer aktiv) —</option>
+                {deckOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <span className={styles.hint}>
+                global = immer im Run · Deck-gebunden = nur bei gewähltem Deck (und nur wenn Default)
+              </span>
             </div>
 
             <div className={styles.checkboxRow}>

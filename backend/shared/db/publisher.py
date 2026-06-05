@@ -161,6 +161,8 @@ def _dump_ach_public(ach: Achievement) -> dict:
         "description": ach.description,
         "points":      ach.points,
         "unlocks_deck": ach.unlocks_deck,
+        "hint":        ach.hint,
+        "hidden":      ach.hidden,
         "image_url":   ach.image_url,
     }
 

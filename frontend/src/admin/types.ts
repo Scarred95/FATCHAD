@@ -124,6 +124,10 @@ export interface Ending {
   requires?: EndingRequirements;
   default?: boolean;
   enabled?: boolean;
+  /** Parent deck name (mirrors Card.deck_name). null = global ending, always
+   *  in a run's active set; set = deck-scoped, auto-on only when its deck is
+   *  selected (and only if `default`). */
+  deck_name?: string | null;
   image_url?: string | null;
 }
 
@@ -143,6 +147,9 @@ export interface Deck {
   description?: string;
   enabled?: boolean;
   unlock_rule?: DeckUnlockRule;
+  /** Ending ids this deck strips from a run's active set when selected — the
+   *  deck's explicit opt-out, applied even against global/deck defaults. */
+  removes_endings?: string[];
   /** ISO 8601, server-stamped. */
   created_at?: string;
   /** ISO 8601, server-stamped. */
@@ -168,6 +175,10 @@ export interface Achievement {
   unlocks_deck?: string | null;
   enabled?: boolean;
   image_url?: string | null;
+  /** Player-safe nudge on how to unlock — shown for locked, non-hidden ones. */
+  hint?: string;
+  /** Hidden achievements stay invisible until earned (reveal-on-unlock). */
+  hidden?: boolean;
 }
 
 export const STAT_DOMAIN: Record<StatKey, { min: number; max: number }> = {

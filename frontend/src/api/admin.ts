@@ -32,7 +32,7 @@ export type PatchCardPayload = Partial<
 export type PatchEndingPayload = Partial<
   Pick<Ending,
     'title' | 'description' | 'priority' | 'requires'
-    | 'default' | 'enabled' | 'image_url'
+    | 'default' | 'enabled' | 'image_url' | 'deck_name'
   >
 >;
 
@@ -161,6 +161,7 @@ export interface CreateDeckPayload {
   description?: string;
   enabled?: boolean;
   unlock_rule?: DeckUnlockRule;
+  removes_endings?: string[];
 }
 
 /** Replace payload — `name` comes from the URL, timestamps are stamped. */
@@ -168,6 +169,7 @@ export interface ReplaceDeckPayload {
   description?: string;
   enabled?: boolean;
   unlock_rule?: DeckUnlockRule;
+  removes_endings?: string[];
 }
 
 /** PATCH payload — partial update; updated_at refreshes any time. */
@@ -213,7 +215,7 @@ export const deleteDeck = (deckName: string) =>
 export type PatchAchievementPayload = Partial<
   Pick<Achievement,
     'name' | 'description' | 'criteria' | 'points'
-    | 'unlocks_deck' | 'enabled' | 'image_url'
+    | 'unlocks_deck' | 'enabled' | 'image_url' | 'hint' | 'hidden'
   >
 >;
 

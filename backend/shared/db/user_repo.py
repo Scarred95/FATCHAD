@@ -401,6 +401,34 @@ class UserRepo:
 
         return True
 
+    # -------------------------------------------------------------------------
+    # Deck unlocks
+    # -------------------------------------------------------------------------
+
+    def list_unlocked_deck_names(self, user_id: str) -> list[str]:
+        """Deck names the user has unlocked via achievements (the UNLOCK#DECK#
+        rows). Default decks aren't here — those are unlocked for everyone and
+        resolved from the catalog. Projects deck_name only; small partition but
+        paginated for safety."""
+        names: list[str] = []
+        kwargs = {
+            "KeyConditionExpression":
+                Key("PK").eq(user_pk(user_id))
+                & Key("SK").begins_with(UserSk.UNLOCK_DECK_PREFIX),
+            "ProjectionExpression": "deck_name",
+        }
+        while True:
+            resp = self._t.query(**kwargs)
+            for item in resp.get("Items", []):
+                name = item.get("deck_name")
+                if name:
+                    names.append(name)
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+        return names
+
     def list_runs_for_user(self, user_id: str) -> list[GameState]:
         """All runs for a user, any status: one Query (SK begins_with RUN#)
         with a 1 MB pagination loop. If users ever accumulate thousands of runs,

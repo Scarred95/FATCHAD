@@ -9,6 +9,10 @@ import './styles/globals.css';
 import { router } from './routes';
 import { useAuthStore } from './stores/authStore';
 import { useCatalogStore } from './stores/catalogStore';
+import { initSettings } from './stores/settingsStore';
+
+// Apply persisted display preferences to <html> before first paint.
+initSettings();
 
 // Restore Cognito session from localStorage before the router mounts.
 // RequireAuth / RequireAdmin wait on `initializing` so no redirect

@@ -75,6 +75,14 @@ export default function Title() {
         >
           Fortsetzen
         </button>
+        {userId && (
+          <nav className={styles.navRow}>
+            <Link to="/profile" className={styles.navLink}>Profil</Link>
+            <Link to="/achievements" className={styles.navLink}>Erfolge</Link>
+            <Link to="/settings" className={styles.navLink}>Einstellungen</Link>
+          </nav>
+        )}
+
         <Link to="/about" className={styles.btnText}>
           Über FATCHAD
         </Link>

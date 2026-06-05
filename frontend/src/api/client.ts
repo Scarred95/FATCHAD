@@ -14,7 +14,9 @@
  */
 import { getAccessToken } from '../stores/authStore';
 import type {
+  AchievementView,
   CardResponse,
+  DeckOption,
   EndSummary,
   GameState,
   HealthResponse,
@@ -22,6 +24,7 @@ import type {
   PublicCatalog,
   RunSummary,
   TurnResponse,
+  UnlockedAchievementView,
 } from './types';
 import { ApiError, http } from './http';
 import { API_BASE } from './config';
@@ -92,11 +95,35 @@ export const claimGuestAccount = (guestAccessToken: string) =>
 export const getCurrentCatalog = () =>
   request<PublicCatalog>('/catalog/current');
 
+/* ─── Decks ────────────────────────────────────────────────────── */
+
+/** Decks this player may pick on the new-run screen — default-unlocked plus the
+ *  caller's achievement-unlocked decks (Tutorial excluded). Per-user. */
+export const listDecks = () =>
+  request<DeckOption[]>('/decks');
+
+/* ─── Achievements ─────────────────────────────────────────────── */
+
+/** Client achievement catalog — every non-hidden achievement with its hint. */
+export const listAchievements = () =>
+  request<AchievementView[]>('/achievements');
+
+/** Achievements this caller has earned, with unlocked_at (hidden-but-earned
+ *  included). */
+export const listUnlockedAchievements = () =>
+  request<UnlockedAchievementView[]>('/achievements/unlocked');
+
 /* ─── Run lifecycle ────────────────────────────────────────────── */
 
-export const createRun = () =>
+/** Start a run. `tutorial` plays the scripted intro; `deck_ids` picks the decks
+ *  to draw from (omit/empty → backend's default-unlocked set). */
+export const createRun = (opts: { tutorial?: boolean; deck_ids?: string[] } = {}) =>
   request<TurnResponse>('/runs', {
     method: 'POST',
+    body: JSON.stringify({
+      tutorial: opts.tutorial ?? true,
+      ...(opts.deck_ids && opts.deck_ids.length ? { deck_ids: opts.deck_ids } : {}),
+    }),
   });
 
 export const listRuns = () =>

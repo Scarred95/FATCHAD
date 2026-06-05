@@ -50,6 +50,7 @@ class CreateDeckRequest(BaseModel):
     description: str = ""
     enabled: bool = True
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
+    removes_endings: list[str] = Field(default_factory=list)
 
 
 @router.post("", response_model=Deck, status_code=201)
@@ -63,6 +64,7 @@ def create_deck(
         description=payload.description,
         enabled=payload.enabled,
         unlock_rule=payload.unlock_rule,
+        removes_endings=payload.removes_endings,
         created_at=now,
         updated_at=now,
     )
@@ -79,6 +81,7 @@ class ReplaceDeckRequest(BaseModel):
     description: str = ""
     enabled: bool = True
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
+    removes_endings: list[str] = Field(default_factory=list)
 
 
 @router.put("/{deck_name}", response_model=Deck)
@@ -95,6 +98,7 @@ def replace_deck(
         description=payload.description,
         enabled=payload.enabled,
         unlock_rule=payload.unlock_rule,
+        removes_endings=payload.removes_endings,
         created_at=existing.created_at,
         updated_at=_now(),
     )
@@ -108,6 +112,7 @@ class PatchDeckRequest(BaseModel):
     description: str | None = None
     enabled: bool | None = None
     unlock_rule: DeckUnlockRule | None = None
+    removes_endings: list[str] | None = None
 
 
 @router.patch("/{deck_name}", response_model=Deck)

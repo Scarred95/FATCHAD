@@ -69,6 +69,7 @@ export const useAdminDeckStore = create<State>()((set, get) => ({
       description: payload.description ?? '',
       enabled: payload.enabled ?? true,
       unlock_rule: payload.unlock_rule ?? { kind: 'default' },
+      removes_endings: payload.removes_endings ?? [],
       created_at: now,
       updated_at: now,
     };
@@ -99,6 +100,7 @@ export const useAdminDeckStore = create<State>()((set, get) => ({
       description: payload.description ?? '',
       enabled: payload.enabled ?? true,
       unlock_rule: payload.unlock_rule ?? { kind: 'default' },
+      removes_endings: payload.removes_endings ?? [],
       updated_at: new Date().toISOString(),
     };
     const next = before.slice();
