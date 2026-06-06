@@ -124,9 +124,10 @@ export interface Ending {
   requires?: EndingRequirements;
   default?: boolean;
   enabled?: boolean;
-  /** Parent deck name (mirrors Card.deck_name). null = global ending, always
-   *  in a run's active set; set = deck-scoped, auto-on only when its deck is
-   *  selected (and only if `default`). */
+  /** Parent deck name (mirrors Card.deck_name). `default` endings are always in
+   *  a run's active set (global or deck-bound). A non-default deck-bound ending
+   *  joins only when its deck is selected; a non-default global ending is never
+   *  auto-assigned (reachable only via triggers_ending). */
   deck_name?: string | null;
   image_url?: string | null;
 }
@@ -150,6 +151,10 @@ export interface Deck {
   /** Ending ids this deck strips from a run's active set when selected — the
    *  deck's explicit opt-out, applied even against global/deck defaults. */
   removes_endings?: string[];
+  /** Card id shuffled into the run's start deck when this story deck is picked,
+   *  so the deck opens on its own scripted card (which then chains via
+   *  adds_to_deck). null = no scripted opener. */
+  starting_card_id?: string | null;
   /** ISO 8601, server-stamped. */
   created_at?: string;
   /** ISO 8601, server-stamped. */
