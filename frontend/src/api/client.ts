@@ -21,7 +21,10 @@ import type {
   GameState,
   HealthResponse,
   HistoryDetailEntry,
+  LeaderboardPointsRow,
+  LeaderboardRunRow,
   PublicCatalog,
+  PublishRunResponse,
   RunSummary,
   TurnResponse,
   UnlockedAchievementView,
@@ -163,5 +166,39 @@ export const getEndSummary = (runId: string) =>
 
 export const getHistory = (runId: string) =>
   request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
+
+/* ─── Leaderboards ─────────────────────────────────────────────── */
+
+/** Public points board — top accounts by career achievement points. No auth
+ *  needed; the rows carry only a name + score. */
+export const getPointsLeaderboard = (limit?: number) =>
+  request<LeaderboardPointsRow[]>(
+    `/leaderboard/points${limit ? `?limit=${limit}` : ''}`,
+  );
+
+/** Public run highscore board — top runs by rounds survived. */
+export const getRunsLeaderboard = (limit?: number) =>
+  request<LeaderboardRunRow[]>(
+    `/leaderboard/runs${limit ? `?limit=${limit}` : ''}`,
+  );
+
+/** The caller's own published runs (≤5). Requires auth; used by the "Nur meine"
+ *  filter and the end-screen publish picker. */
+export const getMyLeaderboardRuns = () =>
+  request<LeaderboardRunRow[]>('/leaderboard/runs/mine');
+
+/** Publish a finished run to the highscore board. `replaceRunId` is only
+ *  consulted at the 5-run cap — it names which existing run to drop. A 409 with
+ *  a `{ reason: "leaderboard_full", current: [...] }` detail means the picker
+ *  must be shown. */
+export const publishRun = (runId: string, replaceRunId?: string) =>
+  request<PublishRunResponse>(`/leaderboard/runs/${runId}`, {
+    method: 'POST',
+    body: JSON.stringify(replaceRunId ? { replace_run_id: replaceRunId } : {}),
+  });
+
+/** Take one of the caller's runs back off the highscore board. */
+export const unpublishRun = (runId: string) =>
+  request<void>(`/leaderboard/runs/${runId}`, { method: 'DELETE' });
 
 export { ApiError };

@@ -170,6 +170,32 @@ export interface UnlockedAchievementView extends AchievementView {
   unlocked_at: string;
 }
 
+/** One row of the points board (GET /leaderboard/points). Public-shaped —
+ *  the backend omits user_id; a name + career points is all it carries. */
+export interface LeaderboardPointsRow {
+  display_name: string;
+  score: number;
+}
+
+/** One row of the run highscore board (GET /leaderboard/runs and /runs/mine),
+ *  or one of the caller's own published runs. `score` is rounds survived. */
+export interface LeaderboardRunRow {
+  display_name: string;
+  score: number;
+  run_id: string;
+  deck_ids: string[];
+  status: GameStatus;
+  ending: string | null;
+  published_at: string;
+}
+
+/** Returned by POST /leaderboard/runs/{run_id}. `evicted_run_id` is set only
+ *  when publishing at the cap replaced an existing run. */
+export interface PublishRunResponse {
+  entry: LeaderboardRunRow;
+  evicted_run_id: string | null;
+}
+
 /** Player-safe catalog bundle served by GET /catalog/current.
  *  Mirrors `publisher.py`'s `_dump_*_public` output. Cards reuse the
  *  stripped `CardResponse` shape (no weight/requires/effects). */

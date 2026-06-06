@@ -75,6 +75,13 @@ export default function Title() {
         >
           Fortsetzen
         </button>
+        {/* Boards are public — shown to everyone, not gated behind a run/login. */}
+        <button
+          className={styles.btnSecondary}
+          onClick={() => nav('/leaderboard')}
+        >
+          Bestenliste
+        </button>
         {userId && (
           <nav className={styles.navRow}>
             <Link to="/profile" className={styles.navLink}>Profil</Link>

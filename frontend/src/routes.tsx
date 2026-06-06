@@ -8,6 +8,7 @@ import NewRun from './pages/NewRun';
 import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
+import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Achievements from './pages/Achievements';
@@ -82,6 +83,8 @@ export const router = createBrowserRouter([
       // Public routes — no login required
       { path: 'welcome', element: <Welcome /> },
       { path: 'about', element: <About /> },
+      // The boards are public reads; a signed-out visitor can browse them too.
+      { path: 'leaderboard', element: <Leaderboard /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
