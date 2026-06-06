@@ -1,0 +1,208 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ─── Filter row ──────────────────────────────────────────────────── */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  margin-right: 4px;
+}
+
+.fChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  transition: background var(--dur-quick), color var(--dur-quick), border-color var(--dur-quick);
+}
+
+.fChip:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.fChipOn {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.fChipDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--cat-color, var(--color-text-faint));
+  flex-shrink: 0;
+}
+
+.deckChip {
+  color: var(--color-text);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ─── Tile grid ───────────────────────────────────────────────────── */
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* ─── List table ──────────────────────────────────────────────────── */
+
+.table {
+  width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--fs-body-sm);
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-text-faint);
+  font-weight: 500;
+}
+
+.table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-bg-overlay);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--color-bg-elevated);
+}
+
+.rowOff {
+  opacity: 0.55;
+}
+
+.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-dim);
+}
+
+.rowTitle {
+  color: var(--color-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.rowTitle:hover {
+  color: var(--color-accent);
+}
+
+.rowStar {
+  color: var(--color-accent);
+}
+
+.rowSub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+.okChip,
+.warnChip,
+.errChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  border: 1px solid;
+}
+
+.okChip {
+  color: var(--color-success);
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+.warnChip {
+  color: var(--color-warning);
+  background: rgba(240, 176, 32, 0.15);
+  border-color: rgba(240, 176, 32, 0.4);
+}
+
+.errChip {
+  color: #ffb0b0;
+  background: rgba(255, 68, 68, 0.15);
+  border-color: rgba(255, 68, 68, 0.4);
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  gap: var(--space-2);
+  color: var(--color-text-dim);
+}
+
+.emptyGlyph {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: var(--color-text-faint);
+}
+
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.emptySub {
+  font-size: var(--fs-body-sm);
+  margin: 0;
+}

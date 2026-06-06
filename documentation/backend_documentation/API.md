@@ -21,7 +21,12 @@ on the way out (not `id`). The frontend should read `state._id`, `card.id`
 
 - **Errors** — FastAPI returns `{"detail": "<message>"}` on every non-2xx.
 
-- **Authentication** — none yet. `user_id` is passed explicitly. TODO: derive from a token.
+- **Authentication** — Cognito JWT. Every gameplay call carries
+  `Authorization: Bearer <accessToken>`; the backend derives `user_id` from the
+  token's `sub` claim via `get_current_user_id` (`backend/shared/auth.py`). **No
+  endpoint takes `user_id` in body or query.** Admin routes are additionally
+  gated by `require_admin` (Cognito `admin` group; falls back to `ADMIN_TOKEN`
+  only in local dev where `COGNITO_USER_POOL_ID` is unset).
 
 ---
 
@@ -29,7 +34,8 @@ on the way out (not `id`). The frontend should read `state._id`, `card.id`
 
 ### `GET /healthz`
 
-Liveness probe. Pings Mongo.
+Liveness probe. Reads the DynamoDB catalog pointer to confirm DB + published
+catalog are reachable.
 
 **Response 200:**
 ```json
@@ -47,12 +53,14 @@ The active game loop lives under "Gameplay".
 ### `POST /runs` — start a new run
 
 Creates a fresh game state and returns it with the first card pre-fetched
-(saves the client a round-trip).
+(saves the client a round-trip). `user_id` comes from the JWT, not the body.
 
-**Request:**
+**Request — `CreateRunRequest` (all optional):**
 ```json
-{ "user_id": "user_abc123" }
+{ "tutorial": true, "deck_ids": ["Tutorial", "..."] }
 ```
+`tutorial` (default `true`) seeds the scripted tutorial opener; `deck_ids`
+selects which decks build the run's redraw pool (omitted → server default decks).
 
 **Response 201 — `TurnResponse`:**
 ```json
@@ -62,17 +70,16 @@ Creates a fresh game state and returns it with the first card pre-fetched
 }
 ```
 
-`next_card` is `null` if the events collection is empty (run is created already
-in `lost / softlock_no_cards` state). The starter deck is seeded from the
-`tutorial` category, capped at 15.
+`next_card` is `null` if no drawable card exists — the run is then born already
+`ended` with `ending = "softlock_no_cards"`. The redraw pool is built from the
+selected decks (`build_run_deck`); the tutorial opener is seeded separately.
 
 ---
 
-### `GET /runs?user_id={user_id}` — list a user's runs
+### `GET /runs` — list the caller's runs
 
-Lightweight summaries — no deck, history, or flags.
-
-**Query params:** `user_id` (required)
+Lightweight summaries — no deck, history, or flags. The user is taken from the
+JWT; there is no `user_id` parameter.
 
 **Response 200 — `list[RunSummary]`:**
 ```json
@@ -128,7 +135,7 @@ Marks the run as `abandoned`, preserving history (use `DELETE` to wipe).
 
 **Errors:**
 - `404` if the run doesn't exist.
-- `409` if the run is already ended (`won` / `lost` / `abandoned`).
+- `409` if the run is no longer `active` (already `ended` or `abandoned`).
 
 ---
 
@@ -144,6 +151,54 @@ Prefer `POST /abandon` to quit cleanly while keeping history.
 **Errors:**
 - `404` if the run doesn't exist.
 - `409` if the run is `active` and `force=true` was not provided.
+
+---
+
+## Guest sessions & account claim
+
+Let a player start playing instantly without signing up, then keep their
+progress if they later register. The auth-flow rationale lives in
+[cognito.md](cognito.md#guest-sessions); this section is the wire contract.
+
+### `POST /guest` — mint a throwaway account
+
+**Unauthenticated.** Creates a confirmed Cognito user in the `guest` group with
+a random email + password and writes its profile row, then returns the
+credentials so the browser can sign in via the normal SRP flow. From then on a
+guest is just a user whose JWT carries the `guest` group.
+
+**Request:** none.
+
+**Response 201 — `GuestSessionResponse`:**
+```json
+{ "email": "guest-3f2a…@guest.fatchad.local", "password": "<disposable secret>" }
+```
+
+**Errors:**
+- `503` if auth isn't configured (`COGNITO_USER_POOL_ID` unset — local dev).
+
+### `POST /account/claim` — absorb a guest's progress
+
+Called by a freshly-registered **real** account (authenticated via the
+`Authorization` header) to migrate a guest's runs + profile totals onto itself.
+The guest is proven by passing its own still-valid access token in the body, so
+only the holder of the guest session can claim it. Runs are merged (no data
+loss) and the guest's Cognito account is deleted.
+
+**Request — `ClaimGuestRequest`:**
+```json
+{ "guest_access_token": "<the guest's JWT>" }
+```
+
+**Response 200 — `ClaimGuestResponse`:**
+```json
+{ "migrated_runs": 3 }
+```
+
+**Errors:**
+- `400` if the guest token has no `sub`, or the guest is the caller's own account.
+- `403` if the supplied token isn't a guest (no `guest` group) — real accounts can't be claimed.
+- `401` if the guest token is invalid/expired.
 
 ---
 
@@ -184,7 +239,7 @@ Effects, requirements, weight, and the `important` flag are NOT exposed.
 - `404` if the run doesn't exist.
 - `409` if the run is not `active`.
 - `409` if no card in the deck is currently drawable — the run is auto-marked
-  `lost / softlock_no_cards` before the error returns.
+  `ended` with `ending = "softlock_no_cards"` before the error returns.
 
 ---
 
@@ -216,7 +271,9 @@ new state plus the next card.
 
 `next_card` is `null` when the run has just ended (`status != "active"`).
 
-**Server-side per-turn pipeline (in order):**
+**Server-side per-turn pipeline (in order)** — see `apply_choice` in
+`backend/shared/game/effects.py` and `check_endings` in
+`backend/shared/game/endings.py`:
 
 1. Consume the played card from the deck. Cards above it that were ineligible:
    - `important: true`  → re-shuffled to a random position deeper in the deck
@@ -225,15 +282,21 @@ new state plus the next card.
 2. Apply stat effects (each clamped to its valid range).
 3. Apply flag mutations (`sets_flags`, `clears_flags`).
 4. Apply this choice's `adds_to_deck` (immediate or scheduled).
-5. Append a `HistoryEntry`; increment `turn`.
-6. Promote any scheduled cards whose `play_on_turn` is now ≤ current turn.
-7. Strip leftover tutorial cards once `tutorial_done` is set.
-8. Refill the deck if it dropped below `DECK_REFILL_THRESHOLD` (5), capped at
-   `DECK_TARGET_SIZE` (12), drawing from `GENERIC_CATEGORIES`.
-9. Evaluate end conditions (priority order):
-   - Choice's `triggers_ending` → `won`
-   - Any main stat at 0 or 100 → `lost` with the matching `death_*` ending
-   - Chaos at ±100 → `won` with `chaos_agent` / `grey_eminence`
+5. Mutate the run's active ending set (`unlocks_endings` / `removes_endings`).
+6. Append a `HistoryEntry`; increment `turn`.
+7. Promote any scheduled cards whose `play_on_turn` is now ≤ current turn.
+8. Strip leftover tutorial cards once `tutorial_done` is set.
+9. Refill the live deck from the run's `redraw_deck` if it dropped below
+   `DECK_REFILL_THRESHOLD` (5), capped at `DECK_TARGET_SIZE` (12).
+10. Evaluate endings against the run's **active ending set** (data-driven, not
+    hardcoded). The status becomes `ended` and `ending` is set when either:
+    - the choice's `triggers_ending` is in the active set, or
+    - an enabled active ending's `requires` (flags + stat ranges) is satisfied —
+      lowest `priority` wins on a tie.
+
+    Threshold endings (e.g. a stat hitting 0/100, chaos at ±100) are expressed as
+    ordinary `Ending` records with the appropriate `requires`/`priority`, not as
+    engine constants.
 
 **Errors:**
 - `400` — `choice_index` out of range for the current card.
@@ -249,15 +312,21 @@ Only callable once the run has ended.
 **Response 200 — `EndSummary`:**
 ```json
 {
-  "ending":         "singularity",
-  "status":         "won",
-  "turns_survived": 47,
-  "final_stats":    { "moneten": 30, "aura": 75, "respekt": 40, "rizz": 60, "chaos": 60 },
-  "cards_played":   47
+  "ending":             "singularity",
+  "ending_title":       "Die Singularität",
+  "ending_description": "Du bist mit dem System verschmolzen…",
+  "status":             "ended",
+  "turns_survived":     47,
+  "final_stats":        { "moneten": 30, "aura": 75, "respekt": 40, "rizz": 60, "chaos": 60 },
+  "cards_played":       47,
+  "newly_unlocked":     [ /* UnlockedAchievement[] — achievements earned this run */ ]
 }
 ```
 
-`ending` may be `null` for an `abandoned` run with no specific ending tag.
+`status` is `"ended"` (an ending fired) or `"abandoned"`. `ending`,
+`ending_title`, and `ending_description` are `null` for an `abandoned` run with
+no specific ending tag (title/description are denormalised from the `Ending` doc
+so the recap renders from one fetch).
 
 **Errors:**
 - `404` — run not found.
@@ -265,10 +334,117 @@ Only callable once the run has ended.
 
 ---
 
+## Leaderboards
+
+Two public boards, both backed by a dedicated `fatchad_leaderboard` table
+(separate from per-user data):
+
+- **Points board** — one row per account, career achievement points. Maintained
+  automatically: whenever a finalize grants achievements, the gameplay Lambda
+  mirrors the account's new total onto the board (`sync_points_for_grants`).
+  Players never publish it by hand. Guests are kept off it.
+- **Run (highscore) board** — one row per published run, scored by rounds
+  survived (`state.turn`). Opt-in from the end-screen and capped at **5 runs per
+  account**; at the cap the client must pick an existing run to replace. Guests
+  cannot publish.
+
+The read endpoints (`GET /points`, `GET /runs`) are public-shaped (no `user_id`
+exposed); the write/own-view endpoints derive the account from the JWT.
+
+### `GET /leaderboard/points` — top accounts by points
+
+**Query params:** `limit` (default `100`, clamped to `1…200`).
+
+**Response 200 — `list[LeaderboardPointsRow]`** (highest first):
+```json
+[
+  { "display_name": "Spieler", "score": 420 }
+]
+```
+
+### `GET /leaderboard/runs` — top runs by rounds survived
+
+**Query params:** `limit` (default `100`, clamped to `1…200`).
+
+**Response 200 — `list[LeaderboardRunRow]`** (highest first):
+```json
+[
+  {
+    "display_name": "Spieler",
+    "score":        47,
+    "run_id":       "run_abc123",
+    "deck_ids":     ["Politik", "Strasse"],
+    "status":       "ended",
+    "ending":       "singularity",
+    "published_at": "2026-06-06T12:00:00Z"
+  }
+]
+```
+
+`score` is rounds survived; `status` is `"ended"` or `"abandoned"`; `ending`
+may be `null` (abandoned run).
+
+### `GET /leaderboard/runs/mine` — the caller's published runs
+
+The end-screen uses this to show "N/5 published" and to populate the replace
+picker. Account is taken from the JWT.
+
+**Response 200 — `list[LeaderboardRunRow]`** (oldest first), same shape as above.
+
+### `POST /leaderboard/runs/{run_id}` — publish a finished run
+
+Publishes one of the caller's **non-active** runs to the highscore board.
+
+**Request — `PublishRunRequest` (optional):**
+```json
+{ "replace_run_id": "run_old456" }
+```
+`replace_run_id` is only consulted at the 5-run cap — it names which existing
+published run to drop in favour of this one.
+
+**Response 201 — `PublishRunResponse`:**
+```json
+{
+  "entry":           { /* LeaderboardRunRow */ },
+  "evicted_run_id":  "run_old456"
+}
+```
+`evicted_run_id` is set only when a replace actually happened.
+
+**Errors:**
+- `403` — caller is a guest (guests can't publish).
+- `409` — run is still `active`.
+- `409` — run is already published (`"Dieser Run steht bereits im Leaderboard."`).
+- `400` — `replace_run_id` isn't one of the caller's published runs.
+- `409` — board is full and no `replace_run_id` was given. The `detail` is a
+  structured object so the client can open the replace picker:
+  ```json
+  {
+    "detail": {
+      "reason":  "leaderboard_full",
+      "max":     5,
+      "current": [ /* LeaderboardRunRow[] — the caller's current 5 */ ]
+    }
+  }
+  ```
+
+### `DELETE /leaderboard/runs/{run_id}` — unpublish a run
+
+Removes one of the caller's runs from the highscore board.
+
+**Response 204** — empty body on success.
+
+**Errors:**
+- `404` — the run isn't on the board (`"Dieser Run steht nicht im Leaderboard."`).
+
+---
+
 ## Admin — card content (`/admin/cards`)
 
-Card definitions stored in the `events` collection. Currently unauthenticated
-(TODO).
+Card definitions stored as items in the DynamoDB catalog table (`CatalogRepo`).
+Every `/admin/*` route is gated by `require_admin` at the parent admin router.
+For the `category` taxonomy, flag-naming and weight conventions, and questline
+patterns, see the [card-authoring guide](categories.md).
 
 ### `GET /admin/cards` — list cards
 
@@ -290,8 +466,10 @@ Card definitions stored in the `events` collection. Currently unauthenticated
   "title":       "Der korrupte Minister",
   "description": "…",
   "category":    "politik",
+  "deck_name":   "Politik",
   "weight":      10,
   "important":   false,
+  "enabled":     true,
   "requires":    { "flags_all": [], "flags_none": [], "flags_any": [], "stats": {} },
   "choices":     [ /* Choice[] — 2 to 3 entries */ ],
   "image_url":   null
@@ -307,7 +485,9 @@ Card definitions stored in the `events` collection. Currently unauthenticated
   "sets_flags":      ["minister_dead"],
   "clears_flags":    [],
   "adds_to_deck":    [{ "card_id": "evt_x", "position": "shuffle", "in_turns": null }],
-  "triggers_ending": null
+  "triggers_ending": null,
+  "unlocks_endings": [],
+  "removes_endings": []
 }
 ```
 
@@ -345,7 +525,7 @@ Only fields present in the request body are changed; everything else is left
 intact (uses `model_dump(exclude_unset=True)`).
 
 **Allowed fields:** `title`, `description`, `category`, `weight`, `image_url`,
-`requires`, `choices` (and `important`, once added to the patch schema).
+`requires`, `choices`, `enabled`, `important`, `deck_name`.
 
 **Response 200 — `Event`** (merged result).
 
@@ -361,39 +541,40 @@ intact (uses `model_dump(exclude_unset=True)`).
 
 ---
 
-## Admin — debug deck tools (`/admin/runs/...`)
+### `POST /admin/cards/decks/{deck_name}/toggle` — bulk enable/disable a deck
 
-Manual deck manipulation for testing card sequences. Dev-only.
+Sets the `enabled` flag on every card belonging to `deck_name` in one call. Pass
+`__orphans__` to target cards with no `deck_name`.
 
-### `POST /admin/runs/{run_id}/deck` — inject a card into a run's deck
+**Request — `DeckToggleRequest`:** `{ "enabled": false }`
 
-**Request — `InsertCardRequest`:**
-```json
-{
-  "card_id":  "evt_singularity_finale",
-  "position": "top"
-}
-```
-
-`position` ∈ `"top"` (default) | `"bottom"` | `"shuffle"` (random index).
-Note: `shuffle` here uses the global RNG (not the run's seeded one) since
-reproducibility doesn't matter for dev tools.
-
-**Response 204.**
-
-**Errors:** `404` if the run doesn't exist.
+**Response 200 — `DeckToggleResponse`:** `{ "matched": 12, "modified": 9 }`
 
 ---
 
-### `DELETE /admin/runs/{run_id}/deck/{index}` — remove a card by deck index
+## Admin — run inspection (`/admin/runs/...`)
 
-Deletes the card at `state.deck[index]`.
+Read-only inspection of player runs (the "why didn't this achievement fire?"
+debugging surface). There is **no** deck-mutation endpoint — runs are never
+edited through the admin API. A run row lives under `USER#<uid>` with no run_id
+GSI, so these routes take the owning `user_id` alongside the `run_id`.
 
-**Response 204.**
+### `GET /admin/runs/{user_id}` — list a user's runs
 
-**Errors:**
-- `404` — run not found.
-- `400` — index out of range.
+**Response 200 — `list[RunSummaryRow]`:** lightweight rows (`run_id`, `status`,
+`turn`, `ending`, timestamps), newest first.
+
+---
+
+### `GET /admin/runs/{user_id}/{run_id}/history` — full run state
+
+Returns the complete `GameState`, including the per-turn `history[].stats`
+snapshot the player-facing history endpoint omits, plus the `newly_unlocked`
+ids stamped at finalize.
+
+**Response 200 — `GameState`.**
+
+**Errors:** `404` if the run is absent from all status partitions for the user.
 
 ---
 
@@ -409,12 +590,18 @@ Deletes the card at `state.deck[index]`.
 | `chaos`    | -100 – +100 | systemic instability (poles are wins, not deaths) |
 
 ### `GameStatus`
-`"active"` | `"won"` | `"lost"` | `"abandoned"`
+`"active"` | `"ended"` | `"abandoned"`
+
+`ended` is a single terminal state — there is no separate won/lost flag. *Which*
+ending fired lives in the run's `ending` field (a string id), not in the status.
 
 ### Endings
-- **Wins:** `chaos_agent`, `grey_eminence`, plus any custom string from a
-  card's `triggers_ending`.
-- **Deaths:** `death_bankrupt`, `death_revolution`, `death_irrelevant`,
-  `death_jumped_shark`, `death_couped`, `death_conspiracy`, `death_frozen_out`,
-  `death_drowned_in_drama`.
-- **Softlock:** `softlock_no_cards` (no drawable card available).
+Endings are **data-driven** `Ending` records in the catalog, not engine
+constants. A run carries an `active_endings` set (globals + its selected decks'
+defaults, snapshotted at run start); `check_endings` fires one when a choice's
+`triggers_ending` is in that set, or when an active ending's `requires` (flags +
+stat ranges) is met — lowest `priority` wins ties. Threshold conditions (a stat
+hitting 0/100, chaos at ±100) are expressed as ordinary `Ending` records with
+the appropriate `requires`/`priority`. The `ending` id may be any string defined
+in the catalog; `softlock_no_cards` is the one engine sentinel (set when no
+drawable card exists), not an `Ending` doc.

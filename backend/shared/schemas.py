@@ -157,6 +157,13 @@ class HistoryEntry(BaseModel):
     event_id: str
     choice: int = Field(ge=0)
     turn: int = Field(ge=0)
+    # Post-effect stat snapshot for this turn — drives group-C achievement
+    # predicates (peak/trough/stay/swing) and the admin run-trail view.
+    # Optional (not a zero default) so entries written before this field
+    # existed read back as "no snapshot" rather than a phantom all-zero row,
+    # which would false-match trough/stay predicates on partially-migrated
+    # runs. Never surfaced to players — see HistoryDetailEntry.
+    stats: Optional[Stats] = None
 
 GameStatus = Literal["active", "ended", "abandoned"]
 
@@ -176,6 +183,16 @@ class GameState(BaseModel):
     rng_seed: int
     status: GameStatus = "active"
     ending: Optional[str] = None
+    # Achievement ids that fired when this run ended. Empty for active runs;
+    # stamped once by evaluate_achievements at finalize so the end-screen
+    # endpoint can rebuild the unlock list on every refresh.
+    newly_unlocked: list[str] = Field(default_factory=list)
+    # Decks this run draws from (Tutorial excluded), snapshotted at creation so
+    # admin deck edits don't change an in-flight run.
+    deck_ids: list[str] = Field(default_factory=list)
+    # Materialized candidate-id pool refill samples from. Persists for the whole
+    # run and is never emptied — refill reads it, it isn't consumed.
+    redraw_deck: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -195,6 +212,8 @@ class GameState(BaseModel):
         starting_stats: Stats | None = None,
         starting_deck: list[str] | None = None,
         starting_endings: list[str] | None = None,
+        deck_ids: list[str] | None = None,
+        redraw_deck: list[str] | None = None,
     ) -> "GameState":
         """Factory for a fresh run with sensible defaults."""
         now = datetime.now(timezone.utc)
@@ -202,6 +221,8 @@ class GameState(BaseModel):
             _id=run_id,
             user_id=user_id,
             deck=starting_deck or [],
+            deck_ids=deck_ids or [],
+            redraw_deck=redraw_deck or [],
             active_endings=starting_endings or [],
             stats=starting_stats or Stats(moneten=50, aura=50, respekt=50, rizz=50, chaos=0),
             rng_seed=rng_seed,
@@ -231,6 +252,12 @@ class Deck(BaseModel):
     description: str = ""
     enabled: bool = True
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
+    # Ending ids this deck strips from a run's active set when selected — the
+    # deck's explicit opt-out, applied even against global/deck default endings.
+    removes_endings: list[str] = Field(default_factory=list)
+    # The first card drawn when a run starts with this deck selected.
+    # Chains the deck's storyline via adds_to_deck, just like the tutorial.
+    starting_card_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -240,9 +267,10 @@ class Deck(BaseModel):
 # =============================================================================
 
 class AchievementCriteria(BaseModel):
-    """Free-form criteria payload for v1. No DSL yet — until a few achievements
-    exist we don't know which predicates we need. A Lambda reads this blob plus
-    run history and decides; typed predicates replace `description` later."""
+    """Free-form criteria payload for v1. No DSL yet — the evaluator in
+    shared.game.achievements reads `payload` (a typed-predicate blob carrying a
+    `type` key) plus run history and decides. `description` is the admin-facing
+    note. Matched by the admin editor and the predicate evaluator alike."""
     description: str
     payload: dict = Field(default_factory=dict)
 
@@ -259,6 +287,11 @@ class Achievement(BaseModel):
     # unlocks" without a separate unlock-rules table.
     unlocks_deck: Optional[str] = None
     enabled: bool = True
+    # Player-facing hint on how to earn this — shown next to locked achievements.
+    hint: str = ""
+    # Hidden achievements aren't listed to the client until the player earns
+    # them (then they surface in the unlocked list). Admin always sees them.
+    hidden: bool = False
     image_url: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -327,16 +360,46 @@ class UserAchievement(BaseModel):
 
 
 # =============================================================================
-# User data: leaderboard entries (PK = LB#<scope>, SK = SCORE#<padded>#<uid>)
+# User data: admin directory entry (PK = USERS#all, SK = USER#<uid>)
 # =============================================================================
 
-class LbEntry(BaseModel):
-    """A leaderboard row, one model for both scopes — LB#points reads `score`
-    as points, LB#longest as turn count (with `run_id` for deep-linking). Build
-    the SK via `keys.leaderboard_sk`; its padding makes DDB's lexicographic
-    sort agree with numeric sort — don't hand-roll it."""
+class DirectoryEntry(BaseModel):
+    """A row in the admin user directory. One per real (non-guest) account,
+    written at profile creation so the admin Users view can enumerate every
+    player with a single Query. Holds just enough to list + search; live
+    points/stats come from the profile on the detail page."""
+    user_id: str
+    display_name: str
+    created_at: datetime
+
+
+# =============================================================================
+# Leaderboard rows (fatchad_leaderboard table — see shared/db/keys.py)
+# =============================================================================
+
+class LbPointsEntry(BaseModel):
+    """A points-board row (PK=LB#points) — one per account. `score` is the
+    account's career achievement points; `display_name` is denormalised in so a
+    board render needs no profile lookup. Build the SK via
+    keys.leaderboard_points_sk (its padding makes DDB sort == numeric)."""
     user_id: str
     display_name: str
     score: int
-    run_id: Optional[str] = None
     updated_at: datetime
+
+
+class LbRunEntry(BaseModel):
+    """A run-board row (PK=LB#longest) — one per published run, up to five per
+    account. `score` is rounds survived (GameState.turn). Everything the board
+    and the replace-picker show is denormalised in, so reads are a single
+    Query: deck_ids, status, ending, plus the owning account + when it was
+    published. Written to BOTH the board and the LBRUN#<uid> index (same body).
+    Build the SKs via keys.leaderboard_run_sk / leaderboard_member_sk."""
+    user_id: str
+    display_name: str
+    score: int
+    run_id: str
+    deck_ids: list[str] = Field(default_factory=list)
+    status: GameStatus
+    ending: Optional[str] = None
+    published_at: datetime

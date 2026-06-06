@@ -73,19 +73,13 @@ item — do this before any public/competitive launch.
 
 ---
 
-## Authn/authz on the gameplay surface
+## ~~Authn/authz on the gameplay surface~~ — DONE
 
-**What:** Derive `user_id` from a verified bearer token instead of taking it as
-a client-supplied query param / body field, and authorize run ownership.
-
-**Why:** Right now every gameplay route trusts a client-provided `user_id`
-(`runs.py`, `gameplay.py`), so anyone can read or mutate anyone else's runs by
-guessing `user_id` + `run_id`. Combined with the seed leak above, that's a full
-account-data exposure. Marked TODO throughout the code.
-
-**Scope:** token verification middleware/dependency; replace the explicit
-`user_id` params in one pass; the `get_owned_run` dependency (see code clean-up
-D1) is the natural single seam to enforce ownership once auth lands.
+Implemented. `user_id` is derived from the verified Cognito JWT `sub` claim via
+`get_current_user_id` (`backend/shared/auth.py`); the `get_owned_run` dependency
+(`backend/gameplay_lambda/routes/runs.py`) enforces run ownership; no gameplay
+route takes a client-supplied `user_id`. Kept here only as a record that the
+once-parked item shipped.
 
 ---
 

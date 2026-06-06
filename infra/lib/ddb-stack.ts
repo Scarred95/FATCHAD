@@ -3,14 +3,16 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 
 /**
- * Provisions the two DynamoDB tables that hold all FATCHAD data.
+ * Provisions the three DynamoDB tables that hold all FATCHAD data.
  *
- * Two tables, splitting them lets us:
+ * Three tables, splitting them lets us:
  *  - destroy/rebuild the catalog table during dev without touching users
  *  - scope IAM per-Lambda (publish writes catalog, gameplay writes users)
  *  - give each table its own stream consumer (publish vs leaderboard agg.)
+ *  - keep the public leaderboards on their own partition space, cleanly
+ *    separated from per-user data (different access pattern + read profile)
  *
- * Both tables use a single-table design within their own scope: one PK,
+ * Each table uses a single-table design within its own scope: one PK,
  * one SK, all entity types encoded into the SK prefix.
  *
  * ============================================================
@@ -63,7 +65,7 @@ import { Construct } from 'constructs';
  *    Whole catalog     →  Scan (table is small — a few hundred items max)
  *
  * ============================================================
- *  fatchad_user_data — per-user state + leaderboards
+ *  fatchad_user_data — per-user state
  * ============================================================
  *
  *  PK              SK                         Item
@@ -80,23 +82,51 @@ import { Construct } from 'constructs';
  *  USER#<uid>      RUN#ABANDONED#<run_id>     GameState snapshot
  *                                             { abandoned_at }
  *
- *  LB#points       SCORE#<padded10>#<uid>     LbEntry { score, display_name,
- *                                                       updated_at }
- *  LB#longest      SCORE#<padded10>#<uid>     LbEntry { turns, display_name,
- *                                                       run_id }
- *
  *  Common queries:
  *    Get profile        →  GetItem pk=USER#<uid>, sk=PROFILE
  *    Get active run     →  Query pk=USER#<uid>, sk begins_with "RUN#ACTIVE#"
  *    List archived runs →  Query pk=USER#<uid>, sk begins_with "RUN#ENDED#"
- *    Top 100 by points  →  Query pk=LB#points, ScanIndexForward=false,
- *                                Limit=100
  *
  *  Why status-in-SK for runs?
  *    Encoding the run status into the SK ("RUN#ACTIVE#" vs "RUN#ENDED#")
  *    lets us fetch "the active run" as a prefix query — no filter, no scan.
  *    Ending a run is delete-old-key + put-new-key, two writes — cheaper
  *    than a status update plus a GSI lookup.
+ *
+ * ============================================================
+ *  fatchad_leaderboard — public boards (points + run highscores)
+ * ============================================================
+ *
+ *  PK              SK                         Item
+ *  -------------   ------------------------   ----------------------------
+ *  LB#points       SCORE#<padded10>#<uid>     LbPointsEntry { user_id,
+ *                                                display_name, score,
+ *                                                updated_at }
+ *  LB#longest      SCORE#<padded10>#<run_id>  LbRunEntry { user_id,
+ *                                                display_name, score, run_id,
+ *                                                deck_ids, status, ending,
+ *                                                published_at }
+ *  LBRUN#<uid>     RUN#<run_id>               LbRunEntry (same body; per-user
+ *                                                index so we can enforce the
+ *                                                5-run cap + list "my runs"
+ *                                                without scanning the board)
+ *
+ *  Common queries:
+ *    Top 100 by points  →  Query pk=LB#points,  ScanIndexForward=false, Limit=100
+ *    Top 100 by rounds  →  Query pk=LB#longest, ScanIndexForward=false, Limit=100
+ *    A user's published  →  Query pk=LBRUN#<uid>, sk begins_with "RUN#"
+ *
+ *  Why a separate table?
+ *    The boards are public, read-heavy, and have a totally different access
+ *    pattern from per-user data. Splitting them keeps IAM + capacity reasoning
+ *    clean and lets the per-user table stay private.
+ *
+ *  Why two rows per published run (board + LBRUN index)?
+ *    The board row is score-sorted for top-N; the index row is keyed on
+ *    run_id alone so we can enforce "max 5 runs per user" and offer a
+ *    replace-picker without scanning the whole board. Publishing writes both;
+ *    unpublishing deletes both. Score lives in the board SK, so changing a
+ *    score is delete-old-SK + put-new-SK.
  *
  *  Why padded scores for leaderboards?
  *    DynamoDB sorts SKs lexicographically. Padding "42" → "0000000042"
@@ -116,11 +146,13 @@ import { Construct } from 'constructs';
  *  Streams + consumers (Lambdas subscribed to the change-feed)
  * ============================================================
  *
- *  Both tables enable NEW_AND_OLD_IMAGES streams. Streams cost nothing
- *  until something consumes them — enabling now is free insurance.
+ *  The catalog + user tables enable NEW_AND_OLD_IMAGES streams. Streams cost
+ *  nothing until something consumes them — enabling now is free insurance.
  *  Consumer Lambdas land in a later step:
  *    - fatchad_catalog  stream → optional: cache-invalidation / audit
- *    - fatchad_user_data stream → leaderboard aggregator on RUN#ENDED writes
+ *    - fatchad_user_data stream → optional aggregation / audit
+ *  The leaderboard table is maintained by direct writes from the gameplay
+ *  Lambda (points auto-sync + opt-in run publish), so it needs no stream.
  *
  *  Note: this is independent of the catalog → S3 publish flow. Publishing
  *  is an explicit admin action: a Lambda reads the whole catalog table,
@@ -130,6 +162,7 @@ import { Construct } from 'constructs';
 export class FatchadDataStack extends cdk.Stack {
   public readonly catalogTable: dynamodb.Table;
   public readonly userDataTable: dynamodb.Table;
+  public readonly leaderboardTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -161,6 +194,20 @@ export class FatchadDataStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // --- Leaderboard table (public boards) -------------------------------
+    // Its own table so the public, read-heavy boards stay cleanly separated
+    // from private per-user data. No stream: the gameplay Lambda writes it
+    // directly (points auto-sync on achievement grants + opt-in run publish),
+    // there is no aggregator to feed. DESTROY in dev like the others — the
+    // board is fully rebuildable from run/profile data.
+    this.leaderboardTable = new dynamodb.Table(this, 'FatchadLeaderboardTable', {
+      tableName: 'fatchad_leaderboard',
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // --- Tags so the bill is legible later -------------------------------
     cdk.Tags.of(this).add('Project', 'FATCHAD');
     cdk.Tags.of(this).add('Component', 'data');
@@ -189,7 +236,16 @@ export class FatchadDataStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this, 'UserDataTableStreamArn', {
       value: this.userDataTable.tableStreamArn ?? '',
-      description: 'Stream ARN — feeds the leaderboard aggregator Lambda.',
+      description: 'Stream ARN — reserved for future aggregation/audit consumers.',
+    });
+
+    new cdk.CfnOutput(this, 'LeaderboardTableName', {
+      value: this.leaderboardTable.tableName,
+      description: 'DynamoDB table name for the public points + run boards.',
+    });
+    new cdk.CfnOutput(this, 'LeaderboardTableArn', {
+      value: this.leaderboardTable.tableArn,
+      description: 'ARN of the leaderboard table (for IAM policies).',
     });
   }
 }

@@ -171,6 +171,21 @@ export function ChoicesEditor({ value, onChange, allCards, flagSuggestions }: Pr
               {endingIds.map((e) => <option key={e} value={e} />)}
             </datalist>
           </div>
+
+          <TagInput
+            label="unlocks_endings (zum Run hinzufügen)"
+            value={ch.unlocks_endings ?? []}
+            onChange={(v) => patchChoice(active, { unlocks_endings: v })}
+            suggestions={endingIds}
+            placeholder="Ending-ID tippen, dann Enter…"
+          />
+          <TagInput
+            label="removes_endings (aus Run entfernen)"
+            value={ch.removes_endings ?? []}
+            onChange={(v) => patchChoice(active, { removes_endings: v })}
+            suggestions={endingIds}
+            placeholder="Ending-ID tippen, dann Enter…"
+          />
         </div>
       )}
     </div>

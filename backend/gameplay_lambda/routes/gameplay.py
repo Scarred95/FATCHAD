@@ -10,23 +10,29 @@ Run lifecycle (create / list / get / abandon / delete) lives in runs.py.
 from fastapi import APIRouter, Depends, HTTPException
 
 from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.leaderboard_repo import LeaderboardRepo
 from shared.db.user_repo import StaleRunWrite, UserRepo
+from shared.game.achievements import evaluate_achievements
 from shared.game.deck import draw_eligible_card, draw_with_refill_retry
 from shared.game.effects import apply_choice
 from shared.schemas import GameState
 
 from gameplay_lambda.routes._deps import (
     get_catalog,
+    get_is_guest,
+    get_leaderboard_repo,
     get_owned_run,
     get_user_repo,
     require_active,
     require_inactive,
 )
+from gameplay_lambda.routes.leaderboard import sync_points_for_grants
 from gameplay_lambda.routes._schemas import (
     CardResponse,
     ChoiceRequest,
     EndSummary,
     TurnResponse,
+    UnlockedAchievement,
 )
 
 router = APIRouter(prefix="/runs", tags=["gameplay"])
@@ -51,6 +57,8 @@ def submit_choice(
     state: GameState = Depends(get_owned_run),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
+    lb: LeaderboardRepo = Depends(get_leaderboard_repo),
+    is_guest: bool = Depends(get_is_guest),
 ):
     """Submit a choice: apply effects, advance the turn, return updated state +
     the next card (saves the client a round-trip)."""
@@ -79,9 +87,18 @@ def submit_choice(
     new_state = apply_choice(state, current_card, payload.choice_index, catalog)
 
     try:
-        # Ending hit — save and return without a next card.
+        # Ending hit — grade achievements, save, return without a next card.
+        # Eval BEFORE the state write so the resulting newly_unlocked ids land
+        # in the same row update. unlock_achievement is itself idempotent, so
+        # a state-write retry can't double-grant.
         if new_state.status != "active":
+            unlocked = evaluate_achievements(
+                new_state, new_state.user_id, catalog, users,
+            )
+            new_state.newly_unlocked = [a.id for a in unlocked]
             users.update_run(new_state, prior_status=prior_status)
+            # Mirror any points gained onto the points board (skips guests).
+            sync_points_for_grants(lb, users, new_state.user_id, unlocked, is_guest)
             return TurnResponse(state=new_state, next_card=None)
 
         # Piggyback the next card; same refill safety net.
@@ -110,6 +127,23 @@ def get_summary(
     require_inactive(state)
 
     ending_doc = catalog.get_ending(state.ending) if state.ending else None
+
+    # Rebuild the unlock list from stored ids — survives reloads, and a
+    # deleted achievement just drops out instead of orphan-rendering.
+    unlocked: list[UnlockedAchievement] = []
+    for aid in state.newly_unlocked:
+        ach = catalog.get_achievement(aid)
+        if ach is None:
+            continue
+        unlocked.append(UnlockedAchievement(
+            id=ach.id,
+            name=ach.name,
+            description=ach.description,
+            points=ach.points,
+            unlocks_deck=ach.unlocks_deck,
+            image_url=ach.image_url,
+        ))
+
     return EndSummary(
         ending=state.ending,
         ending_title=ending_doc.title if ending_doc else None,
@@ -118,4 +152,5 @@ def get_summary(
         turns_survived=state.turn,
         final_stats=state.stats,
         cards_played=len(state.history),
+        newly_unlocked=unlocked,
     )

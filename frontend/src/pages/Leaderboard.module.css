@@ -1,0 +1,176 @@
+/* Static shell: the page fills the viewport and never scrolls itself —
+   only `.scroll` does. Header + board switch + filter stay pinned. */
+.page {
+  height: 100dvh;
+  overflow: hidden;
+  gap: var(--space-4);
+}
+
+/* ─── Board switch (two large segmented buttons) ─────────────────── */
+
+.switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+}
+
+.switchBtn {
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--color-text-dim);
+  background: transparent;
+  transition: background var(--dur-quick), color var(--dur-quick);
+}
+
+.switchBtn:not([data-active='true']):hover {
+  color: var(--color-text);
+}
+
+.switchBtn[data-active='true'] {
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  box-shadow: 0 4px 18px rgba(255, 62, 127, 0.3);
+}
+
+/* ─── "Nur meine" filter ─────────────────────────────────────────── */
+
+.filterRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mineToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  transition: color var(--dur-quick);
+}
+
+.mineToggle:hover {
+  color: var(--color-text);
+}
+
+.mineToggle input {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* ─── Scrollable list region (the only thing that scrolls) ───────── */
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  /* Keep the scrollbar from shoving rows around as content loads. */
+  scrollbar-gutter: stable;
+}
+
+.skeleton {
+  height: 60px;
+  flex: 0 0 auto;
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: var(--fs-body-sm);
+  padding: var(--space-7) 0;
+}
+
+/* ─── Rows ───────────────────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+}
+
+.row[data-top='true'] {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.rank {
+  flex: 0 0 auto;
+  width: 2ch;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-text-faint);
+}
+
+.rank[data-top='true'] {
+  color: var(--color-accent);
+}
+
+.name {
+  font-size: var(--fs-body-lg);
+  color: var(--color-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runMeta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.runSub {
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On the points board the name carries the full width; on the run board the
+   runMeta block does, so push the score to the end either way. */
+.row > .name {
+  flex: 1;
+}
+
+.score {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--fs-display-sm);
+  color: var(--color-accent);
+}
+
+.scoreUnit {
+  font-family: var(--font-body, inherit);
+  font-size: var(--fs-body-xs);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}

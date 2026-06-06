@@ -73,6 +73,9 @@ def handler(event: dict, _context) -> dict:
             created_at=now,
             updated_at=now,
         ))
+        # Real-account only: add to the admin user directory. Guests are created
+        # via guest.py (which never calls this trigger), so they stay out of it.
+        users.put_directory_entry(sub, display_name)
         logger.info("Created profile", sub=sub, display_name=display_name)
     except Exception:  # noqa: BLE001 — never block signup on a profile write
         logger.exception("Failed to create profile", sub=sub)

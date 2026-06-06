@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-pydantic
-boto3
-mangum
-aws-lambda-powertools
-python-jose[cryptography]

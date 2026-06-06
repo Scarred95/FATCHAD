@@ -5,14 +5,28 @@ reads the published snapshot via CatalogSnapshot's pointer-versioned cache.
 """
 from fastapi import Depends, HTTPException
 
-from shared.auth import get_current_user_id
+from shared.auth import get_current_user, get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot, get_current_snapshot
+from shared.db.leaderboard_repo import LeaderboardRepo
 from shared.db.user_repo import UserRepo
 from shared.schemas import GameState
+
+_GUEST_GROUP = "guest"
 
 
 def get_user_repo() -> UserRepo:
     return UserRepo()
+
+
+def get_leaderboard_repo() -> LeaderboardRepo:
+    return LeaderboardRepo()
+
+
+def get_is_guest(claims: dict = Depends(get_current_user)) -> bool:
+    """True when the caller is a throwaway guest (carries the `guest` Cognito
+    group). Guests are kept off the leaderboard — they're swept daily and would
+    just litter it with `Gast` rows."""
+    return _GUEST_GROUP in (claims.get("cognito:groups") or [])
 
 
 def get_catalog() -> CatalogSnapshot:

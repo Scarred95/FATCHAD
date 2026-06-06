@@ -1,0 +1,54 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-bg-overlay);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-md);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+}
+
+.status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-dim);
+  /* Long version strings should clip rather than wrap a tight sidebar. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.publishBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  cursor: pointer;
+  transition: background var(--dur-quick), box-shadow var(--dur-quick);
+}
+
+.publishBtn:not(:disabled):hover {
+  box-shadow: var(--shadow-glow);
+}
+
+.publishBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

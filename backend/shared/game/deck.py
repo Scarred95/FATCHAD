@@ -1,6 +1,6 @@
 # shared/game/deck.py
-"""Deck operations: draw eligible cards, refill from the generic pool, and
-advance scheduled cards into the deck.
+"""Deck operations: build a run's redraw pool, draw eligible cards, refill the
+live deck from the run's redraw pool, and advance scheduled cards into the deck.
 
 Sync — input is a RAM-resident CatalogSnapshot and the Lambda is
 single-invocation per container, so there's no concurrency to win.
@@ -13,11 +13,37 @@ from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.game.constants import (
     DECK_REFILL_THRESHOLD,
     DECK_TARGET_SIZE,
-    GENERIC_CATEGORIES,
+    TUTORIAL_DECK_NAME,
     TUTORIAL_ID_PREFIX,
 )
-from shared.game.eligibility import is_eligible
+from shared.game.eligibility import is_eligible, is_redraw_eligible
 from shared.schemas import DeckAddition, Event, GameState, ScheduledCard
+
+
+# =============================================================================
+# Building a run's redraw pool
+# =============================================================================
+
+def build_run_deck(
+    deck_ids: list[str],
+    catalog: CatalogSnapshot,
+    rng: random.Random,
+) -> list[str]:
+    """Materialize a run's redraw pool: every enabled, weight>0 card in
+    `deck_ids`, shuffled with the run RNG (replay-stable).
+
+    Excludes the Tutorial deck (those cards enter only via the starter seed +
+    their adds_to_deck chain) and weight-0 cards (add-only). Important cards ARE
+    included — their special case is the draw-time reshuffle in consume_top_card,
+    not refill exclusion.
+    """
+    names = set(deck_ids) - {TUTORIAL_DECK_NAME}
+    ids = [
+        c.id for c in catalog.cards_by_decks(list(names))
+        if c.enabled and c.weight > 0
+    ]
+    rng.shuffle(ids)
+    return ids
 
 
 # =============================================================================
@@ -212,18 +238,24 @@ def refill_deck_if_needed(
     rng = rng or turn_rng(state)
     needed = DECK_TARGET_SIZE - len(new_state.deck)
 
-    candidates = _gather_candidate_pool(new_state, catalog)
-    if not candidates:
-        # Nothing to add. Caller should probably end the run gracefully.
-        return new_state
-
-    # Skip cards already in the deck or scheduled.
+    # Sample (never consume) from the run's redraw pool, filtered fresh each
+    # refill: skip deleted/disabled/weight-0, flag-ineligible (re-checked so a
+    # later-set flag can let a card in), and anything already in deck/scheduled.
+    # Stats are NOT checked here — is_redraw_eligible is flags-only; stats gate
+    # at draw time.
     in_deck = set(new_state.deck)
     in_scheduled = {s.card_id for s in new_state.scheduled}
     fresh = [
-        c for c in candidates
-        if c.id not in in_deck and c.id not in in_scheduled
+        c for cid in new_state.redraw_deck
+        if (c := catalog.get_card(cid)) is not None
+        and c.weight > 0
+        and is_redraw_eligible(c, new_state)
+        and cid not in in_deck
+        and cid not in in_scheduled
     ]
+    if not fresh:
+        # Nothing to add. Caller should probably end the run gracefully.
+        return new_state
 
     # Weighted sample without replacement (Efraimidis-Spirakis): key each card
     # by rand^(1/weight), take the top-k. One pass, stable under the seeded RNG.
@@ -248,20 +280,6 @@ def _tutorial_still_queued(state: GameState) -> bool:
     if "tutorial_done" in state.flags:
         return False
     return any(cid.startswith(TUTORIAL_ID_PREFIX) for cid in state.deck)
-
-
-def _gather_candidate_pool(
-    state: GameState,
-    catalog: CatalogSnapshot,
-) -> list[Event]:
-    """Eligible refill candidates from the generic categories. Excludes
-    weight<=0 (questline/ending opt-outs) and important cards (those only
-    enter via adds_to_deck, never at random)."""
-    cards = catalog.cards_by_categories(GENERIC_CATEGORIES)
-    return [
-        c for c in cards
-        if c.weight > 0 and not c.important and is_eligible(c, state)
-    ]
 
 
 # =============================================================================

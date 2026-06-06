@@ -7,10 +7,13 @@ absurde Alltagssituationen; Karten bilden einen gerichteten Graphen, der den
 Lauf verzweigt (Folgekarten in den Stapel pushen, Flags setzen / erfordern,
 Endings auslösen).
 
-**Das Spiel existiert bereits als Rohform** und läuft lokal als Web-App
-(React-Frontend + FastAPI-Backend + MongoDB). Die Projektphase widmet sich
-nicht dem Spiel, sondern der **weiterentwicklung des Spiels** und der **Portierung in eine vollständig
-cloud-native Architektur auf AWS**.
+**Das Spiel existiert als spielbare Web-App** (React-Frontend + FastAPI-Backend).
+Die Projektphase widmet sich der **Weiterentwicklung des Spiels** und der
+**Portierung in eine cloud-native Architektur auf AWS**. Die Portierung ist
+bereits weit fortgeschritten: Die API ist auf mehrere Lambdas aufgeteilt, die
+Persistenz läuft auf DynamoDB, Auth über Cognito, die Infrastruktur ist als
+AWS-CDK definiert, und CI/CD deployt über GitHub Actions. Lokal lässt sich
+weiterhin alles per `uvicorn` + Vite starten (siehe unten).
 
 ## Team
 
@@ -49,14 +52,14 @@ pay-per-request.
                                 └──▶ CloudWatch Logs / Metrics
 ```
 
-| Layer        | Bisher (lokal)                | Ziel (AWS)                                |
-| ------------ | ----------------------------- | ----------------------------------------- |
-| Frontend     | `npm run dev` via Vite        | Build → **S3** + **CloudFront** (CDN/TLS) |
-| Backend      | FastAPI / uvicorn-Prozess     | **API Gateway** → **AWS Lambda**          |
-| Persistenz   | MongoDB                       | **DynamoDB** (Cards, Runs, Suggestions)   |
-| Auth / Token | Static-Bearer aus `.env`      | AWS-Secret + (ggf.) Cognito               |
-| Observability| Lokale Logs                   | CloudWatch Logs + Metrics + Alarms        |
-| Deployment   | manuell                       | **IaC** (Terraform oder AWS SAM/CDK)      |
+| Layer        | Bisher (lokal)                | Ziel (AWS) · Status                              |
+| ------------ | ----------------------------- | ----------------------------------------------- |
+| Frontend     | `npm run dev` via Vite        | Build → **S3** (✅), **CloudFront** (geplant)   |
+| Backend      | FastAPI / uvicorn-Prozess     | **API Gateway** → **AWS Lambda** (✅, gesplittet)|
+| Persistenz   | MongoDB                       | **DynamoDB** (✅ Single-Table)                   |
+| Auth / Token | Static-Bearer aus `.env`      | **Cognito** (JWT, Admin-Group) ✅               |
+| Observability| Lokale Logs                   | CloudWatch Logs + Metrics + Alarms              |
+| Deployment   | manuell                       | **IaC** mit AWS **CDK** (✅) + GitHub Actions   |
 
 ## Knackpunkte beim Port
 
@@ -77,22 +80,29 @@ pay-per-request.
 
 | Bereich       | Bestehend                               | Neu für die Cloud-Phase                  |
 | ------------- | --------------------------------------- | ---------------------------------------- |
-| Frontend      | React 18 + TypeScript + Vite, Zustand   | S3 + CloudFront Hosting                  |
-| Backend       | FastAPI, Pydantic                       | AWS Lambda (Python), API Gateway         |
-| Datenbank     | MongoDB                                 | DynamoDB                                 |
-| Infrastruktur | —                                       | Terraform **oder** AWS SAM/CDK           |
+| Frontend      | React 18 + TypeScript + Vite, Zustand   | S3-Hosting (CloudFront geplant)          |
+| Backend       | FastAPI, Pydantic                       | AWS Lambda (Python, Mangum), API Gateway |
+| Datenbank     | MongoDB                                 | DynamoDB (Single-Table)                  |
+| Auth          | Static-Bearer                           | Cognito (JWT, Admin-Group)               |
+| Infrastruktur | —                                       | AWS CDK (TypeScript)                     |
 | CI/CD         | manuell                                 | GitHub Actions → AWS                     |
 | Monitoring    | lokale Logs                             | CloudWatch                               |
 
 ## Aufbau des Repositorys
 
 ```
-backend/         FastAPI-App, Spiellogik, DB-Repositories, Routen
-  app/game/      Deck-Mechanik, Eligibility, Stat-Effekte
-  app/routes/    Öffentliche und Admin-Endpoints
-frontend/        React-App (Spiel + /admin-Bereich)
-  src/admin/     Karten-Editor, Graph-Ansicht
-infra/           (kommt) IaC-Definitionen für AWS
+backend/             FastAPI-Router pro Lambda + geteilte Spiellogik
+  gameplay_lambda/   Spieler-Endpoints (Runs, Karten, Choices, Endings)
+  admin_lambda/      Admin-CRUD (Cards, Decks, Endings, Achievements, Publish)
+  cognito_lambda/    Cognito-Trigger / Auth-Glue
+  cleanup_lambda/    Aufräum-/Wartungs-Jobs
+  shared/            Spielmechanik, DynamoDB-Repos, Schemas, Catalog-Snapshot
+  dev_app.py         Lokaler Combined-Entrypoint (beide Surfaces, ein Port)
+frontend/            React-App (Spiel + /admin-Bereich)
+  src/admin/         Karten-/Deck-/Ending-/Achievement-Editor
+infra/               AWS-CDK-Stacks (S3, DynamoDB, IAM/OIDC)
+documentation/       Architektur, API-Contract, Frontend-Doku
+.github/workflows/   CI/CD (Frontend-, Lambda-, Data- und Infra-Deploy)
 ```
 
 ## Plan für die nächsten drei Wochen
@@ -105,7 +115,7 @@ infra/           (kommt) IaC-Definitionen für AWS
   migrieren
 - Erste Lambda mit einem Read-Endpoint (z. B. `GET /cards`) live über
   API-Gateway erreichbar machen
-- Tooling-Entscheidung treffen: Terraform vs. AWS SAM/CDK
+- Tooling-Entscheidung getroffen: **AWS CDK** (TypeScript, siehe `infra/`)
 
 **Woche 2 — Migration der Spiel-Logik**
 - Restliche Game-Endpoints auf Lambdas portieren (Run starten, Karte
@@ -128,9 +138,10 @@ zieht ihn sich.
 ## Lokal starten (während der Migration weiterhin nutzbar)
 
 ```bash
-# Backend
+# Backend — kombinierte Dev-App: /runs/*, /admin/* und /healthz auf einem Port
 cd backend
-uvicorn app.main:app --reload
+pip install -r requirements.txt
+uvicorn dev_app:app --reload
 
 # Frontend (separates Terminal)
 cd frontend
@@ -138,4 +149,5 @@ npm install
 npm run dev
 ```
 
-Der Admin-Bereich liegt unter `/admin` (per Token geschützt).
+Der Admin-Bereich liegt unter `/admin` (über die Cognito-`admin`-Gruppe
+geschützt).

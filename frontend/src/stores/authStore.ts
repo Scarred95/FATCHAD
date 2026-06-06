@@ -60,6 +60,10 @@ function sessionToState(session: CognitoUserSession) {
     accessToken: session.getAccessToken().getJwtToken(),
     isAdmin: groups.includes('admin'),
     isGuest: groups.includes('guest'),
+    // `name` / `email` come from the Cognito user attributes baked into the
+    // id token (set at registration). Guests have neither.
+    displayName: (payload.name as string | undefined) ?? null,
+    email: (payload.email as string | undefined) ?? null,
   };
 }
 
@@ -69,6 +73,10 @@ interface AuthStore {
   isAdmin: boolean;
   /** True when the session belongs to a throwaway guest account. */
   isGuest: boolean;
+  /** Cognito `name` attribute — null for guests / pre-name accounts. */
+  displayName: string | null;
+  /** Cognito `email` attribute — null for guests. */
+  email: string | null;
   /** True while login / register is in flight. */
   loading: boolean;
   /** True while restoring session on boot — UI should wait before redirecting. */
@@ -86,6 +94,9 @@ interface AuthStore {
    *  token, captured before logging into the new account. */
   claimGuestData: (guestAccessToken: string) => Promise<number>;
   logout: () => void;
+  /** Change the signed-in user's password. Requires a valid current session
+   *  and the existing password (Cognito verifies it). */
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   /** Step 1 of registration — Cognito sends a verification code to the email.
    *  `displayName` is stored as the Cognito `name` attribute and copied into
    *  the DynamoDB profile by the PostConfirmation trigger. */
@@ -103,6 +114,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   accessToken: null,
   isAdmin: false,
   isGuest: false,
+  displayName: null,
+  email: null,
   loading: false,
   initializing: true,
 
@@ -165,7 +178,28 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logout() {
     if (authConfigured) getUserPool().getCurrentUser()?.signOut();
-    set({ userId: null, accessToken: null, isAdmin: false, isGuest: false });
+    set({
+      userId: null, accessToken: null, isAdmin: false, isGuest: false,
+      displayName: null, email: null,
+    });
+  },
+
+  async changePassword(oldPassword, newPassword) {
+    const user = getUserPool().getCurrentUser();
+    if (!user) throw new Error('Nicht angemeldet');
+    return new Promise<void>((resolve, reject) => {
+      // changePassword needs the session attached to the CognitoUser first.
+      user.getSession((err: Error | null, session: CognitoUserSession | null) => {
+        if (err || !session?.isValid()) {
+          reject(err ?? new Error('Sitzung abgelaufen'));
+          return;
+        }
+        user.changePassword(oldPassword, newPassword, (cpErr) => {
+          if (cpErr) { reject(cpErr); return; }
+          resolve();
+        });
+      });
+    });
   },
 
   async register(email, password, displayName) {

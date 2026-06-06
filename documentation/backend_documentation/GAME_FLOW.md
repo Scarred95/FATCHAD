@@ -1,8 +1,12 @@
 # FATCHAD — Backend Game Flow
 
 This document describes the backend-side flow of a run, from creation to
-ending. Companion to [API.md](API.md) (HTTP contract) and
-[DATA_SHAPES.md](DATA_SHAPES.md) (schemas).
+ending. Companion to [API.md](API.md) (HTTP contract).
+
+The engine lives in `backend/shared/game/` (`effects.py`, `deck.py`,
+`endings.py`, `eligibility.py`, `requirements.py`). Card/ending/deck content is
+read from a RAM-resident `CatalogSnapshot` (published S3 bundle), never from a
+database query per turn.
 
 ---
 
@@ -12,19 +16,19 @@ ending. Companion to [API.md](API.md) (HTTP contract) and
 stateDiagram-v2
     [*] --> creating
     creating --> active:    first card drawn
-    creating --> lost:      no tutorial cards in DB (softlock_no_cards)
+    creating --> ended:     no playable card (softlock_no_cards)
     active --> active:      submit_choice — turn applied, run continues
-    active --> won:         chaos = ±100 OR choice triggers_ending
-    active --> lost:        any main stat = 0 or 100 OR softlock
+    active --> ended:       an Ending fired (triggers_ending or requires match)
     active --> abandoned:   POST /abandon
-    won --> [*]
-    lost --> [*]
+    ended --> [*]
     abandoned --> [*]
 ```
 
-Once a run leaves `active`, it is read-only — gameplay endpoints reject it
-with 409. The only allowed operations on an ended run are `GET /runs/{id}`,
-`GET /runs/{id}/summary`, and `DELETE /runs/{id}`.
+`GameStatus` is `"active"` | `"ended"` | `"abandoned"` — there is no separate
+won/lost flag. *Which* ending fired lives in the run's `ending` field (a string
+id). Once a run leaves `active` it is read-only; gameplay endpoints reject it
+with 409. The only allowed operations on a non-active run are `GET /runs/{id}`,
+`GET /runs/{id}/history`, `GET /runs/{id}/summary`, and `DELETE /runs/{id}`.
 
 ---
 
@@ -35,35 +39,45 @@ sequenceDiagram
     autonumber
     participant C  as Client
     participant R  as runs.py
-    participant E  as EventRepo
-    participant S  as GameStateRepo
+    participant K  as CatalogSnapshot
     participant D  as deck.py
+    participant U  as UserRepo
 
-    C ->> R: POST /runs { user_id }
-    R ->> E: list_ids_by_category("tutorial")
-    E -->> R: [evt_…, …] (capped at 15)
-    R ->> R: build GameState (rng_seed, defaults)
-    R ->> D: draw_eligible_card(state)
-    D ->> E: get_many(state.deck[:5])
-    E -->> D: [Event…]
-    D -->> R: first eligible Event (or None)
+    C ->> R: POST /runs { tutorial?, deck_ids? }  (user_id from JWT)
+    R ->> R: resolve deck_ids (or default-unlocked decks)
+    R ->> D: build_run_deck(deck_ids) → redraw pool
+    R ->> R: seed start deck (tutorial starter + decks' starting_card_id)
+    R ->> K: active_ending_ids_for_run(deck_ids) → snapshot active endings
+    R ->> D: refill_deck_if_needed(force=True) → fill live deck
+    R ->> D: draw_eligible_card(state) → peek first card
     alt first card found
-        R ->> S: save(state)  — status="active"
-    else no card available
-        R ->> R: state.status="lost", ending="softlock_no_cards"
-        R ->> S: save(state)
+        R ->> U: insert_run(state)  — status="active"
+    else nothing playable
+        R ->> R: status="ended", ending="softlock_no_cards", grade achievements
+        R ->> U: insert_run(state)
     end
     R -->> C: 201 TurnResponse { state, next_card }
 ```
 
 **Steps**
 
-1. Client sends `user_id`.
-2. Backend reads tutorial card IDs (cap 15), builds the initial `GameState`
-   with default stats and a fresh `rng_seed`.
-3. **Peek** the first eligible card without consuming — saves the client a
-   second round-trip and lets us detect an empty content collection upfront.
-4. State is saved exactly once. If the peek failed, the run is born `lost`.
+1. `user_id` comes from the Cognito JWT (`sub`), never the body. The body is an
+   optional `CreateRunRequest { tutorial?: bool, deck_ids?: list[str] }`.
+2. Resolve which decks feed the run: explicit `deck_ids`, else every
+   default-unlocked deck. Fewer than `MIN_RUN_DECKS` → 409.
+3. `build_run_deck` materializes the run's **redraw pool** from those decks'
+   enabled, weight>0 cards (the Tutorial deck is excluded — it enters only via
+   the starter seed + its `adds_to_deck` chain). Too few cards → 409.
+4. Seed the **live start deck**: the scripted tutorial starter (when
+   `tutorial` is true) plus each selected deck's `starting_card_id`, all
+   shuffled together with the run's seeded RNG.
+5. Snapshot the run's **active ending set** (`active_ending_ids_for_run`) into
+   the savestate so later admin edits to deck defaults don't change in-flight
+   runs.
+6. Force-refill the live deck from the redraw pool, then **peek** the first
+   eligible card without consuming it. State is saved exactly once. If the peek
+   fails, the run is born `ended` with `ending="softlock_no_cards"` (a softlock
+   can still satisfy turn/stat achievement criteria, so they're graded first).
 
 ---
 
@@ -73,158 +87,171 @@ The core game loop. Every turn passes through these stages, in order.
 
 ```mermaid
 flowchart TD
-    A[POST /runs id /choice] --> B{Run exists?}
+    A[POST /runs id /choice] --> B{Run owned + exists?}
     B -- no --> X1[404 Run not found]
     B -- yes --> C{status == active?}
-    C -- no --> X2[409 Run is already X]
+    C -- no --> X2[409 Run is no longer active]
     C -- yes --> D{expected_turn matches?}
     D -- no --> X3[409 Stale request]
-    D -- yes --> E[draw_eligible_card]
+    D -- yes --> E[draw_with_refill_retry]
     E --> F{Card found?}
-    F -- no --> X4["mark lost / softlock_no_cards<br/>409"]
+    F -- no --> X4[409 No drawable card]
     F -- yes --> G{choice_index in range?}
     G -- no --> X5[400 Invalid choice_index]
     G -- yes --> H[apply_choice pipeline]
     H --> I{status != active?}
-    I -- yes --> J[save and return - next_card null]
-    I -- no --> K[draw_eligible_card next]
-    K --> L{Found?}
-    L -- no --> M["mark lost / softlock_no_cards"]
-    L -- yes --> N[CardResponse from_event]
-    M --> O[save and return]
-    N --> O
-    O --> Z[200 TurnResponse]
+    I -- yes --> J[grade achievements, save, return next_card null]
+    I -- no --> K[draw_with_refill_retry next]
+    K --> L[save and return]
+    L --> Z[200 TurnResponse]
 ```
+
+Note the draw uses `draw_with_refill_retry`: it peeks, and if nothing is
+eligible *anywhere* in the deck it recovers exactly once (force-refill →
+seeded whole-deck shuffle → peek again), in memory. A still-empty result is a
+real softlock.
 
 ### `apply_choice` pipeline
 
-This is the single mutation entry point inside `app/game/effects.py`. All steps
-operate on a deep-copied state so failures leave the original untouched.
+The single mutation entry point in `shared/game/effects.py`. Every sub-step
+operates on a deep-copied state, so a failure leaves the original untouched.
 
 ```mermaid
 flowchart LR
-    S0[Deep-copy state] --> S1[1 - consume_top_card]
-    S1 --> S2[2 - apply stat effects clamped]
-    S2 --> S3[3 - apply flag mutations]
-    S3 --> S4[4 - tick flag timers]
-    S4 --> S5[5 - apply deck additions]
-    S5 --> S6[6 - history append + turn++]
-    S6 --> S7[7 - promote due scheduled]
-    S7 --> S8[8 - refill if low]
-    S8 --> S9[9 - check_endings]
-    S9 --> S10[updated_at = now]
+    S1[1 consume_top_card] --> S2[2 apply stat effects]
+    S2 --> S3[3 apply flag mutations]
+    S3 --> S4[4 apply_deck_additions]
+    S4 --> S5[5 history append + turn++]
+    S5 --> S6[6 promote_due_scheduled]
+    S6 --> S7[7 cleanup_zombie_tutorial_cards]
+    S7 --> S8[8 refill_deck_if_needed]
+    S8 --> S9[9 check_endings]
 ```
 
 **Step-by-step**
 
-1. **`consume_top_card`** — fetch top 5 deck IDs in one Mongo query, walk
-   them, find the first eligible card.
-   - Cards above the drawn one:
-     - `important: true`  → re-shuffled to a random position deeper in the deck
-     - `important: false` → dropped
-     - stale (deleted)    → dropped
-   - If nothing eligible in the top 5: deck is left untouched (recoverable).
-2. **Apply stat effects** — add each `effects.<stat>` delta, clamp main stats
-   to `0..100` and chaos to `-100..100`.
-3. **Apply flag mutations** — `sets_flags` adds (idempotent — set semantics),
-   `clears_flags` removes the flag. Within a single choice, clears win over
-   sets if the same flag appears in both lists.
-4. **Apply deck additions** — for each entry in `choice.adds_to_deck`:
-   - `in_turns` set → goes to `state.scheduled` with `play_on_turn = turn + N`
-   - else `position`-based insert into `state.deck` (`top` / `bottom` /
-     seeded random for `shuffle`)
-5. **History + turn** — append `HistoryEntry`, increment `state.turn`.
-6. **Promote scheduled** — any `ScheduledCard` whose `play_on_turn ≤ turn`
-   gets inserted at deck position 0 (consequence lands now). Multiple cards
-   due the same turn insert in LIFO order — the most recently-scheduled one
-   plays first (intentional).
-7. **Tutorial cleanup** — once `tutorial_done` is set, any leftover `evt_tut_*`
-   cards in the deck or scheduled list are stripped (they'd be permanently
-   ineligible after the tutorial-flag clear in the finale).
-8. **Refill** — if `len(deck) < 5`, top up by drawing from
-   `GENERIC_CATEGORIES = ["politik", "social", "economy", "chaos"]` until
-   the deck reaches `DECK_TARGET_SIZE = 12`. Already-in-deck and already-
-   scheduled cards are excluded. Single `$in` query.
-9. **`check_endings`** — first match wins, in priority order:
-   1. `choice.triggers_ending` set → `won` with that ending ID
-   2. Any main stat `== 0` or `== 100` → `lost` with the matching `death_*`
-   3. `chaos == 100` → `won` with `chaos_agent`
-   4. `chaos == -100` → `won` with `grey_eminence`
+1. **`consume_top_card`** — scan the whole deck top→bottom for the first
+   eligible card and pop it. Cards *above* the drawn one are resolved now:
+   - `important` + `enabled` → reshuffled to a random slot (kept)
+   - everything else (non-important ineligible, disabled, stale) → dropped
 
-After step 9 the new state is returned. The route then saves it and decides
-whether to bundle a next card.
+   With nothing eligible the deck is left unchanged so it can recover.
+2. **Apply stat effects** — add each `effects.<stat>` delta. **No clamping** —
+   endings (not the engine) gate out-of-band values, so a quest can drop an
+   ending to lift the cap.
+3. **Apply flag mutations** — `sets_flags` adds, `clears_flags` removes; clears
+   win over sets within one choice. Flags are an idempotent set.
+4. **`apply_deck_additions`** — for each `choice.adds_to_deck`:
+   - `in_turns = N` → appended to `state.scheduled` with `play_on_turn = turn + N`
+   - else `position`-based insert into `state.deck` (`top` / `bottom` /
+     seeded-random `shuffle`)
+5. **History + turn** — append a `HistoryEntry` (with a snapshot of the
+   post-effect stats, read back by group-C achievements + the admin run view),
+   then increment `state.turn`.
+6. **`promote_due_scheduled`** — any `ScheduledCard` whose `play_on_turn ≤ turn`
+   is inserted at deck position 0.
+7. **`cleanup_zombie_tutorial_cards`** — once `tutorial_done` is set, strip any
+   leftover `evt_tut_*` cards from deck and scheduled (run *before* refill so it
+   doesn't waste candidate slots). No-op while the tutorial is still running.
+8. **`refill_deck_if_needed`** — if `len(deck) < DECK_REFILL_THRESHOLD` (5), top
+   up from the run's **`redraw_deck`** to `DECK_TARGET_SIZE` (12).
+9. **`check_endings`** — data-driven (see below). May set `status="ended"` +
+   `ending=<id>`, then applies this choice's `unlocks_endings` / `removes_endings`
+   to the run's active ending set.
+
+After step 9 the new state is returned. The route grades achievements + saves on
+an ending, or bundles a next card and saves otherwise.
 
 ---
 
-## Eligibility check — `is_eligible(card, state)`
+## Ending evaluation — `check_endings(state, choice, catalog)`
 
-Used by `draw_eligible_card`, `consume_top_card`, and the refill candidate
-filter. Pure function. A card is eligible when **all four** of the following
-hold:
+Endings are **data-driven** `Ending` records, not engine constants. Evaluated
+each turn after stats/flags/deck settle, against the run's snapshotted
+`active_endings` set (enabled-only):
 
-```mermaid
-flowchart LR
-    A[is_eligible] --> B[flags_all subset of state.flags]
-    A --> C[flags_none disjoint from state.flags]
-    A --> D[flags_any non-empty AND intersects, OR flags_any is empty]
-    A --> E[every requires.stats range satisfied]
-    B & C & D & E --> R[True]
-```
+1. If `choice.triggers_ending` is set **and** that id is in the active set →
+   fire it (a quest that removed the ending wins over a card that tries to
+   invoke it).
+2. Otherwise, the **lowest-priority** active ending whose `requires` (flags +
+   stat ranges) is satisfied fires. `min(priority)` breaks ties.
+3. Either way, apply the choice's `unlocks_endings` / `removes_endings` to
+   `state.active_endings` afterward (removes win over unlocks). These land
+   *after* evaluation, so a card can unlock an ending without insta-firing it
+   on the same play.
+
+Threshold conditions (a stat hitting 0/100, chaos at ±100) are expressed as
+ordinary `Ending` records with the appropriate `requires`/`priority` — there are
+no hardcoded `death_*` / `chaos_agent` / `grey_eminence` constants in the engine.
+`softlock_no_cards` is the one engine sentinel (set when no card is drawable),
+not an `Ending` doc.
+
+---
+
+## Eligibility — `is_eligible` vs `is_redraw_eligible`
+
+Two checks against the same `Requirements` shape (`shared/game/requirements.py`):
+
+- **`is_eligible`** (draw time) — card must be `enabled` **and** satisfy ALL
+  requirements: `flags_all` ⊆ flags, `flags_none` disjoint from flags,
+  `flags_any` intersects flags (when non-empty), and every `requires.stats`
+  range holds.
+- **`is_redraw_eligible`** (refill time) — `enabled` + **flags only**. Stat
+  ranges are deliberately ignored: a card refilled now may not surface for
+  several turns, by which point stats have moved, so stats are enforced only
+  when the card actually surfaces (via `is_eligible`).
 
 Empty constraint lists are vacuously true. An unknown stat name in
-`requires.stats` returns `False` — surfaces card-author bugs instead of
+`requires.stats` returns `False` — surfacing card-author bugs instead of
 silently passing.
 
 ---
 
 ## Refill — keeping the deck alive
 
-Triggered as step 8 of every turn.
+Step 8 of every turn (and forced at run start / during draw recovery).
 
 ```mermaid
 flowchart TD
-    A[refill_deck_if_needed] --> B{len deck < 5?}
-    B -- no --> X[return state unchanged]
+    A[refill_deck_if_needed] --> T{tutorial still queued?}
+    T -- yes --> X0[return unchanged]
+    T -- no --> B{force OR len deck < 5?}
+    B -- no --> X[return unchanged]
     B -- yes --> C[deep-copy state]
-    C --> D["candidates = events for category in GENERIC_CATEGORIES, eligible only"]
-    D --> E{candidates empty?}
-    E -- yes --> Y[return - softlock will be detected next draw]
-    E -- no --> F[exclude already in deck or scheduled]
-    F --> G[shuffle with per-turn seeded RNG]
-    G --> H["take min needed, len fresh"]
-    H --> I[append to deck]
+    C --> D["fresh = redraw_deck cards: weight>0, is_redraw_eligible,<br/>not already in deck/scheduled"]
+    D --> E{fresh empty?}
+    E -- yes --> Y[return - softlock detected next draw]
+    E -- no --> F["weighted sample without replacement<br/>(Efraimidis-Spirakis, seeded RNG)"]
+    F --> G["take min(needed, len fresh)"]
+    G --> H[append to deck]
 ```
 
-`needed = DECK_TARGET_SIZE - len(deck)`. The cap means refill never overshoots
-the target — even if the candidate pool is huge.
+`needed = DECK_TARGET_SIZE - len(deck)`. Candidates are sampled (never consumed)
+from the run's `redraw_deck`, weighted by each card's `weight` via an
+Efraimidis-Spirakis key (`rand ** (1/weight)`, take top-k). The tutorial gate
+(`_tutorial_still_queued`) blocks refill while scripted tutorial cards remain in
+the deck, so the tutorial plays out before the random pool kicks in.
 
 ---
 
 ## Run termination paths
 
-| End state                    | Cause                                                       |
-|------------------------------|-------------------------------------------------------------|
-| `won` + `chaos_agent`        | Step 9 of `apply_choice` saw `chaos == 100`                 |
-| `won` + `grey_eminence`      | Step 9 saw `chaos == -100`                                  |
-| `won` + *custom*             | Step 9 saw `choice.triggers_ending != null`                 |
-| `lost` + `death_*`           | Step 9 saw a main stat at boundary                          |
-| `lost` + `softlock_no_cards` | A draw step found nothing eligible *and* refill couldn't help |
-| `abandoned`                  | Client called `POST /runs/{id}/abandon`                     |
+| End state                     | Cause                                                        |
+|-------------------------------|-------------------------------------------------------------|
+| `ended` + *ending id*         | `check_endings` fired (triggers_ending or a `requires` match) |
+| `ended` + `softlock_no_cards` | A draw step found nothing eligible *and* refill couldn't help |
+| `abandoned`                   | Client called `POST /runs/{id}/abandon`                      |
 
-Once non-active, the run record stays in Mongo (history preserved) until
-explicitly deleted via `DELETE /runs/{id}`.
+Once non-active, the run row is preserved (history intact) until explicitly
+deleted via `DELETE /runs/{id}`.
 
 ---
 
 ## Determinism
 
-The RNG is seeded per-turn as `Random(state.rng_seed + state.turn)`. This means:
-
-- Re-running the same turn from the same state produces the same shuffle /
-  refill / `important`-reshuffle order.
-- A run is *not* fully reproducible from `rng_seed` alone — choices and
-  effects are also inputs — but a single turn's randomness is deterministic
-  given the inputs.
-- The admin `POST /admin/runs/{id}/deck` "shuffle" position is the one
-  exception: it uses the global RNG since reproducibility doesn't matter for
-  dev tools.
+A run stores one `rng_seed`; per turn the engine derives
+`turn_rng = Random(rng_seed + turn)` and threads that single stream through every
+sub-step (consume reshuffle, deck additions, refill sample, recovery shuffle) so
+they don't independently replay the same seed. This means a single turn's
+randomness is deterministic given its inputs, though a run is not fully
+reproducible from `rng_seed` alone — choices and effects are also inputs.

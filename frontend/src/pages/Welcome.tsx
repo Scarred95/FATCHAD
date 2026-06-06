@@ -67,6 +67,10 @@ export default function Welcome() {
         <button className={styles.btnSecondary} onClick={onGuest} disabled={loading}>
           {loading ? '…' : 'Als Gast spielen'}
         </button>
+        {/* Boards are public — reachable before signing in. */}
+        <Link to="/leaderboard" className={styles.btnText}>
+          Bestenliste
+        </Link>
         <Link to="/about" className={styles.btnText}>
           Über FATCHAD
         </Link>

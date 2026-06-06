@@ -1,0 +1,224 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 920px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1;
+}
+
+.sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: 4px 0 0;
+}
+
+.error {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #ffb0b0;
+}
+
+.muted {
+  color: var(--color-text-faint);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* ─── stats ────────────────────────────────────────────────────── */
+
+.statsCard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-md);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.statVal {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+/* ─── blocks ───────────────────────────────────────────────────── */
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blockHeading {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* ─── achievements ─────────────────────────────────────────────── */
+
+.achList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.achRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+}
+
+.achMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+}
+
+.achId {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}
+
+.achDeck {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.achPts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.achWhen {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+
+/* ─── runs ─────────────────────────────────────────────────────── */
+
+.runList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.runRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--dur-quick);
+}
+
+.runRow:hover {
+  border-color: var(--color-accent);
+}
+
+.runMeta {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-overlay);
+  color: var(--color-text-dim);
+}
+
+.st_active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+}
+
+.st_ended {
+  background: rgba(74, 222, 128, 0.15);
+  color: #86efac;
+}
+
+.st_abandoned {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}

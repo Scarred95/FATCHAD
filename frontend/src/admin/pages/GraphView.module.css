@@ -4,103 +4,174 @@
   gap: var(--space-3);
 }
 
-.toolbar {
+/* ─── Filter row (same pattern as Endings/Cards/Decks) ────────────── */
+
+.filterRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px;
-}
-
-.left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
 }
 
-.crumbLink {
-  font-size: var(--fs-body-sm);
-  color: var(--color-text-dim);
-  text-decoration: none;
-}
-
-.crumbLink:hover { color: var(--color-text); }
-
-.heading {
-  font-size: var(--fs-display-sm);
-  font-family: var(--font-display);
-  letter-spacing: var(--tracking-display);
-  color: var(--color-text);
-  margin: 0;
-}
-
-.stats {
-  font-size: var(--fs-body-xs);
+.filterLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
   color: var(--color-text-faint);
+  margin-right: 4px;
 }
 
-.right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: var(--fs-body-xs);
-  flex-wrap: wrap;
-}
-
-.toggle {
-  display: flex;
+.fChip {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  transition: background var(--dur-quick), color var(--dur-quick), border-color var(--dur-quick);
 }
+
+.fChip:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+.fChip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fChipOn {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ─── Canvas + sidebar grid ───────────────────────────────────────── */
 
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 @media (min-width: 1024px) {
   .grid {
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 300px;
   }
 }
 
 .canvas {
   height: 78vh;
   overflow: hidden;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-lg);
 }
+
+/* ─── Empty state ─────────────────────────────────────────────────── */
 
 .empty {
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-faint);
-  font-size: var(--fs-body-sm);
+  gap: var(--space-2);
+  color: var(--color-text-dim);
 }
+
+.emptyGlyph {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: var(--color-text-faint);
+}
+
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.emptySub {
+  font-size: var(--fs-body-sm);
+  margin: 0;
+}
+
+/* ─── Sidebar boxes ───────────────────────────────────────────────── */
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   max-height: 78vh;
   overflow: auto;
   padding-right: 4px;
 }
 
 .box {
-  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  gap: var(--space-2);
 }
+
+.boxHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-bg-overlay);
+}
+
+.boxHint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+  margin: 0;
+}
+
+.boxBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ─── Deck rows ───────────────────────────────────────────────────── */
 
 .deckRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--fs-body-xs);
+  font-size: var(--fs-body-sm);
+  padding: 4px 2px;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-quick);
+}
+
+.deckRow:hover {
+  background: var(--color-bg-overlay);
 }
 
 .deckRowHidden {
@@ -110,8 +181,8 @@
 
 .swatch {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -123,68 +194,57 @@
   color: var(--color-text);
   flex: 1 1 auto;
   min-width: 0;
+  font-size: var(--fs-body-sm);
 }
 
 .deckCount {
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--color-text-faint);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
-.deckBulkBtn {
+.deckMiniBtn {
+  font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-loose);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-text-faint);
   background: transparent;
   color: var(--color-text-dim);
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color var(--dur-quick), border-color var(--dur-quick), background var(--dur-quick);
 }
 
-.deckBulkBtn:hover:not(:disabled) {
+.deckMiniBtn:hover:not(:disabled) {
   color: var(--color-text);
-  border-color: var(--color-text-dim);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
-.deckBulkBtn:disabled {
+.deckMiniBtn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.deckHideBtn {
-  font-size: 11px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 3px;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-dim);
-  transition: color 120ms ease, border-color 120ms ease;
-}
-
-.deckHideBtn:hover {
-  color: var(--color-text);
-  border-color: var(--color-text-faint);
-}
+/* ─── Flag rows ───────────────────────────────────────────────────── */
 
 .flagsEmpty {
-  font-size: var(--fs-body-xs);
+  font-size: var(--fs-body-sm);
   color: var(--color-text-faint);
 }
 
 .flagRow {
-  font-size: var(--fs-body-xs);
+  font-size: var(--fs-body-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 6px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: transparent;
   border: 1px solid transparent;
@@ -192,6 +252,7 @@
   width: 100%;
   text-align: left;
   font: inherit;
+  transition: background var(--dur-quick), border-color var(--dur-quick);
 }
 
 .flagRow:hover {
@@ -201,39 +262,33 @@
 
 .flagRowActive {
   composes: flagRow;
-  background: var(--color-bg-overlay);
-  border-color: var(--color-text-faint);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
 }
 
 .flagName {
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .flagCounts {
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--color-text-faint);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
-.legend {
-  font-size: var(--fs-body-xs);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-}
+/* ─── Legend ──────────────────────────────────────────────────────── */
 
 .legendRow {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.legendHint {
-  color: var(--color-text-faint);
-  padding-top: 4px;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
 }
