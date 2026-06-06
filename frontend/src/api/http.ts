@@ -11,10 +11,15 @@
 export class ApiError extends Error {
   status: number;
   detail: string;
-  constructor(status: number, detail: string) {
+  /** The parsed response body, kept intact so callers can read a structured
+   *  `detail` (e.g. the 409 leaderboard-full payload) that `detail` flattens
+   *  to a string. Null on a network failure or an empty/non-JSON body. */
+  data: unknown;
+  constructor(status: number, detail: string, data: unknown = null) {
     super(detail);
     this.status = status;
     this.detail = detail;
+    this.data = data;
   }
 }
 
@@ -45,7 +50,7 @@ export async function http<T>(url: string, init?: RequestInit): Promise<T> {
     /* empty body */
   }
 
-  if (!res.ok) throw new ApiError(res.status, detailFrom(data, res.status));
+  if (!res.ok) throw new ApiError(res.status, detailFrom(data, res.status), data);
   return data as T;
 }
 

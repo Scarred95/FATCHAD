@@ -1,29 +1,46 @@
 /**
  * Run-over screen — ending banner, final-stat grid, share + new-run actions.
  */
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getEndSummary } from '../api/client';
-import { errorMessage } from '../api/http';
+import { getEndSummary, publishRun } from '../api/client';
+import { ApiError, errorMessage } from '../api/http';
 import { STAT_NAMES } from '../api/types';
-import type { EndSummary, Stats, UnlockedAchievement } from '../api/types';
+import type { EndSummary, LeaderboardRunRow, Stats, UnlockedAchievement } from '../api/types';
 import { STAT_LABEL } from '../components/statMeta';
 import StatIcon from '../components/StatIcon/StatIcon';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useAuthStore } from '../stores/authStore';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './EndScreen.module.css';
+
+/** The publish endpoint returns a structured 409 when the caller is at the
+ *  5-run cap: `{ detail: { reason: 'leaderboard_full', current: [...] } }`.
+ *  Pull the current runs out so the UI can prompt for a swap; null for any
+ *  other error (including the plain "already published" 409). */
+function fullBoardRuns(e: unknown): LeaderboardRunRow[] | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null;
+  const d = (e.data as { detail?: { reason?: string; current?: LeaderboardRunRow[] } } | null)
+    ?.detail;
+  return d?.reason === 'leaderboard_full' ? d.current ?? [] : null;
+}
 
 export default function EndScreen() {
   const { runId } = useParams<{ runId: string }>();
   const nav = useNavigate();
   const pushToast = useToastStore((s) => s.push);
+  const isGuest = useAuthStore((s) => s.isGuest);
   const exitRun = useRunStore((s) => s.exitRun);
   const createRun = useRunStore((s) => s.createRun);
   const [summary, setSummary] = useState<EndSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [publishState, setPublishState] = useState<'idle' | 'busy' | 'done'>('idle');
+  // Non-null while the replace picker is open — the caller's current 5 runs.
+  const [pickerRuns, setPickerRuns] = useState<LeaderboardRunRow[] | null>(null);
 
   useEffect(() => {
     if (!runId) return;
@@ -39,6 +56,35 @@ export default function EndScreen() {
       nav(`/runs/${id}`);
     } catch (e) {
       pushToast(errorMessage(e, 'Konnte nicht laden'), 'error');
+    }
+  }
+
+  // Publish this run to the highscore board. At the cap the backend 409s with
+  // the current five; we surface them in the picker and re-call with the chosen
+  // run to replace. A plain "already published" 409 just flips to the done state.
+  async function publish(replaceRunId?: string) {
+    if (!runId) return;
+    setPublishState('busy');
+    try {
+      await publishRun(runId, replaceRunId);
+      setPickerRuns(null);
+      setPublishState('done');
+      pushToast('Run ist jetzt im Leaderboard', 'info');
+    } catch (e) {
+      const current = fullBoardRuns(e);
+      if (current) {
+        setPickerRuns(current);
+        setPublishState('idle');
+        return;
+      }
+      if (e instanceof ApiError && e.status === 409) {
+        // Already published — nothing to do but reflect it.
+        setPublishState('done');
+        pushToast(errorMessage(e, 'Run steht bereits im Leaderboard'), 'info');
+        return;
+      }
+      setPublishState('idle');
+      pushToast(errorMessage(e, 'Veröffentlichen fehlgeschlagen'), 'error');
     }
   }
 
@@ -131,6 +177,19 @@ export default function EndScreen() {
         transition={{ duration: 0.5, delay: 1.4 }}
       >
         <button className={styles.primary} onClick={newRun}>Neue Runde</button>
+        {!isGuest && (
+          <button
+            className={styles.secondary}
+            onClick={() => publish()}
+            disabled={publishState !== 'idle'}
+          >
+            {publishState === 'done'
+              ? 'Im Leaderboard ✓'
+              : publishState === 'busy'
+                ? 'Wird veröffentlicht…'
+                : 'Aufs Leaderboard'}
+          </button>
+        )}
         <button className={styles.secondary} onClick={() => setHistoryOpen(true)}>Verlauf</button>
         <button className={styles.secondary} onClick={share}>Teilen</button>
         <Link to="/runs" className={styles.tertiary}>Zurück zur Übersicht</Link>
@@ -141,7 +200,82 @@ export default function EndScreen() {
         runId={runId ?? null}
         onClose={() => setHistoryOpen(false)}
       />
+
+      <ReplacePicker
+        runs={pickerRuns}
+        busy={publishState === 'busy'}
+        onPick={(rid) => publish(rid)}
+        onClose={() => setPickerRuns(null)}
+      />
     </main>
+  );
+}
+
+/** Shown when the highscore board is full: the caller picks one of their five
+ *  existing runs to drop in favour of the new one. */
+function ReplacePicker({
+  runs,
+  busy,
+  onPick,
+  onClose,
+}: {
+  runs: LeaderboardRunRow[] | null;
+  busy: boolean;
+  onPick: (runId: string) => void;
+  onClose: () => void;
+}) {
+  useEscapeKey(runs !== null, onClose);
+  return (
+    <AnimatePresence>
+      {runs !== null && (
+        <motion.div
+          className={styles.backdrop}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className={styles.pickerDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Run ersetzen"
+            initial={{ scale: 0.95, y: 16, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, y: 16, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className={styles.pickerHead}>
+              <h2 className={styles.pickerTitle}>Leaderboard voll</h2>
+              <p className={styles.pickerSub}>
+                Du hast bereits {runs.length} Runs im Leaderboard. Wähle einen, den
+                du ersetzen möchtest.
+              </p>
+            </header>
+            <ul className={styles.pickerList}>
+              {runs.map((r) => (
+                <li key={r.run_id}>
+                  <button
+                    type="button"
+                    className={styles.pickerRow}
+                    onClick={() => onPick(r.run_id)}
+                    disabled={busy}
+                  >
+                    <span className={styles.pickerScore}>{r.score} Runden</span>
+                    <span className={styles.pickerMeta}>{r.ending ?? r.status}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className={styles.pickerCancel} onClick={onClose}>
+              Abbrechen
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
