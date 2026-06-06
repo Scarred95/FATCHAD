@@ -14,8 +14,7 @@
 .summaryMain {
   font-family: var(--font-display);
   font-size: var(--fs-display-md);
-  letter-spacing: var(--tracking-display);
-  color: var(--color-accent);
+  color: var(--color-accent)
 }
 
 .summarySub {
