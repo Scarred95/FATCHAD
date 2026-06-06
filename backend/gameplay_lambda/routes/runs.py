@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.leaderboard_repo import LeaderboardRepo
 from shared.db.user_repo import RunConflict, UserRepo
 from shared.game.achievements import evaluate_achievements
 from shared.game.constants import (
@@ -25,10 +26,13 @@ from shared.schemas import Effects, GameState
 
 from gameplay_lambda.routes._deps import (
     get_catalog,
+    get_is_guest,
+    get_leaderboard_repo,
     get_owned_run,
     get_user_repo,
     require_active,
 )
+from gameplay_lambda.routes.leaderboard import sync_points_for_grants
 from gameplay_lambda.routes._schemas import (
     CardResponse,
     CreateRunRequest,
@@ -50,6 +54,8 @@ def create_run(
     user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
+    lb: LeaderboardRepo = Depends(get_leaderboard_repo),
+    is_guest: bool = Depends(get_is_guest),
 ):
     """Start a new run. Returns state + first card so the client needs one request."""
     opts = body or CreateRunRequest()
@@ -113,6 +119,8 @@ def create_run(
         # A softlock can still satisfy turn/stat-based criteria; grade it.
         unlocked = evaluate_achievements(state, user_id, catalog, users)
         state.newly_unlocked = [a.id for a in unlocked]
+        # Mirror any points gained onto the points board (skips guests).
+        sync_points_for_grants(lb, users, user_id, unlocked, is_guest)
 
     try:
         users.insert_run(state)

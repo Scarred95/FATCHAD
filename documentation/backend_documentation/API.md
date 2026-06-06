@@ -334,6 +334,111 @@ so the recap renders from one fetch).
 
 ---
 
+## Leaderboards
+
+Two public boards, both backed by a dedicated `fatchad_leaderboard` table
+(separate from per-user data):
+
+- **Points board** — one row per account, career achievement points. Maintained
+  automatically: whenever a finalize grants achievements, the gameplay Lambda
+  mirrors the account's new total onto the board (`sync_points_for_grants`).
+  Players never publish it by hand. Guests are kept off it.
+- **Run (highscore) board** — one row per published run, scored by rounds
+  survived (`state.turn`). Opt-in from the end-screen and capped at **5 runs per
+  account**; at the cap the client must pick an existing run to replace. Guests
+  cannot publish.
+
+The read endpoints (`GET /points`, `GET /runs`) are public-shaped (no `user_id`
+exposed); the write/own-view endpoints derive the account from the JWT.
+
+### `GET /leaderboard/points` — top accounts by points
+
+**Query params:** `limit` (default `100`, clamped to `1…200`).
+
+**Response 200 — `list[LeaderboardPointsRow]`** (highest first):
+```json
+[
+  { "display_name": "Spieler", "score": 420 }
+]
+```
+
+### `GET /leaderboard/runs` — top runs by rounds survived
+
+**Query params:** `limit` (default `100`, clamped to `1…200`).
+
+**Response 200 — `list[LeaderboardRunRow]`** (highest first):
+```json
+[
+  {
+    "display_name": "Spieler",
+    "score":        47,
+    "run_id":       "run_abc123",
+    "deck_ids":     ["Politik", "Strasse"],
+    "status":       "ended",
+    "ending":       "singularity",
+    "published_at": "2026-06-06T12:00:00Z"
+  }
+]
+```
+
+`score` is rounds survived; `status` is `"ended"` or `"abandoned"`; `ending`
+may be `null` (abandoned run).
+
+### `GET /leaderboard/runs/mine` — the caller's published runs
+
+The end-screen uses this to show "N/5 published" and to populate the replace
+picker. Account is taken from the JWT.
+
+**Response 200 — `list[LeaderboardRunRow]`** (oldest first), same shape as above.
+
+### `POST /leaderboard/runs/{run_id}` — publish a finished run
+
+Publishes one of the caller's **non-active** runs to the highscore board.
+
+**Request — `PublishRunRequest` (optional):**
+```json
+{ "replace_run_id": "run_old456" }
+```
+`replace_run_id` is only consulted at the 5-run cap — it names which existing
+published run to drop in favour of this one.
+
+**Response 201 — `PublishRunResponse`:**
+```json
+{
+  "entry":           { /* LeaderboardRunRow */ },
+  "evicted_run_id":  "run_old456"
+}
+```
+`evicted_run_id` is set only when a replace actually happened.
+
+**Errors:**
+- `403` — caller is a guest (guests can't publish).
+- `409` — run is still `active`.
+- `409` — run is already published (`"Dieser Run steht bereits im Leaderboard."`).
+- `400` — `replace_run_id` isn't one of the caller's published runs.
+- `409` — board is full and no `replace_run_id` was given. The `detail` is a
+  structured object so the client can open the replace picker:
+  ```json
+  {
+    "detail": {
+      "reason":  "leaderboard_full",
+      "max":     5,
+      "current": [ /* LeaderboardRunRow[] — the caller's current 5 */ ]
+    }
+  }
+  ```
+
+### `DELETE /leaderboard/runs/{run_id}` — unpublish a run
+
+Removes one of the caller's runs from the highscore board.
+
+**Response 204** — empty body on success.
+
+**Errors:**
+- `404` — the run isn't on the board (`"Dieser Run steht nicht im Leaderboard."`).
+
+---
+
 ## Admin — card content (`/admin/cards`)
 
 Card definitions stored as items in the DynamoDB catalog table (`CatalogRepo`).

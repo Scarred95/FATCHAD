@@ -374,16 +374,32 @@ class DirectoryEntry(BaseModel):
 
 
 # =============================================================================
-# User data: leaderboard entries (PK = LB#<scope>, SK = SCORE#<padded>#<uid>)
+# Leaderboard rows (fatchad_leaderboard table — see shared/db/keys.py)
 # =============================================================================
 
-class LbEntry(BaseModel):
-    """A leaderboard row, one model for both scopes — LB#points reads `score`
-    as points, LB#longest as turn count (with `run_id` for deep-linking). Build
-    the SK via `keys.leaderboard_sk`; its padding makes DDB's lexicographic
-    sort agree with numeric sort — don't hand-roll it."""
+class LbPointsEntry(BaseModel):
+    """A points-board row (PK=LB#points) — one per account. `score` is the
+    account's career achievement points; `display_name` is denormalised in so a
+    board render needs no profile lookup. Build the SK via
+    keys.leaderboard_points_sk (its padding makes DDB sort == numeric)."""
     user_id: str
     display_name: str
     score: int
-    run_id: Optional[str] = None
     updated_at: datetime
+
+
+class LbRunEntry(BaseModel):
+    """A run-board row (PK=LB#longest) — one per published run, up to five per
+    account. `score` is rounds survived (GameState.turn). Everything the board
+    and the replace-picker show is denormalised in, so reads are a single
+    Query: deck_ids, status, ending, plus the owning account + when it was
+    published. Written to BOTH the board and the LBRUN#<uid> index (same body).
+    Build the SKs via keys.leaderboard_run_sk / leaderboard_member_sk."""
+    user_id: str
+    display_name: str
+    score: int
+    run_id: str
+    deck_ids: list[str] = Field(default_factory=list)
+    status: GameStatus
+    ending: Optional[str] = None
+    published_at: datetime

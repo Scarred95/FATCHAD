@@ -133,10 +133,29 @@ def directory_user_key(user_id: str) -> DdbKey:
 
 
 # =============================================================================
-# fatchad_user_data — leaderboards (PK = "LB#<scope>")
+# fatchad_leaderboard — public boards (its own table, env LEADERBOARD_TABLE)
 # =============================================================================
+#
+# Kept out of fatchad_user_data on purpose: board churn (every score change is
+# a delete+put) never contends with run/profile writes. Two boards + one index:
+#
+#   * points board  PK=LB#points   — one row per account,  score = career points
+#   * run board     PK=LB#longest  — up to 5 rows/account,  score = rounds survived
+#   * per-account index  PK=LBRUN#<uid>  — a player's published runs, so the
+#     5-run cap + replace picker is one Query (no GSI; mirrors USERS#all).
+#
+# The score sits IN the board SK, zero-padded so DDB's lexicographic order
+# matches numeric order — top-N is Query(ScanIndexForward=False, Limit=N), no
+# client-side sort. The index SK keys only on run_id (publish order is restored
+# by sorting the <=5 rows in Python), so deletes never depend on a datetime
+# string round-tripping byte-for-byte.
 
 LbScope = Literal["points", "longest"]
+
+POINTS_SCOPE: LbScope = "points"
+RUNS_SCOPE: LbScope = "longest"
+
+LBRUN_MEMBER_PREFIX = "RUN#"
 
 
 def leaderboard_pk(scope: LbScope) -> str:
@@ -152,19 +171,40 @@ def _padded_score(score: int) -> str:
     return f"{score:0{SCORE_PAD_WIDTH}d}"
 
 
-def leaderboard_sk(score: int, user_id: str) -> str:
-    """Build the SK for a leaderboard entry. Top-N is a Query with
-    ScanIndexForward=False; no client-side sort needed.
+def leaderboard_points_sk(user_id: str, score: int) -> str:
+    """Points board SK — one row per account (user_id ends the SK).
 
-    INVARIANT (writer must enforce): the score lives IN the SK, so a user's new
-    score is a different SK than their old one. Updating an entry is therefore
-    delete-old-SK + put-new-SK — a plain put leaves a stale row per old score.
-    """
+    INVARIANT (writer must enforce): the score lives IN the SK, so a new score
+    is a new SK. Updating is delete-old-SK + put-new-SK — a plain put would
+    strand the row under its old score."""
     return f"SCORE#{_padded_score(score)}#{user_id}"
 
 
-def leaderboard_key(scope: LbScope, score: int, user_id: str) -> DdbKey:
-    return {
-        "PK": leaderboard_pk(scope),
-        "SK": leaderboard_sk(score, user_id),
-    }
+def leaderboard_points_key(user_id: str, score: int) -> DdbKey:
+    return {"PK": leaderboard_pk(POINTS_SCOPE), "SK": leaderboard_points_sk(user_id, score)}
+
+
+def leaderboard_run_sk(run_id: str, score: int) -> str:
+    """Run board SK — one row per published run (run_id ends the SK, since an
+    account may have up to five). Same padded-score ordering as the points
+    board; the score-in-SK delete-old + put-new invariant applies here too."""
+    return f"SCORE#{_padded_score(score)}#{run_id}"
+
+
+def leaderboard_run_key(run_id: str, score: int) -> DdbKey:
+    return {"PK": leaderboard_pk(RUNS_SCOPE), "SK": leaderboard_run_sk(run_id, score)}
+
+
+def leaderboard_member_pk(user_id: str) -> str:
+    return f"LBRUN#{user_id}"
+
+
+def leaderboard_member_sk(run_id: str) -> str:
+    """Per-account index SK — one row per published run, keyed only on run_id so
+    a delete is fully deterministic. Publish order isn't encoded here; callers
+    sort the (<=5) rows by their `published_at` field."""
+    return f"{LBRUN_MEMBER_PREFIX}{run_id}"
+
+
+def leaderboard_member_key(user_id: str, run_id: str) -> DdbKey:
+    return {"PK": leaderboard_member_pk(user_id), "SK": leaderboard_member_sk(run_id)}

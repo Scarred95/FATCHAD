@@ -5,12 +5,14 @@ profile, runs, and the run-status-prefix mechanics of the single-table design.
 """
 from __future__ import annotations
 
-import json
-from decimal import Decimal
-
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
+from shared.db._serde import (
+    item_to_dict as _item_to_dict,
+    model_to_item as _model_to_item,
+    normalize_decimals as _normalize_decimals,  # noqa: F401 — re-exported for callers
+)
 from shared.db.ddb import user_table
 from shared.db.keys import (
     RunStatus,
@@ -24,36 +26,6 @@ from shared.db.keys import (
     user_run_key,
 )
 from shared.schemas import DirectoryEntry, GameState, Profile, UserAchievement, DeckUnlock, Achievement
-
-
-# =============================================================================
-# (de)serialization helpers — same pattern as catalog_repo (duplicated for
-# now; if a third repo lands we lift these into shared/db/_serde.py)
-# =============================================================================
-
-def _normalize_decimals(obj):
-    if isinstance(obj, list):
-        return [_normalize_decimals(v) for v in obj]
-    if isinstance(obj, dict):
-        return {k: _normalize_decimals(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        # User-data numerics are all ints (stats, turn, rng_seed, score).
-        return int(obj)
-    return obj
-
-
-def _model_to_item(model, pk: str, sk: str) -> dict:
-    data = json.loads(model.model_dump_json())
-    data["PK"] = pk
-    data["SK"] = sk
-    return data
-
-
-def _item_to_dict(item: dict | None) -> dict | None:
-    if item is None:
-        return None
-    cleaned = {k: v for k, v in item.items() if k not in ("PK", "SK")}
-    return _normalize_decimals(cleaned)
 
 
 _STATUS_TO_SK: dict[str, RunStatus] = {

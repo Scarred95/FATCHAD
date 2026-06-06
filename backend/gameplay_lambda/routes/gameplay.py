@@ -10,6 +10,7 @@ Run lifecycle (create / list / get / abandon / delete) lives in runs.py.
 from fastapi import APIRouter, Depends, HTTPException
 
 from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.leaderboard_repo import LeaderboardRepo
 from shared.db.user_repo import StaleRunWrite, UserRepo
 from shared.game.achievements import evaluate_achievements
 from shared.game.deck import draw_eligible_card, draw_with_refill_retry
@@ -18,11 +19,14 @@ from shared.schemas import GameState
 
 from gameplay_lambda.routes._deps import (
     get_catalog,
+    get_is_guest,
+    get_leaderboard_repo,
     get_owned_run,
     get_user_repo,
     require_active,
     require_inactive,
 )
+from gameplay_lambda.routes.leaderboard import sync_points_for_grants
 from gameplay_lambda.routes._schemas import (
     CardResponse,
     ChoiceRequest,
@@ -53,6 +57,8 @@ def submit_choice(
     state: GameState = Depends(get_owned_run),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
+    lb: LeaderboardRepo = Depends(get_leaderboard_repo),
+    is_guest: bool = Depends(get_is_guest),
 ):
     """Submit a choice: apply effects, advance the turn, return updated state +
     the next card (saves the client a round-trip)."""
@@ -91,6 +97,8 @@ def submit_choice(
             )
             new_state.newly_unlocked = [a.id for a in unlocked]
             users.update_run(new_state, prior_status=prior_status)
+            # Mirror any points gained onto the points board (skips guests).
+            sync_points_for_grants(lb, users, new_state.user_id, unlocked, is_guest)
             return TurnResponse(state=new_state, next_card=None)
 
         # Piggyback the next card; same refill safety net.

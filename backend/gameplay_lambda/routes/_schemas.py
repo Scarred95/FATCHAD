@@ -7,7 +7,16 @@ gameplay.py can import them without circular imports.
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.schemas import Effects, Event, GameState, GameStatus, StatHint, Stats
+from shared.schemas import (
+    Effects,
+    Event,
+    GameState,
+    GameStatus,
+    LbPointsEntry,
+    LbRunEntry,
+    StatHint,
+    Stats,
+)
 from shared.views import public_card_dict
 
 
@@ -195,3 +204,56 @@ class EndSummary(BaseModel):
     final_stats: Stats
     cards_played: int
     newly_unlocked: list[UnlockedAchievement] = []
+
+
+# =============================================================================
+# Leaderboards
+# =============================================================================
+
+class LeaderboardPointsRow(BaseModel):
+    """One row of the points board. user_id is omitted on purpose — the board is
+    public and only needs a name + score."""
+    display_name: str
+    score: int
+
+    @classmethod
+    def from_entry(cls, e: "LbPointsEntry") -> "LeaderboardPointsRow":
+        return cls(display_name=e.display_name, score=e.score)
+
+
+class LeaderboardRunRow(BaseModel):
+    """One row of the run (highscore) board, or one of a player's own published
+    runs. score = rounds survived; deck_ids/status/ending describe the run."""
+    display_name: str
+    score: int
+    run_id: str
+    deck_ids: list[str]
+    status: GameStatus
+    ending: str | None = None
+    published_at: datetime
+
+    @classmethod
+    def from_entry(cls, e: "LbRunEntry") -> "LeaderboardRunRow":
+        return cls(
+            display_name=e.display_name,
+            score=e.score,
+            run_id=e.run_id,
+            deck_ids=e.deck_ids,
+            status=e.status,
+            ending=e.ending,
+            published_at=e.published_at,
+        )
+
+
+class PublishRunRequest(BaseModel):
+    """Body for POST /leaderboard/runs/{run_id}. replace_run_id is only consulted
+    when the player is already at the 5-run cap — it names which existing run to
+    drop in favour of this one."""
+    replace_run_id: str | None = None
+
+
+class PublishRunResponse(BaseModel):
+    """Returned on a successful publish. evicted_run_id is set only when a
+    replace happened (the run dropped to make room)."""
+    entry: LeaderboardRunRow
+    evicted_run_id: str | None = None

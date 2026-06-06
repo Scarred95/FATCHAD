@@ -4,7 +4,8 @@ Lazy-initialized so import needs no AWS creds; reused across warm invocations
 (standard connection-reuse pattern, avoids the TLS handshake per call).
 
 Env (prod defaults): CATALOG_TABLE=fatchad_catalog, USER_TABLE=fatchad_user_data,
-CATALOG_BUCKET=fatchad-catalog, AWS_REGION=eu-central-1 (Lambda sets it).
+LEADERBOARD_TABLE=fatchad_leaderboard, CATALOG_BUCKET=fatchad-catalog,
+AWS_REGION=eu-central-1 (Lambda sets it).
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ _DEFAULT_REGION = "eu-central-1"
 _ddb_resource = None
 _catalog_table = None
 _user_table = None
+_leaderboard_table = None
 _s3_client = None
 
 
@@ -43,13 +45,24 @@ def catalog_table():
 
 
 def user_table():
-    """Handle for the fatchad_user_data table (profile, runs, unlocks, lbs)."""
+    """Handle for the fatchad_user_data table (profile, runs, unlocks, directory)."""
     global _user_table
     if _user_table is None:
         _user_table = _resource().Table(
             os.getenv("USER_TABLE", "fatchad_user_data")
         )
     return _user_table
+
+
+def leaderboard_table():
+    """Handle for the fatchad_leaderboard table (points + run boards). Kept
+    separate from user data so board churn never contends with run writes."""
+    global _leaderboard_table
+    if _leaderboard_table is None:
+        _leaderboard_table = _resource().Table(
+            os.getenv("LEADERBOARD_TABLE", "fatchad_leaderboard")
+        )
+    return _leaderboard_table
 
 
 def s3_client():
