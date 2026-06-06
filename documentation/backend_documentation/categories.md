@@ -1,16 +1,23 @@
 # Card Categories — FATCHAD
 
-Categories control how the deck refill pool is partitioned.
-The seeder uses them for bulk queries; the eligibility system uses them for filtering.
+Categories are a **content taxonomy** for cards (used by the admin authoring
+surface for grouping/filtering). They are **not** what drives deck refill — the
+refill pool is now built per-run from the *decks* a run was started with
+(`build_run_deck` → `redraw_deck`, refilled by `refill_deck_if_needed` in
+`backend/shared/game/deck.py`), not by category.
 
-**Refill categories** (drawn automatically to top up the deck):
-`politik`, `social`, `economy`, `chaos`
-→ Defined in `game/deck.py → GENERIC_CATEGORIES`. Add a category here to make it
-  part of the random refill pool.
+The canonical category lists live in the frontend at
+`frontend/src/admin/types.ts` (`REFILL_CATEGORIES`, `NON_REFILL_CATEGORIES`,
+`PROPOSED_CATEGORIES`, `ALL_CATEGORIES`). The backend does not enumerate
+categories in `constants.py`.
 
-**Non-refill categories** (injected explicitly via `adds_to_deck`):
-`tutorial`, `ending`, and any questline-only categories
-→ Cards in these categories should have `weight: 0` so they're never accidentally drawn.
+**Refill categories** (`REFILL_CATEGORIES`): `politik`, `social`, `economy`,
+`chaos` — the everyday content pool.
+
+**Non-refill categories** (`NON_REFILL_CATEGORIES`): `tutorial`, `ending`, plus
+any questline-only categories. These cards enter a run explicitly via
+`adds_to_deck` / the tutorial starter chain, and should carry `weight: 0` so
+they're never accidentally drawn into the redraw pool.
 
 ---
 

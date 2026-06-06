@@ -1,5 +1,10 @@
 # FATCHAD Cloud Design
 
+> **Historical design record — the AWS migration described here is complete.**
+> Kept for the rationale (architecture choices, cost model, non-goals), not as a
+> status tracker. For the *current* infra state — stacks, deploy flow, secrets,
+> observability — see [backend_documentation/DEPLOYMENT.md](../backend_documentation/DEPLOYMENT.md).
+
 Target: a fully AWS-native deployment that costs ~$3–5/month at indie scale,
 scales sub-linearly with user count, and keeps the local dev experience
 unchanged. Budget ceiling: $30/month (currently has ~10× headroom).
@@ -230,24 +235,30 @@ $30 budget gives ~10× headroom at indie scale. Reserve the headroom for:
 
 ## Migration order
 
+> **Status (as built):** steps 1–7 and 9 are **done**; step 8 (leaderboards) is
+> **not yet implemented** — the DDB key builders exist (`backend/shared/db/keys.py`)
+> but there are no leaderboard endpoints or writes. Of the open questions below,
+> region (`eu-central-1`) and single-account are settled in `infra/`; JWT-claim
+> denormalization and offline/service-worker remain deferred by design.
+
 Slices, smallest-risk first. Each step is shippable independently.
 
 1. **CDK skeleton + GitHub OIDC**. Empty stack that deploys one hello-world
-   Lambda. Proves the pipeline.
+   Lambda. Proves the pipeline. ✅
 2. **Cognito + frontend auth**. Replace `userStore`-only flow with Cognito
    JWT. Anonymous mode still works. No backend changes — JWT just sits in
-   the client.
+   the client. ✅
 3. **Lambda + DDB backend running in parallel** with the existing Mongo
    FastAPI. Frontend env var toggles target. Compare behaviour under real
-   traffic.
+   traffic. ✅
 4. **Port catalogue + game state**. One-time migration script reads Mongo,
-   writes DDB. Then implement the S3 publish step for the catalogue.
-5. **Cut over fully; retire Mongo backend.**
-6. **User accounts surface**: profile page, "claim my anonymous runs."
+   writes DDB. Then implement the S3 publish step for the catalogue. ✅
+5. **Cut over fully; retire Mongo backend.** ✅
+6. **User accounts surface**: profile page, "claim my anonymous runs." ✅
 7. **Achievements**: definitions in DDB, evaluator in Lambda, UI in admin
-   + player profile.
-8. **Leaderboards**: DDB partitions + CloudFront-cached endpoints.
-9. **Admin auth via Cognito group**, retire hand-rolled bearer token.
+   + player profile. ✅
+8. **Leaderboards**: DDB partitions + CloudFront-cached endpoints. ⏳ not built
+9. **Admin auth via Cognito group**, retire hand-rolled bearer token. ✅
 
 Steps 1–5 are infrastructure with no new user features. Steps 6–9 are the
 goals that motivated the migration.

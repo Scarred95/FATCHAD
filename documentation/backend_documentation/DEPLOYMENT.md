@@ -5,8 +5,8 @@ piece of infrastructure does, and where to look when something breaks.
 
 This document describes the **API layer** (Lambdas + HTTP API). The data
 layer (`FatchadDataStack`) and frontend (`FatchadFrontendStack`) have the
-same shape but live in their own stacks/workflows; see [CLOUD_DESIGN.md](../CLOUD_DESIGN.md)
-for the broader picture.
+same shape but live in their own stacks/workflows; see [CLOUD_DESIGN.md](../history/CLOUD_DESIGN.md)
+for the broader picture (a historical design record — migration complete).
 
 ---
 
@@ -30,13 +30,16 @@ the CloudFormation stack outputs) is the only thing the frontend needs.
 
 | Stack | File | What it owns |
 |---|---|---|
-| `FatchadBootstrapStack` | [infra/lib/bootstrap-stack.ts](../infra/lib/bootstrap-stack.ts) | GitHub OIDC provider + three IAM deploy roles |
-| `FatchadDataStack`      | [infra/lib/ddb-stack.ts](../infra/lib/ddb-stack.ts)           | DynamoDB tables `fatchad_catalog` + `fatchad_user_data` |
-| `FatchadFrontendStack`  | [infra/lib/frontend-stack.ts](../infra/lib/frontend-stack.ts) | S3 website bucket for the React build |
-| `FatchadApiStack`       | [infra/lib/api-stack.ts](../infra/lib/api-stack.ts)           | Catalog bundle bucket, two Lambdas, HTTP API |
+| `FatchadBootstrapStack` | [infra/lib/bootstrap-stack.ts](../../infra/lib/bootstrap-stack.ts) | GitHub OIDC provider + three IAM deploy roles |
+| `FatchadDataStack`      | [infra/lib/ddb-stack.ts](../../infra/lib/ddb-stack.ts)           | DynamoDB tables `fatchad_catalog` + `fatchad_user_data` |
+| `FatchadFrontendStack`  | [infra/lib/frontend-stack.ts](../../infra/lib/frontend-stack.ts) | S3 website bucket for the React build |
+| `FatchadCognitoStack`   | [infra/lib/cognito-stack.ts](../../infra/lib/cognito-stack.ts)   | Cognito User Pool + `admin`/`user`/`guest` groups + web app client |
+| `FatchadApiStack`       | [infra/lib/api-stack.ts](../../infra/lib/api-stack.ts)           | Catalog bundle bucket, two Lambdas, HTTP API |
 
-All four are instantiated in [infra/bin/fatchad.ts](../infra/bin/fatchad.ts). Default region is
-`eu-central-1`; account comes from `CDK_DEFAULT_ACCOUNT` (your AWS profile).
+All five are instantiated in [infra/bin/fatchad.ts](../../infra/bin/fatchad.ts). The API stack
+consumes the Cognito stack's `userPoolId` / `userPoolClientId` so its Lambdas can
+verify JWTs. Default region is `eu-central-1`; account comes from
+`CDK_DEFAULT_ACCOUNT` (your AWS profile).
 
 ---
 
@@ -62,17 +65,22 @@ s3://fatchad-catalog/v2/...
 
 ### `fatchad-admin` (Lambda)
 - Handler: `admin_lambda.handler.handler` — Mangum wraps the FastAPI app
-  in [backend/admin_lambda/app.py](../backend/admin_lambda/app.py).
+  in [backend/admin_lambda/app.py](../../backend/admin_lambda/app.py).
 - Runtime: Python 3.12, 512 MB, 15 s timeout.
 - Env vars: `CATALOG_TABLE`, `USER_TABLE`, `CATALOG_BUCKET`,
-  `ADMIN_TOKEN`, `CORS_ORIGINS`. `AWS_REGION` is auto-injected by Lambda.
-- IAM: `fatchad_catalog` RW + `fatchad-catalog` PUT/GET. No access to
-  user data — admin routes never touch player runs.
+  `ADMIN_TOKEN`, `CORS_ORIGINS`, plus `COGNITO_USER_POOL_ID` and
+  `COGNITO_APP_CLIENT_ID` (when the Cognito stack is wired). `AWS_REGION` is
+  auto-injected by Lambda.
+- IAM: `fatchad_catalog` RW + `fatchad-catalog` PUT/GET + `fatchad_user_data`
+  **read-only**. The read-only user-data grant exists for the admin
+  inspection views (Users directory, per-user detail, Run-Inspektor), which
+  Query profiles/runs/achievements but never mutate them.
 
 ### `fatchad-gameplay` (Lambda)
 - Handler: `gameplay_lambda.handler.handler`.
 - Runtime: Python 3.12, 512 MB, 10 s timeout.
-- Env vars: same minus `ADMIN_TOKEN` (no admin-gated routes).
+- Env vars: same minus `ADMIN_TOKEN` (no admin-gated routes); still receives
+  the `COGNITO_*` vars to verify player JWTs.
 - IAM: `fatchad_user_data` RW + `fatchad_catalog` **read-only** +
   `fatchad-catalog` GET. Gameplay can never mutate the catalog.
 
@@ -113,11 +121,47 @@ time just to call `PutRetentionPolicy`.
 
 ---
 
+## Observability
+
+> **Status: mostly planned.** Today the only observability wiring that actually
+> exists is request-id correlation plus the raw Lambda log groups above.
+> Structured JSON logging and the CloudWatch dashboard are **not built** — they're
+> the intended next step.
+
+### Request correlation (implemented)
+
+`RequestIDMiddleware` (`backend/shared/api/middleware.py`) stamps every request
+with an `X-Request-ID` — reusing a client-supplied one for trace stitching,
+otherwise minting a hex uuid — stashes it on `request.state.request_id`, and
+echoes it back in the response header. It does **not** itself emit a structured
+log line; it just makes the id available to any logger that wants to correlate.
+Plain `logging` is used elsewhere (e.g. the CORS wildcard warning in the same
+file); Lambda forwards stdout/stderr to the per-function log groups above.
+
+### Structured logging (planned)
+
+The intent is one JSON log entry per request so CloudWatch can filter by field
+(`request_id`, `method`, `path`, `status_code`, `duration_ms`, `cold_start`).
+Not wired yet: `aws-lambda-powertools` is not in `backend/requirements.txt`, and
+`RequestIDMiddleware` emits no per-request line. Implementing it means adding the
+logging dependency (or hand-rolling a JSON formatter) and having the middleware
+log keyed by the existing `request_id`.
+
+### Dashboard (planned)
+
+The intent is a CloudWatch Dashboard named `fatchad` built from free built-in AWS
+metrics (no custom metrics, no extra cost): Lambda Errors / Duration / Invocations
+(per function) + DDB consumed capacity on `fatchad_user_data`. There is no
+dashboard code in any stack yet — it would be added as a `cloudwatch.Dashboard`
+construct in `infra/lib/api-stack.ts`.
+
+---
+
 ## How a deploy works
 
 1. **Tag the commit** — `git tag lambda-v<major>.<minor>.<patch>` and push.
    The pattern `lambda-v*` triggers
-   [.github/workflows/deploy-lambdas.yml](../.github/workflows/deploy-lambdas.yml). Anything else (branch
+   [.github/workflows/deploy-lambdas.yml](../../.github/workflows/deploy-lambdas.yml). Anything else (branch
    pushes, PR opens, frontend tags) is ignored.
 
 2. **OIDC handshake** — the workflow exchanges its short-lived GitHub
@@ -153,7 +197,7 @@ Configured **once** in the GitHub repo (Settings → Secrets and variables
 | Secret | Used for | Notes |
 |---|---|---|
 | `AWS_LAMBDA_DEPLOY_ROLE_ARN` | OIDC role assume in `deploy-lambdas.yml` | From `FatchadBootstrapStack` outputs (`LambdaDeployRoleArn`). |
-| `ADMIN_TOKEN`                | Bearer token gating `/admin/*`       | Generate with `openssl rand -hex 32`. Rotate by re-setting + redeploying. |
+| `ADMIN_TOKEN`                | Local-dev fallback for `/admin/*`    | Only used when `COGNITO_USER_POOL_ID` is unset; in deployed envs `/admin/*` is gated by the Cognito `admin` group. Generate with `openssl rand -hex 32`. |
 | `CORS_ORIGINS`               | Frontend origin allow-list           | Comma-separated, e.g. `https://fatchad.example,http://localhost:5173`. |
 
 Both `ADMIN_TOKEN` and `CORS_ORIGINS` are passed into CDK as
@@ -208,23 +252,29 @@ GitHub Actions on tag push.
 
 ```bash
 export API=https://<id>.execute-api.eu-central-1.amazonaws.com
-export ADMIN_TOKEN=<value from the GitHub secret>
 
-# Public surface
+# Public surface — needs no auth
 curl -i "$API/healthz"
 
-# Create a run (will softlock-end if catalog is empty)
+# Authenticated calls need a Cognito JWT. Once the Cognito stack is deployed,
+# both /runs and /admin/* require a Bearer access token (the ADMIN_TOKEN
+# fallback only applies in local dev, where COGNITO_USER_POOL_ID is unset).
+export JWT=<Cognito access token for a player>
+export ADMIN_JWT=<Cognito access token for a user in the `admin` group>
+
+# Create a run (user_id comes from the JWT `sub`, not the body;
+# will softlock-end if the catalog is empty)
 curl -s -X POST "$API/runs" \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":"test-user"}' | jq
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" -d '{}' | jq
 
 # Admin: trigger a publish
 curl -s -X POST "$API/admin/publish" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+  -H "Authorization: Bearer $ADMIN_JWT" | jq
 
 # What's currently published
 curl -s "$API/admin/publish/current" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+  -H "Authorization: Bearer $ADMIN_JWT" | jq
 
 # Verify S3 received the bundle
 aws s3 ls s3://fatchad-catalog/ --recursive --region eu-central-1
