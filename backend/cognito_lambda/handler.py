@@ -21,16 +21,15 @@ Configured as `cognito_lambda.handler.handler` in FatchadCognitoStack.
 """
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 
 import boto3
+from aws_lambda_powertools import Logger
 
 from shared.db.user_repo import UserRepo
 from shared.schemas import Profile
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = Logger(service="fatchad-post-confirm")
 
 _USER_GROUP = "user"
 
@@ -55,9 +54,9 @@ def handler(event: dict, _context) -> dict:
             Username=event["userName"],
             GroupName=_USER_GROUP,
         )
-        logger.info("Added %s to group %s", sub, _USER_GROUP)
+        logger.info("Added user to group", sub=sub, group=_USER_GROUP)
     except Exception:  # noqa: BLE001 — never block signup on group assignment
-        logger.exception("Failed to add %s to group %s", sub, _USER_GROUP)
+        logger.exception("Failed to add user to group", sub=sub, group=_USER_GROUP)
 
     display_name = attrs.get("name") or _name_from_email(attrs.get("email", ""))
 
@@ -65,7 +64,7 @@ def handler(event: dict, _context) -> dict:
         users = UserRepo()
         # Idempotent: a stray re-fire must not clobber accrued totals.
         if users.get_profile(sub) is not None:
-            logger.info("Profile already exists for %s; skipping", sub)
+            logger.info("Profile already exists, skipping", sub=sub)
             return event
         now = datetime.now(timezone.utc)
         users.put_profile(Profile(
@@ -77,9 +76,9 @@ def handler(event: dict, _context) -> dict:
         # Real-account only: add to the admin user directory. Guests are created
         # via guest.py (which never calls this trigger), so they stay out of it.
         users.put_directory_entry(sub, display_name)
-        logger.info("Created profile for %s (%s)", sub, display_name)
+        logger.info("Created profile", sub=sub, display_name=display_name)
     except Exception:  # noqa: BLE001 — never block signup on a profile write
-        logger.exception("Failed to create profile for %s", sub)
+        logger.exception("Failed to create profile", sub=sub)
 
     return event
 

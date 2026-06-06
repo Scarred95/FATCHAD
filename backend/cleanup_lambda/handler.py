@@ -15,16 +15,15 @@ Configured as `cleanup_lambda.handler.handler` in FatchadCognitoStack.
 """
 from __future__ import annotations
 
-import logging
 import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from aws_lambda_powertools import Logger
 
 from shared.db.user_repo import UserRepo
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = Logger(service="fatchad-guest-cleanup")
 
 _GUEST_GROUP = "guest"
 
@@ -65,18 +64,20 @@ def handler(_event: dict, _context) -> dict:
             try:
                 if sub:
                     n = users.delete_all_user_data(sub)
-                    logger.info("Deleted %d data items for guest %s", n, sub)
+                    logger.info("Deleted guest data", sub=sub, items=n)
                 cognito.admin_delete_user(UserPoolId=pool_id, Username=username)
                 deleted += 1
             except Exception:  # noqa: BLE001 — one bad guest shouldn't abort the sweep
-                logger.exception("Failed to delete guest %s", username)
+                logger.exception("Failed to delete guest", username=username)
 
         pagination_token = resp.get("NextToken")
         if not pagination_token:
             break
 
     logger.info(
-        "Guest sweep complete: scanned=%d deleted=%d (older than %dh)",
-        scanned, deleted, max_age_hours,
+        "Guest sweep complete",
+        scanned=scanned,
+        deleted=deleted,
+        max_age_hours=max_age_hours,
     )
     return {"scanned": scanned, "deleted": deleted}

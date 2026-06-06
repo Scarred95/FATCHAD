@@ -6,6 +6,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -280,6 +281,96 @@ export class FatchadApiStack extends cdk.Stack {
       methods: [apigw.HttpMethod.ANY],
       integration: gameplayIntegration,
     });
+
+    // ------------------------------------------------------------------
+    // CloudWatch Dashboard
+    //
+    // Row 1: Lambda Errors     Row 2: Lambda Duration
+    // Row 3: Lambda Invocations  Row 4: DDB capacity (user table)
+    // Row 5: Support Lambdas (guest-cleanup + post-confirm) — defined in
+    //        FatchadCognitoStack, referenced here by name (no cross-stack ref).
+    // ------------------------------------------------------------------
+    const dashboard = new cloudwatch.Dashboard(this, 'FatchadDashboard', {
+      dashboardName: 'fatchad',
+    });
+
+    const p5m = cdk.Duration.minutes(5);
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors',
+        left: [
+          this.adminFn.metricErrors({ period: p5m, label: 'Admin' }),
+          this.gameplayFn.metricErrors({ period: p5m, label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Duration (avg ms)',
+        left: [
+          this.adminFn.metricDuration({ period: p5m, label: 'Admin' }),
+          this.gameplayFn.metricDuration({ period: p5m, label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Invocations',
+        left: [
+          this.adminFn.metricInvocations({ period: p5m, label: 'Admin' }),
+          this.gameplayFn.metricInvocations({ period: p5m, label: 'Gameplay' }),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'DDB Consumed Capacity (user table)',
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/DynamoDB',
+            metricName: 'ConsumedReadCapacityUnits',
+            dimensionsMap: { TableName: 'fatchad_user_data' },
+            period: p5m, statistic: 'Sum', label: 'Reads',
+          }),
+          new cloudwatch.Metric({
+            namespace: 'AWS/DynamoDB',
+            metricName: 'ConsumedWriteCapacityUnits',
+            dimensionsMap: { TableName: 'fatchad_user_data' },
+            period: p5m, statistic: 'Sum', label: 'Writes',
+          }),
+        ],
+        width: 12,
+      }),
+    );
+
+    // Support Lambdas live in FatchadCognitoStack — reference by name.
+    const lambdaMetric = (fn: string, metricName: string, label: string) =>
+      new cloudwatch.Metric({
+        namespace: 'AWS/Lambda',
+        metricName,
+        dimensionsMap: { FunctionName: fn },
+        period: p5m, statistic: 'Sum', label,
+      });
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Support Lambda Errors',
+        left: [
+          lambdaMetric('fatchad-guest-cleanup', 'Errors', 'Guest Cleanup'),
+          lambdaMetric('fatchad-post-confirm', 'Errors', 'Post Confirm'),
+        ],
+        width: 12,
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Support Lambda Invocations',
+        left: [
+          lambdaMetric('fatchad-guest-cleanup', 'Invocations', 'Guest Cleanup'),
+          lambdaMetric('fatchad-post-confirm', 'Invocations', 'Post Confirm'),
+        ],
+        width: 12,
+      }),
+    );
 
     // ------------------------------------------------------------------
     // Tags + outputs
