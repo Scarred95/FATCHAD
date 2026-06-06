@@ -10,9 +10,11 @@
  *               backend doesn't support rename in one shot).
  *
  * Fields: name (only when new), description, enabled, unlock_rule,
- * removes_endings. Unlock rule: a radio between "Standard" (kind=default) and
- * "Achievement" (kind=achievement, requires achievement_id). removes_endings
- * is a checkbox list of endings this deck strips from a run when selected.
+ * removes_endings, starting_card_id. Unlock rule: a radio between "Standard"
+ * (kind=default) and "Achievement" (kind=achievement, requires
+ * achievement_id). removes_endings is an autocomplete chip list of endings
+ * this deck strips from a run when selected. starting_card_id is the story
+ * card shuffled into the run's start deck when this deck is picked.
  *
  * Pattern matches CardEditor / EndingEditor: dirty tracking, blocked save
  * while invalid, danger zone with delete (edit mode only).
@@ -23,6 +25,8 @@ import { useAdminDeckStore } from '../deckStore';
 import { useAdminCardStore, cardsInDeck } from '../store';
 import { useAdminEndingStore } from '../endingStore';
 import type { DeckUnlockRule } from '../types';
+import { TagInput } from '../components/TagInput';
+import { CardPicker } from '../components/CardPicker';
 import admin from '../admin.module.css';
 import styles from './DeckEditor.module.css';
 
@@ -60,6 +64,10 @@ export function DeckEditorPage({ mode }: Props) {
   const [unlockKind, setUnlockKind]   = useState<DeckUnlockRule['kind']>('default');
   const [achievementId, setAchId]     = useState<string>('');
   const [removesEndings, setRemoves]  = useState<string[]>([]);
+  const [startingCardId, setStartId]  = useState<string>('');
+  // CardPicker seeds its text box only at mount; bump this on hydrate so it
+  // remounts once with the loaded starting card instead of rendering blank.
+  const [cardPickerKey, setCardPickerKey] = useState<number>(0);
   const [dirty, setDirty]             = useState<boolean>(false);
   const [busy, setBusy]               = useState<boolean>(false);
 
@@ -73,6 +81,8 @@ export function DeckEditorPage({ mode }: Props) {
     setUnlockKind(existing.unlock_rule?.kind ?? 'default');
     setAchId(existing.unlock_rule?.achievement_id ?? '');
     setRemoves(existing.removes_endings ?? []);
+    setStartId(existing.starting_card_id ?? '');
+    setCardPickerKey((k) => k + 1);
     setDirty(false);
   }, [mode, existing]);
 
@@ -96,18 +106,16 @@ export function DeckEditorPage({ mode }: Props) {
 
   const onChange = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
 
-  const toggleRemove = (id: string) => {
-    setRemoves((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-    setDirty(true);
-  };
-
-  // Endings sorted for a stable picker; deck-removal also drops orphan ids that
-  // no longer exist as endings so the saved list can be cleaned up by re-saving.
+  // Endings sorted for a stable autocomplete; deck-removal also drops orphan
+  // ids that no longer exist as endings so the saved list can be cleaned up by
+  // re-saving.
   const sortedEndings = useMemo(
     () => [...endings].sort((a, b) => a._id.localeCompare(b._id)),
     [endings],
+  );
+  const endingIdSuggestions = useMemo(
+    () => sortedEndings.map((e) => e._id),
+    [sortedEndings],
   );
   const orphanRemovals = useMemo(
     () => removesEndings.filter((id) => !endings.some((e) => e._id === id)),
@@ -129,6 +137,7 @@ export function DeckEditorPage({ mode }: Props) {
           enabled,
           unlock_rule: buildUnlock(),
           removes_endings: removesEndings,
+          starting_card_id: startingCardId || null,
         });
         if (created) {
           setDirty(false);
@@ -140,6 +149,7 @@ export function DeckEditorPage({ mode }: Props) {
           enabled,
           unlock_rule: buildUnlock(),
           removes_endings: removesEndings,
+          starting_card_id: startingCardId || null,
         });
         if (saved) setDirty(false);
       }
@@ -294,18 +304,12 @@ export function DeckEditorPage({ mode }: Props) {
         {sortedEndings.length === 0 ? (
           <div className={styles.fieldHint}>Keine Endings geladen.</div>
         ) : (
-          <div className={styles.radioRow}>
-            {sortedEndings.map((e) => (
-              <label key={e._id} className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={removesEndings.includes(e._id)}
-                  onChange={() => toggleRemove(e._id)}
-                />
-                <span>{e.title || e._id} <code>{e._id}</code></span>
-              </label>
-            ))}
-          </div>
+          <TagInput
+            value={removesEndings}
+            onChange={(v) => { setRemoves(v); setDirty(true); }}
+            suggestions={endingIdSuggestions}
+            placeholder="Ending-ID tippen, dann Enter…"
+          />
         )}
         {orphanRemovals.length > 0 && (
           <div className={styles.fieldError}>
@@ -313,6 +317,22 @@ export function DeckEditorPage({ mode }: Props) {
             {orphanRemovals.join(', ')}
           </div>
         )}
+      </section>
+
+      <section className={styles.section}>
+        <label className={styles.fieldLabel}>Startkarte</label>
+        <div className={styles.fieldHint}>
+          Story-Karte, die beim Wählen dieses Decks in das Start-Deck gemischt
+          wird — der Run öffnet damit (die Karte verkettet sich dann via
+          adds_to_deck). Leer = kein eigener Auftakt.
+        </div>
+        <CardPicker
+          key={cardPickerKey}
+          value={startingCardId}
+          onChange={(id) => onChange(setStartId)(id)}
+          cards={cards}
+          placeholder="card_id (optional)"
+        />
       </section>
 
       {mode === 'edit' && (

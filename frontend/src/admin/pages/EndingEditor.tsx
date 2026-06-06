@@ -257,13 +257,13 @@ export function EndingEditorPage({ mode }: Props) {
                 value={ending.deck_name ?? ''}
                 onChange={(e) => patch('deck_name', e.target.value || null)}
               >
-                <option value="">— global (immer aktiv) —</option>
+                <option value="">— global (kein Deck) —</option>
                 {deckOptions.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
               </select>
               <span className={styles.hint}>
-                global = immer im Run · Deck-gebunden = nur bei gewähltem Deck (und nur wenn Default)
+                Default = immer im Run (egal ob global oder Deck-gebunden) · Deck-gebunden ohne Default = nur bei gewähltem Deck · global ohne Default = nie automatisch, nur via triggers_ending
               </span>
             </div>
 

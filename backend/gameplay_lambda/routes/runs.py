@@ -96,11 +96,12 @@ def create_run(
         redraw_deck=redraw_deck,
     )
 
-    # No scripted seed (no tutorial and no story starter) → the live deck is
-    # empty, so fill it from the redraw pool (force past the threshold) before
-    # peeking.
-    if not starting_deck:
-        state = refill_deck_if_needed(state, catalog, force=True, rng=rng)
+    # Fill the live deck from the redraw pool (force past the threshold) before
+    # peeking. Safe to call unconditionally: refill_deck_if_needed honours the
+    # tutorial gate internally, so a tutorial run keeps its scripted single-card
+    # opener while a story-starter or plain run gets a full deck — the scripted
+    # starter(s) stay on top and are drawn first.
+    state = refill_deck_if_needed(state, catalog, force=True, rng=rng)
 
     # Peek the first card before saving — if nothing's playable, end the run
     # up-front so we write the final state in a single DDB round-trip.

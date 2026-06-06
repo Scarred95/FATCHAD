@@ -162,6 +162,7 @@ export interface CreateDeckPayload {
   enabled?: boolean;
   unlock_rule?: DeckUnlockRule;
   removes_endings?: string[];
+  starting_card_id?: string | null;
 }
 
 /** Replace payload — `name` comes from the URL, timestamps are stamped. */
@@ -170,6 +171,7 @@ export interface ReplaceDeckPayload {
   enabled?: boolean;
   unlock_rule?: DeckUnlockRule;
   removes_endings?: string[];
+  starting_card_id?: string | null;
 }
 
 /** PATCH payload — partial update; updated_at refreshes any time. */

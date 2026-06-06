@@ -97,14 +97,17 @@ class CatalogSnapshot:
         return [e for eid in ids if (e := self._endings.get(eid))]
 
     def active_ending_ids_for_run(self, selected_decks: list[str]) -> list[str]:
-        """Ending ids a fresh run starts with. Every global ending (deck_name
-        None) is in by default; deck-scoped endings come in only if `default`
-        and their deck was selected; then each selected deck's removes_endings
-        is subtracted. Card-driven add/remove happens later, at play time.
+        """Ending ids a fresh run starts with. Two ways in, then a subtraction:
 
-        Global endings ignore the `default` flag on purpose — "not in a deck =
-        default-in". A secret global ending would fire early, so secrets must
-        live in a deck (default=False) or be reached only via triggers_ending.
+        * `default=True` → ALWAYS in the run, whether global (deck_name None) or
+          deck-bound — regardless of which decks were picked.
+        * `default=False` but bound to a SELECTED deck → in the run too.
+
+        Then each selected deck's removes_endings is subtracted. Card-driven
+        add/remove happens later, at play time.
+
+        A non-default global ending (deck_name None, default False) is never
+        auto-assigned — it's a secret reachable only via triggers_ending.
         """
         deck_set = set(selected_decks)
         removed = {
@@ -116,7 +119,7 @@ class CatalogSnapshot:
         return [
             e.id for e in self._endings.values()
             if e.enabled
-            and (e.deck_name is None or (e.default and e.deck_name in deck_set))
+            and (e.default or e.deck_name in deck_set)
             and e.id not in removed
         ]
 

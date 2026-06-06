@@ -70,6 +70,7 @@ export const useAdminDeckStore = create<State>()((set, get) => ({
       enabled: payload.enabled ?? true,
       unlock_rule: payload.unlock_rule ?? { kind: 'default' },
       removes_endings: payload.removes_endings ?? [],
+      starting_card_id: payload.starting_card_id ?? null,
       created_at: now,
       updated_at: now,
     };
@@ -101,6 +102,7 @@ export const useAdminDeckStore = create<State>()((set, get) => ({
       enabled: payload.enabled ?? true,
       unlock_rule: payload.unlock_rule ?? { kind: 'default' },
       removes_endings: payload.removes_endings ?? [],
+      starting_card_id: payload.starting_card_id ?? null,
       updated_at: new Date().toISOString(),
     };
     const next = before.slice();
