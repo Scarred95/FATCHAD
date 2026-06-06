@@ -27,6 +27,7 @@ import * as path from 'path';
  *   gameplay → catalog table read-only (pointer + items on snapshot refresh)
  *              + catalog bucket GET (bundle download)
  *              + user table RW (run lifecycle)
+ *              + leaderboard table RW (points sync + run publish)
  *
  * Tables and the catalog bucket are looked up by name rather than imported
  * from FatchadDataStack so this stack can deploy independently of any
@@ -86,6 +87,11 @@ export class FatchadApiStack extends cdk.Stack {
       this,
       'UserTableRef',
       'fatchad_user_data',
+    );
+    const leaderboardTable = dynamodb.Table.fromTableName(
+      this,
+      'LeaderboardTableRef',
+      'fatchad_leaderboard',
     );
 
     // ------------------------------------------------------------------
@@ -170,6 +176,11 @@ export class FatchadApiStack extends cdk.Stack {
     });
 
     catalogTable.grantReadWriteData(this.adminFn);
+    // Read-only on user data: the admin lookup views (Users directory, per-user
+    // detail, Run-Inspektor) Query profiles/runs/achievements but never mutate
+    // them. Without this the admin Lambda has USER_TABLE in its env but no IAM
+    // access, so those routes 500 with AccessDenied.
+    userTable.grantReadData(this.adminFn);
     // Publish endpoint writes new bundle versions; never overwrites or deletes.
     this.catalogBucket.grantPut(this.adminFn);
     // Admin needs to read the pointer for "what's currently published".
@@ -189,6 +200,7 @@ export class FatchadApiStack extends cdk.Stack {
       environment: {
         CATALOG_TABLE: 'fatchad_catalog',
         USER_TABLE: 'fatchad_user_data',
+        LEADERBOARD_TABLE: 'fatchad_leaderboard',
         CATALOG_BUCKET: this.catalogBucket.bucketName,
         CORS_ORIGINS: props.corsOrigins,
         // No ADMIN_TOKEN — gameplay has no admin-gated routes.
@@ -200,6 +212,8 @@ export class FatchadApiStack extends cdk.Stack {
     // Pointer read + snapshot refill only. Never writes the catalog.
     catalogTable.grantReadData(this.gameplayFn);
     userTable.grantReadWriteData(this.gameplayFn);
+    // Points auto-sync on achievement grants + opt-in run publish/unpublish.
+    leaderboardTable.grantReadWriteData(this.gameplayFn);
     this.catalogBucket.grantRead(this.gameplayFn);
 
     // POST /guest mints throwaway Cognito accounts. Scope the admin actions to

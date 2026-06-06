@@ -8,6 +8,10 @@ import NewRun from './pages/NewRun';
 import Game from './pages/Game';
 import EndScreen from './pages/EndScreen';
 import About from './pages/About';
+import Leaderboard from './pages/Leaderboard';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import Achievements from './pages/Achievements';
 import RouteError from './pages/RouteError';
 import Welcome from './pages/Welcome';
 import Login from './pages/Login';
@@ -42,6 +46,27 @@ const EndingsIndex = lazy(() =>
 const EndingEditorPage = lazy(() =>
   import('./admin').then((m) => ({ default: m.EndingEditorPage })),
 );
+const CardsIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.CardsIndex })),
+);
+const DeckEditorPage = lazy(() =>
+  import('./admin').then((m) => ({ default: m.DeckEditorPage })),
+);
+const AchievementsIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.AchievementsIndex })),
+);
+const AchievementEditorPage = lazy(() =>
+  import('./admin').then((m) => ({ default: m.AchievementEditorPage })),
+);
+const RunInspector = lazy(() =>
+  import('./admin').then((m) => ({ default: m.RunInspector })),
+);
+const UsersIndex = lazy(() =>
+  import('./admin').then((m) => ({ default: m.UsersIndex })),
+);
+const UserDetail = lazy(() =>
+  import('./admin').then((m) => ({ default: m.UserDetail })),
+);
 
 const adminFallback = (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-faint)' }}>
@@ -58,6 +83,8 @@ export const router = createBrowserRouter([
       // Public routes — no login required
       { path: 'welcome', element: <Welcome /> },
       { path: 'about', element: <About /> },
+      // The boards are public reads; a signed-out visitor can browse them too.
+      { path: 'leaderboard', element: <Leaderboard /> },
       { path: 'login', element: <Login /> },
       { path: 'register', element: <Register /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
@@ -68,6 +95,9 @@ export const router = createBrowserRouter([
         element: <RequireAuth />,
         children: [
           { index: true, element: <Title /> },
+          { path: 'profile', element: <Profile /> },
+          { path: 'settings', element: <Settings /> },
+          { path: 'achievements', element: <Achievements /> },
           { path: 'runs', element: <RunList /> },
           { path: 'runs/new', element: <NewRun /> },
           { path: 'runs/:runId', element: <Game /> },
@@ -89,12 +119,22 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <DecksIndex /> },
           { path: 'decks/:name', element: <DeckDetail /> },
+          { path: 'decks-edit/new', element: <DeckEditorPage mode="new" /> },
+          { path: 'decks-edit/:name', element: <DeckEditorPage mode="edit" /> },
           { path: 'graph', element: <GraphView /> },
+          { path: 'cards', element: <CardsIndex /> },
           { path: 'cards/new', element: <CardEditorPage mode="new" /> },
           { path: 'cards/:id', element: <CardEditorPage mode="edit" /> },
+          { path: 'achievements', element: <AchievementsIndex /> },
+          { path: 'achievements/new', element: <AchievementEditorPage mode="new" /> },
+          { path: 'achievements/:id', element: <AchievementEditorPage mode="edit" /> },
           { path: 'endings', element: <EndingsIndex /> },
           { path: 'endings/new', element: <EndingEditorPage mode="new" /> },
           { path: 'endings/:id', element: <EndingEditorPage mode="edit" /> },
+          { path: 'runs', element: <RunInspector /> },
+          { path: 'runs/:userId/:runId', element: <RunInspector /> },
+          { path: 'users', element: <UsersIndex /> },
+          { path: 'users/:userId', element: <UserDetail /> },
         ],
       },
     ],

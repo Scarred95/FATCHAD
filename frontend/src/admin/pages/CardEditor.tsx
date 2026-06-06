@@ -190,23 +190,29 @@ export function CardEditorPage({ mode }: Props) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.crumbs}>
-        <Link
-          to={card.deck_name ? `/admin/decks/${encodeURIComponent(card.deck_name)}` : '/admin/decks/__orphans__'}
-          className={styles.crumbLink}
-        >← Back to {card.deck_name ?? 'orphans'}</Link>
-        <span className={styles.divider}>/</span>
-        <Link to="/admin" className={styles.crumbFaint}>all decks</Link>
-        <span className={styles.divider}>/</span>
-        <span className={styles.crumbId}>{card._id || '(unsaved)'}</span>
+      <header className={styles.header}>
+        <div>
+          <h1 className={styles.heading}>
+            {mode === 'new' ? 'Neue Karte' : card.title || card._id || 'Karte bearbeiten'}
+          </h1>
+          <p className={styles.sub}>
+            <Link
+              to={card.deck_name ? `/admin/decks/${encodeURIComponent(card.deck_name)}` : '/admin/decks/__orphans__'}
+            >← {card.deck_name ?? 'orphans'}</Link>
+            <span>·</span>
+            <Link to="/admin">alle Decks</Link>
+            <span>·</span>
+            <span className={styles.crumbId}>{card._id || '(unsaved)'}</span>
+            {dirty && (
+              <span className={styles.dirty} title="Ungesicherte Änderungen">
+                <span className={styles.dirtyDot} aria-hidden />
+                ungespeichert
+              </span>
+            )}
+          </p>
+        </div>
 
         <div className={styles.actions}>
-          {dirty && (
-            <span className={styles.dirty} title="Ungesicherte Änderungen">
-              <span className={styles.dirtyDot} aria-hidden />
-              unsaved
-            </span>
-          )}
           <button
             type="button"
             onClick={() => { setInspectorFlag(null); setInspectorOpen(true); }}
@@ -214,16 +220,17 @@ export function CardEditorPage({ mode }: Props) {
             title="Karten finden, die ein Flag setzen / lesen"
           >Flags…</button>
           {mode === 'edit' && <button onClick={() => void onDuplicate()} className={admin.btnSecondary} title="Cmd/Ctrl+D">Duplicate</button>}
-          {mode === 'edit' && <button onClick={() => onDelete()} className={admin.btnDanger}>Delete</button>}
+          {mode === 'edit' && <button onClick={() => onDelete()} className={admin.btnDanger}>Löschen</button>}
           <button onClick={() => void onSave()} disabled={blockSave} className={admin.btnPrimary} title="Cmd/Ctrl+S">
-            {errors.length > 0 ? `Fix ${errors.length} error(s)` : busy ? 'Saving…' : 'Save'}
+            {errors.length > 0 ? `${errors.length} Fehler` : busy ? 'Speichert…' : 'Speichern'}
           </button>
         </div>
-      </div>
+      </header>
 
       <div className={styles.grid}>
         {/* LEFT — Identity */}
         <section className={`${admin.panel} ${styles.section}`}>
+          <header className={styles.sectionHead}>Stammdaten</header>
           <div>
             <div className={admin.fieldLabel}>
               _id {isLocked && <span className={styles.locked}>(locked)</span>}
@@ -349,6 +356,7 @@ export function CardEditorPage({ mode }: Props) {
 
         {/* MIDDLE — Choices */}
         <section className={`${admin.panel} ${styles.section}`}>
+          <header className={styles.sectionHead}>Antworten</header>
           <ChoicesEditor
             value={card.choices}
             onChange={(v) => patch({ choices: v })}
@@ -360,10 +368,12 @@ export function CardEditorPage({ mode }: Props) {
         {/* RIGHT — Preview & graph + validation */}
         <section className={styles.rightCol}>
           <div className={`${admin.panel} ${styles.previewSection}`}>
+            <header className={`${styles.sectionHead} ${styles.previewHead}`}>Vorschau</header>
             <CardPreview card={card} />
           </div>
 
           <div className={`${admin.panel} ${styles.referrers}`}>
+            <header className={styles.sectionHead}>Referenzen</header>
             <div>
               <div className={admin.fieldLabel}>Adds:</div>
               <div className={styles.refRow}>

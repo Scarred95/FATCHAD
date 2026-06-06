@@ -1,205 +1,223 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { decksOf, useAdminCardStore } from '../store';
-import { useAdminEndingStore } from '../endingStore';
+/**
+ * Decks section — top-level browser of server-side Deck records.
+ *
+ * The previous version of this page grouped *cards by deck_name* — useful
+ * when only cards lived in the database. Now that the backend has real
+ * Deck records, the tile reflects the record (name, description, unlock
+ * rule, enabled flag) and pulls card stats from the card store as a
+ * derived view.
+ *
+ * "Shadow decks" — deck_names present on cards but not yet promoted to a
+ * record — are surfaced inline with a hint so the admin can create the
+ * missing record.
+ */
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAdminCardStore, cardsInDeck, deckNamesOf } from '../store';
+import { useAdminDeckStore } from '../deckStore';
+import { SectionToolbar, type ViewMode } from '../components/SectionToolbar';
+import { DeckTile } from '../components/DeckTile';
+import { Toggle } from '../components/Toggle';
 import { ImportExportBar } from '../components/ImportExportBar';
-import { validateCard } from '../utils/validate';
-import { dropRecent, loadRecents, timeAgo, type RecentEntry } from '../utils/recents';
-import type { Card } from '../types';
-import admin from '../admin.module.css';
+import type { Card, Deck } from '../types';
 import styles from './DecksIndex.module.css';
 
-function deckHas3Choice(cards: Card[]) {
-  return cards.some((c) => c.choices.length === 3);
-}
-function deckHasQuestline(cards: Card[]) {
-  return cards.some((c) =>
-    c.choices.some((ch) => (ch.adds_to_deck?.length ?? 0) > 0)
-    || c.important
-    || (c.weight ?? 10) === 0,
-  );
-}
-function categoryBreakdown(cards: Card[]) {
-  const map = new Map<string, number>();
-  for (const c of cards) map.set(c.category, (map.get(c.category) ?? 0) + 1);
-  return [...map.entries()].sort((a, b) => b[1] - a[1]);
+type SortKey = 'name' | 'cards' | 'updated';
+
+const SORT_OPTIONS = [
+  { value: 'name',    label: 'A–Z' },
+  { value: 'cards',   label: 'Karten' },
+  { value: 'updated', label: 'Zuletzt geändert' },
+];
+
+/** Synth Deck record for a deck_name that exists on cards but not yet on
+ *  the server. Marked with `__shadow__` so we can render a hint and link
+ *  the row to "promote to record" instead of the normal edit page. */
+interface ShadowDeck extends Deck {
+  __shadow__: true;
 }
 
-interface DeckHealth { errors: number; warnings: number }
-
-/** Count cards in a deck that have at least one error / warning. */
-function deckHealth(deckCards: Card[], allCards: Card[], endingIds: Set<string>): DeckHealth {
-  let errors = 0;
-  let warnings = 0;
-  for (const c of deckCards) {
-    const issues = validateCard(c, allCards, endingIds);
-    if (issues.some((i) => i.level === 'error')) errors++;
-    else if (issues.some((i) => i.level === 'warning')) warnings++;
-  }
-  return { errors, warnings };
+function isShadow(d: Deck | ShadowDeck): d is ShadowDeck {
+  return (d as ShadowDeck).__shadow__ === true;
 }
 
 export function DecksIndex() {
   const cards = useAdminCardStore((s) => s.cards);
-  const endings = useAdminEndingStore((s) => s.endings);
-  const endingIds = useMemo(() => new Set(endings.map((e) => e._id)), [endings]);
-  const decks = decksOf(cards);
+  const decks = useAdminDeckStore((s) => s.decks);
+  const setDeckRecordEnabled = useAdminDeckStore((s) => s.setDeckRecordEnabled);
+  const nav = useNavigate();
 
-  // Recently-edited rail: read from localStorage once + after each save.
-  // We refresh when `cards` changes because that's the only signal we
-  // need — markRecent is called from the store's upsert path.
-  const [recents, setRecents] = useState<RecentEntry[]>(() => loadRecents());
-  useEffect(() => { setRecents(loadRecents()); }, [cards]);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortKey>('name');
+  const [viewMode, setViewMode] = useState<ViewMode>('tile');
 
-  const recentResolved = useMemo(() => {
-    const byId = new Map(cards.map((c) => [c._id, c]));
-    return recents
-      .map((r) => ({ entry: r, card: byId.get(r.id) }))
-      .filter((x): x is { entry: RecentEntry; card: Card } => !!x.card)
-      .slice(0, 5);
-  }, [recents, cards]);
-
-  const onForgetRecent = (id: string) => {
-    dropRecent(id);
-    setRecents(loadRecents());
-  };
-
-  // Health map: deck key → counts. Recomputed when cards or endings change.
-  const healthByDeck = useMemo(() => {
-    const out = new Map<string, DeckHealth>();
-    for (const [name, list] of decks.entries()) {
-      out.set(name, deckHealth(list, cards, endingIds));
+  // Build the union of {server-side Decks} ∪ {deck_names referenced on
+  // cards without a record}. Shadow rows surface the gap so the admin
+  // can promote them — we never silently drop cards' deck_name values.
+  const rows = useMemo<(Deck | ShadowDeck)[]>(() => {
+    const byName = new Map<string, Deck | ShadowDeck>();
+    for (const d of decks) byName.set(d.name, d);
+    for (const name of deckNamesOf(cards)) {
+      if (!byName.has(name)) {
+        byName.set(name, {
+          name,
+          description: '',
+          enabled: true,
+          unlock_rule: { kind: 'default' },
+          __shadow__: true,
+        });
+      }
     }
-    return out;
-    // decks is derived from cards; only re-run on cards/endings changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, endingIds]);
+    return [...byName.values()];
+  }, [decks, cards]);
 
-  const totalErrors = useMemo(
-    () => [...healthByDeck.values()].reduce((n, h) => n + h.errors, 0),
-    [healthByDeck],
-  );
-  const totalWarnings = useMemo(
-    () => [...healthByDeck.values()].reduce((n, h) => n + h.warnings, 0),
-    [healthByDeck],
-  );
+  const cardsByDeck = useMemo(() => {
+    const map = new Map<string, Card[]>();
+    for (const r of rows) map.set(r.name, cardsInDeck(cards, r.name));
+    return map;
+  }, [rows, cards]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const matches = (d: Deck | ShadowDeck) => {
+      if (!q) return true;
+      return [d.name, d.description ?? ''].some((s) => s.toLowerCase().includes(q));
+    };
+    const list = rows.filter(matches);
+    list.sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      if (sort === 'cards') {
+        return (cardsByDeck.get(b.name)?.length ?? 0)
+          - (cardsByDeck.get(a.name)?.length ?? 0);
+      }
+      // 'updated' — shadow rows have no timestamp, sink to bottom.
+      const at = a.updated_at ?? '';
+      const bt = b.updated_at ?? '';
+      return bt.localeCompare(at);
+    });
+    return list;
+  }, [rows, search, sort, cardsByDeck]);
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.heading}>FATCHAD — Card Editor</h1>
-          <p className={styles.sub}>
-            {cards.length} card(s) · {[...decks.keys()].filter(Boolean).length} deck(s)
-            {totalErrors > 0 && (
-              <span className={styles.totalError}> · {totalErrors} error{totalErrors === 1 ? '' : 's'}</span>
-            )}
-            {totalWarnings > 0 && (
-              <span className={styles.totalWarn}> · {totalWarnings} warning{totalWarnings === 1 ? '' : 's'}</span>
-            )}
-          </p>
-        </div>
-        <div className={styles.actions}>
-          <Link to="/admin/graph" className={admin.btnSecondary}>Graph view</Link>
-          <ImportExportBar />
-        </div>
-      </header>
+      <SectionToolbar
+        title="Decks"
+        count={decks.length}
+        noun="Decks"
+        search={search} onSearch={setSearch}
+        sortOptions={SORT_OPTIONS}
+        sort={sort} onSort={(v) => setSort(v as SortKey)}
+        viewMode={viewMode} onViewMode={setViewMode}
+        extras={<ImportExportBar />}
+        primaryAction={{ label: 'Neues Deck', onClick: () => nav('/admin/decks-edit/new') }}
+      />
 
-      {recentResolved.length > 0 && (
-        <div className={`${admin.panel} ${styles.recentsRail}`}>
-          <div className={styles.recentsHead}>
-            <span className={styles.recentsLabel}>Recently edited</span>
-          </div>
-          <div className={styles.recentsList}>
-            {recentResolved.map(({ entry, card }) => (
-              <div key={card._id} className={styles.recentItem}>
-                <Link
-                  to={`/admin/cards/${encodeURIComponent(card._id)}`}
-                  className={styles.recentLink}
-                >
-                  <span className={styles.recentTitle}>{card.title || card._id}</span>
-                  <span className={styles.recentMeta}>
-                    {card.deck_name ?? 'orphan'} · {timeAgo(entry.at)}
-                  </span>
-                </Link>
-                <button
-                  type="button"
-                  className={styles.recentDrop}
-                  onClick={() => onForgetRecent(card._id)}
-                  aria-label={`Forget ${card._id}`}
-                  title="Aus der Liste entfernen"
-                >×</button>
-              </div>
-            ))}
-          </div>
+      {filtered.length === 0 ? (
+        <div className={styles.empty}>
+          <div className={styles.emptyGlyph}>—</div>
+          <h2 className={styles.emptyTitle}>Keine Decks</h2>
+          <p className={styles.emptySub}>Lege ein erstes Deck an, um Karten zu gruppieren.</p>
         </div>
-      )}
-
-      {cards.length === 0 && (
-        <div className={`${admin.panel} ${styles.empty}`}>
-          <div className={styles.emptyTitle}>No cards loaded.</div>
-          <div style={{ fontSize: 'var(--fs-body-sm)' }}>
-            Use <b>Import JSON…</b> to drop in an existing deck, or create one from scratch.
-          </div>
-          <Link to="/admin/cards/new" className={admin.btnPrimary}>+ New card</Link>
+      ) : viewMode === 'tile' ? (
+        <div className={styles.tileGrid}>
+          {filtered.map((d) => (
+            <div key={d.name} className={styles.tileWrap}>
+              {isShadow(d) && (
+                <div className={styles.shadowHint}>
+                  Noch kein Datensatz —{' '}
+                  <button
+                    type="button"
+                    className={styles.shadowAction}
+                    onClick={() => nav(`/admin/decks-edit/new?name=${encodeURIComponent(d.name)}`)}
+                  >
+                    anlegen
+                  </button>
+                </div>
+              )}
+              <DeckTile
+                deck={d}
+                cards={cardsByDeck.get(d.name) ?? []}
+                onToggleEnabled={() => {
+                  if (isShadow(d)) return; // can't toggle a non-existent record
+                  void setDeckRecordEnabled(d.name, d.enabled === false);
+                }}
+              />
+            </div>
+          ))}
         </div>
-      )}
-
-      <div className={styles.grid}>
-        {[...decks.entries()]
-          .sort(([a], [b]) => {
-            if (a === '') return 1;
-            if (b === '') return -1;
-            return a.localeCompare(b);
-          })
-          .map(([name, list]) => {
-            const isOrphan = name === '';
-            const key = isOrphan ? '__orphans__' : name;
-            const breakdown = categoryBreakdown(list);
-            const health = healthByDeck.get(name) ?? { errors: 0, warnings: 0 };
-            return (
-              <Link
-                key={key}
-                to={`/admin/decks/${encodeURIComponent(key)}`}
-                className={`${admin.panel} ${styles.deck}`}
-              >
-                <div className={styles.deckHead}>
-                  <div className={styles.deckName}>{isOrphan ? 'Orphans (no deck_name)' : name}</div>
-                  <div className={styles.deckChips}>
-                    {health.errors > 0 && (
-                      <span className={styles.errorBadge} title={`${health.errors} card(s) with validation errors`}>
-                        {health.errors} err
-                      </span>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ width: 40 }}></th>
+              <th>Deck</th>
+              <th>Beschreibung</th>
+              <th>Unlock</th>
+              <th className={styles.num}>Karten</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((d) => {
+              const list = cardsByDeck.get(d.name) ?? [];
+              const shadow = isShadow(d);
+              const unlock = d.unlock_rule ?? { kind: 'default' };
+              return (
+                <tr key={d.name} className={d.enabled === false ? styles.rowOff : ''}>
+                  <td>
+                    <Toggle
+                      on={d.enabled !== false}
+                      onToggle={() => {
+                        if (shadow) {
+                          nav(`/admin/decks-edit/new?name=${encodeURIComponent(d.name)}`);
+                          return;
+                        }
+                        void setDeckRecordEnabled(d.name, d.enabled === false);
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={styles.rowTitle}
+                      onClick={() => nav(`/admin/decks/${encodeURIComponent(d.name)}`)}
+                    >
+                      {d.name}
+                    </button>
+                    {shadow && <span className={styles.shadowTag}>Schatten</span>}
+                  </td>
+                  <td className={styles.descCell}>{d.description || '—'}</td>
+                  <td className={styles.mono}>
+                    {unlock.kind === 'achievement'
+                      ? `★ ${unlock.achievement_id ?? '—'}`
+                      : 'standard'}
+                  </td>
+                  <td className={styles.num}>{list.length}</td>
+                  <td>
+                    {shadow ? (
+                      <button
+                        type="button"
+                        className={styles.shadowAction}
+                        onClick={() => nav(`/admin/decks-edit/new?name=${encodeURIComponent(d.name)}`)}
+                      >
+                        anlegen
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.editAction}
+                        onClick={() => nav(`/admin/decks-edit/${encodeURIComponent(d.name)}`)}
+                      >
+                        bearbeiten
+                      </button>
                     )}
-                    {health.warnings > 0 && (
-                      <span className={styles.warnBadge} title={`${health.warnings} card(s) with warnings`}>
-                        {health.warnings} warn
-                      </span>
-                    )}
-                    {deckHasQuestline(list) && <span className={admin.chip}>questline</span>}
-                    {deckHas3Choice(list) && <span className={admin.chip}>3-choice</span>}
-                  </div>
-                </div>
-                <div className={styles.deckCount}>
-                  {list.length} card(s)
-                  {(() => {
-                    const enabled = list.filter((c) => c.enabled !== false).length;
-                    const disabled = list.length - enabled;
-                    if (disabled === 0) return null;
-                    return (
-                      <span className={styles.deckCountDisabled}> · {disabled} disabled</span>
-                    );
-                  })()}
-                </div>
-                <div className={styles.deckBreakdown}>
-                  {breakdown.slice(0, 6).map(([cat, n]) => (
-                    <span key={cat} className={admin.chip}>{cat} · {n}</span>
-                  ))}
-                </div>
-              </Link>
-            );
-          })}
-      </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

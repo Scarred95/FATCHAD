@@ -1,0 +1,137 @@
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.typeSelect,
+.input {
+  width: 100%;
+  background: var(--color-bg-base);
+  color: var(--color-text);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  outline: none;
+  transition: border-color var(--dur-quick);
+}
+
+.typeSelect:focus,
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+}
+
+/* ─── multi-value (flags / endings) ──────────────────────────────── */
+
+.multi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.multiRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.iconBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-text-faint);
+  background: var(--color-bg-base);
+  color: var(--color-text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--dur-quick), color var(--dur-quick);
+}
+
+.iconBtn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.addRow,
+.addNested {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color var(--dur-quick), color var(--dur-quick);
+}
+
+.addRow:hover,
+.addNested:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ─── nesting ────────────────────────────────────────────────────── */
+
+.children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-bg-overlay-strong);
+}
+
+.childRow {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.childBody {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+}
+
+.maxDepth {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}

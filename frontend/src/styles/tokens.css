@@ -34,6 +34,7 @@
   /* ─── Typography ───────────────────────────────────────────── */
   --font-display: 'Anton', 'Bebas Neue', 'Impact', system-ui, sans-serif;
   --font-body: 'Inter', 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', 'Consolas', monospace;
 
   --fs-display-xl: clamp(3.5rem, 14vw, 7rem);
   --fs-display-lg: clamp(2.5rem, 9vw, 4.5rem);

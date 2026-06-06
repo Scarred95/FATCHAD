@@ -1,221 +1,203 @@
+/**
+ * Endings section — top-level browser.
+ *
+ *   • SectionToolbar with search · sort · view mode · import/export · "+ Neues Ending"
+ *   • Filter chips: default / quest / nur aktiv
+ *   • Tile or list view
+ *
+ * Tile/row click → EndingEditor (unchanged). Default + enabled flips use
+ * the optimistic store actions; both are reversible from inside the tile.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminEndingStore, referencesToEnding } from '../endingStore';
 import { useAdminCardStore } from '../store';
+import { SectionToolbar, type ViewMode } from '../components/SectionToolbar';
+import { EndingTile } from '../components/EndingTile';
 import { EndingsImportExportBar } from '../components/EndingsImportExportBar';
-import type { Ending, StatKey } from '../types';
-import { STAT_COLORS, STAT_LABELS, STAT_KEYS } from '../types';
-import admin from '../admin.module.css';
+import { Toggle } from '../components/Toggle';
+import type { Ending } from '../types';
 import styles from './EndingsIndex.module.css';
 
-type Filter = 'all' | 'default' | 'nondefault' | 'disabled';
+type SortKey = 'priority' | 'title' | 'id' | 'refs';
+type KindFilter = 'all' | 'default' | 'quest';
 
-/**
- * Endings as a card grid. Each card surfaces the requirements (stats + flags)
- * at a glance so authors can scan the catalogue without opening the editor.
- */
-export function EndingsIndex() {
-  const nav = useNavigate();
-  const endings = useAdminEndingStore((s) => s.endings);
-  const cards = useAdminCardStore((s) => s.cards);
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const filtered = useMemo(() => {
-    const arr = endings.slice();
-    arr.sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a._id.localeCompare(b._id));
-    if (filter === 'default') return arr.filter((e) => e.default);
-    if (filter === 'nondefault') return arr.filter((e) => !e.default);
-    if (filter === 'disabled') return arr.filter((e) => e.enabled === false);
-    return arr;
-  }, [endings, filter]);
-
-  const counts = useMemo(() => ({
-    all: endings.length,
-    default: endings.filter((e) => e.default).length,
-    nondefault: endings.filter((e) => !e.default).length,
-    disabled: endings.filter((e) => e.enabled === false).length,
-  }), [endings]);
-
-  return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.heading}>Endings</h1>
-          <p className={styles.sub}>
-            {endings.length} Ending{endings.length === 1 ? '' : 's'} · klick zum Bearbeiten
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={admin.btnPrimary}
-            onClick={() => nav('/admin/endings/new')}
-          >
-            + Neues Ending
-          </button>
-        </div>
-      </header>
-
-      <EndingsImportExportBar />
-
-      <div className={styles.filters}>
-        <FilterChip label={`Alle (${counts.all})`} active={filter === 'all'} onClick={() => setFilter('all')} />
-        <FilterChip label={`Default (${counts.default})`} active={filter === 'default'} onClick={() => setFilter('default')} />
-        <FilterChip label={`Nicht-default (${counts.nondefault})`} active={filter === 'nondefault'} onClick={() => setFilter('nondefault')} />
-        <FilterChip label={`Deaktiviert (${counts.disabled})`} active={filter === 'disabled'} onClick={() => setFilter('disabled')} />
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className={styles.empty}>
-          {endings.length === 0
-            ? 'Noch keine Endings vorhanden.'
-            : 'Kein Ending passt zum Filter.'}
-        </div>
-      ) : (
-        <div className={styles.grid}>
-          {filtered.map((e) => (
-            <EndingCard
-              key={e._id}
-              ending={e}
-              refCount={totalRefs(e._id, cards)}
-              onClick={() => nav(`/admin/endings/${encodeURIComponent(e._id)}`)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className={active ? styles.chipActive : styles.chip}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
-interface CardProps {
-  ending: Ending;
-  refCount: number;
-  onClick: () => void;
-}
-
-function EndingCard({ ending, refCount, onClick }: CardProps) {
-  const disabled = ending.enabled === false;
-  const reqs = ending.requires ?? {};
-  const statEntries: Array<{ key: StatKey; min?: number | null; max?: number | null }> = useMemo(
-    () =>
-      STAT_KEYS.flatMap((k) => {
-        const r = reqs.stats?.[k];
-        if (!r) return [];
-        if (r.min == null && r.max == null) return [];
-        return [{ key: k, min: r.min, max: r.max }];
-      }),
-    [reqs],
-  );
-
-  const flagsAll = reqs.flags_all ?? [];
-  const flagsAny = reqs.flags_any ?? [];
-  const flagsNone = reqs.flags_none ?? [];
-  const hasFlags = flagsAll.length + flagsAny.length + flagsNone.length > 0;
-  const hasReqs = statEntries.length > 0 || hasFlags;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${admin.panel} ${styles.card} ${disabled ? styles.cardDisabled : ''}`}
-    >
-      <div className={styles.cardHead}>
-        <div className={styles.cardTitleWrap}>
-          <span className={styles.cardTitle}>{ending.title || '(ohne Titel)'}</span>
-          <span className={styles.cardId}>{ending._id}</span>
-        </div>
-        <div className={styles.cardBadges}>
-          {ending.default ? (
-            <span className={styles.badgeDefault}>default</span>
-          ) : (
-            <span className={styles.badge}>quest</span>
-          )}
-          {disabled && <span className={styles.badgeOff}>aus</span>}
-        </div>
-      </div>
-
-      {ending.description && (
-        <div className={styles.cardDesc}>{ending.description}</div>
-      )}
-
-      {hasReqs ? (
-        <div className={styles.reqs}>
-          {statEntries.length > 0 && (
-            <div className={styles.reqSection}>
-              <div className={styles.reqLabel}>Stats</div>
-              <div className={styles.chipRow}>
-                {statEntries.map((s) => (
-                  <span
-                    key={s.key}
-                    className={styles.statChip}
-                    style={{
-                      borderColor: STAT_COLORS[s.key],
-                      color: STAT_COLORS[s.key],
-                    }}
-                  >
-                    {STAT_LABELS[s.key]} {formatRange(s.min, s.max)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {hasFlags && (
-            <div className={styles.reqSection}>
-              <div className={styles.reqLabel}>Flags</div>
-              <div className={styles.chipRow}>
-                {flagsAll.map((f) => (
-                  <span key={`all-${f}`} className={styles.flagAll} title="required (all)">
-                    +{f}
-                  </span>
-                ))}
-                {flagsAny.map((f) => (
-                  <span key={`any-${f}`} className={styles.flagAny} title="required (any)">
-                    ±{f}
-                  </span>
-                ))}
-                {flagsNone.map((f) => (
-                  <span key={`none-${f}`} className={styles.flagNone} title="must not have">
-                    −{f}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className={styles.reqsEmpty}>Keine Bedingungen</div>
-      )}
-
-      <div className={styles.cardFoot}>
-        <span title="Priorität (lower = früher geprüft)">p{ending.priority ?? 100}</span>
-        <span title="Anzahl Karten, die dieses Ending referenzieren">
-          {refCount} ref{refCount === 1 ? '' : 's'}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function formatRange(min?: number | null, max?: number | null): string {
-  if (min != null && max != null) return `${min}…${max}`;
-  if (min != null) return `≥ ${min}`;
-  if (max != null) return `≤ ${max}`;
-  return '';
-}
+const SORT_OPTIONS = [
+  { value: 'priority', label: 'Priorität' },
+  { value: 'title',    label: 'A–Z' },
+  { value: 'id',       label: 'ID' },
+  { value: 'refs',     label: 'Referenzen' },
+];
 
 function totalRefs(id: string, cards: Parameters<typeof referencesToEnding>[1]): number {
   const c = referencesToEnding(id, cards);
   return c.triggers + c.unlocks + c.removes;
+}
+
+export function EndingsIndex() {
+  const nav = useNavigate();
+  const endings = useAdminEndingStore((s) => s.endings);
+  const setEndingEnabled = useAdminEndingStore((s) => s.setEndingEnabled);
+  const setEndingDefault = useAdminEndingStore((s) => s.setEndingDefault);
+  const cards = useAdminCardStore((s) => s.cards);
+
+  const [search, setSearch]     = useState('');
+  const [sort, setSort]         = useState<SortKey>('priority');
+  const [viewMode, setViewMode] = useState<ViewMode>('tile');
+  const [kind, setKind]         = useState<KindFilter>('all');
+  const [includeDisabled, setIncludeDisabled] = useState(true);
+
+  const refsById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of endings) m.set(e._id, totalRefs(e._id, cards));
+    return m;
+  }, [endings, cards]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const matches = (e: Ending) => {
+      if (q && ![e.title, e._id, e.description ?? '']
+        .some((s) => s.toLowerCase().includes(q))) return false;
+      if (kind === 'default' && !e.default) return false;
+      if (kind === 'quest'   &&  e.default) return false;
+      if (!includeDisabled && e.enabled === false) return false;
+      return true;
+    };
+    const list = endings.filter(matches);
+    list.sort((a, b) => {
+      if (sort === 'priority') {
+        return (a.priority ?? 100) - (b.priority ?? 100) || a._id.localeCompare(b._id);
+      }
+      if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
+      if (sort === 'refs')  return (refsById.get(b._id) ?? 0) - (refsById.get(a._id) ?? 0);
+      return a._id.localeCompare(b._id);
+    });
+    return list;
+  }, [endings, search, kind, includeDisabled, sort, refsById]);
+
+  const counts = useMemo(() => ({
+    all: endings.length,
+    default: endings.filter((e) => e.default).length,
+    quest: endings.filter((e) => !e.default).length,
+  }), [endings]);
+
+  return (
+    <div className={styles.page}>
+      <SectionToolbar
+        title="Endings"
+        count={endings.length}
+        noun="Endings"
+        search={search} onSearch={setSearch}
+        sortOptions={SORT_OPTIONS}
+        sort={sort} onSort={(v) => setSort(v as SortKey)}
+        viewMode={viewMode} onViewMode={setViewMode}
+        extras={<EndingsImportExportBar />}
+        primaryAction={{ label: 'Neues Ending', onClick: () => nav('/admin/endings/new') }}
+      />
+
+      <div className={styles.filterRow}>
+        <span className={styles.filterLabel}>Typ</span>
+        <button
+          type="button"
+          className={`${styles.fChip} ${kind === 'all' ? styles.fChipOn : ''}`}
+          onClick={() => setKind('all')}
+        >alle ({counts.all})</button>
+        <button
+          type="button"
+          className={`${styles.fChip} ${kind === 'default' ? styles.fChipOn : ''}`}
+          onClick={() => setKind('default')}
+        >default ({counts.default})</button>
+        <button
+          type="button"
+          className={`${styles.fChip} ${kind === 'quest' ? styles.fChipOn : ''}`}
+          onClick={() => setKind('quest')}
+        >quest ({counts.quest})</button>
+        <span className={styles.spacer} />
+        <button
+          type="button"
+          className={`${styles.fChip} ${!includeDisabled ? styles.fChipOn : ''}`}
+          onClick={() => setIncludeDisabled((v) => !v)}
+        >
+          {includeDisabled ? 'alle Status' : 'nur aktiv'}
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className={styles.empty}>
+          <div className={styles.emptyGlyph}>—</div>
+          <h2 className={styles.emptyTitle}>Keine Endings</h2>
+          <p className={styles.emptySub}>
+            {endings.length === 0
+              ? 'Noch nichts angelegt.'
+              : 'Kein Ending passt zum Filter.'}
+          </p>
+        </div>
+      ) : viewMode === 'tile' ? (
+        <div className={styles.tileGrid}>
+          {filtered.map((e) => (
+            <EndingTile
+              key={e._id}
+              ending={e}
+              refCount={refsById.get(e._id) ?? 0}
+              onToggleEnabled={() => void setEndingEnabled(e._id, e.enabled === false)}
+              onToggleDefault={() => void setEndingDefault(e._id, !e.default)}
+            />
+          ))}
+        </div>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ width: 40 }}></th>
+              <th>Ending</th>
+              <th>Typ</th>
+              <th className={styles.num}>Prio</th>
+              <th className={styles.num}>Refs</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((e) => (
+              <tr key={e._id} className={e.enabled === false ? styles.rowOff : ''}>
+                <td>
+                  <Toggle
+                    on={e.enabled !== false}
+                    onToggle={() => void setEndingEnabled(e._id, e.enabled === false)}
+                  />
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className={styles.rowTitle}
+                    onClick={() => nav(`/admin/endings/${encodeURIComponent(e._id)}`)}
+                  >
+                    {e.title || '(ohne Titel)'}
+                  </button>
+                  <div className={styles.rowSub}>{e._id}</div>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className={e.default ? styles.kindDefault : styles.kindQuest}
+                    onClick={() => void setEndingDefault(e._id, !e.default)}
+                  >
+                    {e.default ? 'default' : 'quest'}
+                  </button>
+                </td>
+                <td className={styles.num}>{e.priority ?? 100}</td>
+                <td className={styles.num}>{refsById.get(e._id) ?? 0}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={styles.editAction}
+                    onClick={() => nav(`/admin/endings/${encodeURIComponent(e._id)}`)}
+                  >bearbeiten</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }

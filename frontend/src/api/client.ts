@@ -14,14 +14,20 @@
  */
 import { getAccessToken } from '../stores/authStore';
 import type {
+  AchievementView,
   CardResponse,
+  DeckOption,
   EndSummary,
   GameState,
   HealthResponse,
   HistoryDetailEntry,
+  LeaderboardPointsRow,
+  LeaderboardRunRow,
   PublicCatalog,
+  PublishRunResponse,
   RunSummary,
   TurnResponse,
+  UnlockedAchievementView,
 } from './types';
 import { ApiError, http } from './http';
 import { API_BASE } from './config';
@@ -92,11 +98,35 @@ export const claimGuestAccount = (guestAccessToken: string) =>
 export const getCurrentCatalog = () =>
   request<PublicCatalog>('/catalog/current');
 
+/* ─── Decks ────────────────────────────────────────────────────── */
+
+/** Decks this player may pick on the new-run screen — default-unlocked plus the
+ *  caller's achievement-unlocked decks (Tutorial excluded). Per-user. */
+export const listDecks = () =>
+  request<DeckOption[]>('/decks');
+
+/* ─── Achievements ─────────────────────────────────────────────── */
+
+/** Client achievement catalog — every non-hidden achievement with its hint. */
+export const listAchievements = () =>
+  request<AchievementView[]>('/achievements');
+
+/** Achievements this caller has earned, with unlocked_at (hidden-but-earned
+ *  included). */
+export const listUnlockedAchievements = () =>
+  request<UnlockedAchievementView[]>('/achievements/unlocked');
+
 /* ─── Run lifecycle ────────────────────────────────────────────── */
 
-export const createRun = () =>
+/** Start a run. `tutorial` plays the scripted intro; `deck_ids` picks the decks
+ *  to draw from (omit/empty → backend's default-unlocked set). */
+export const createRun = (opts: { tutorial?: boolean; deck_ids?: string[] } = {}) =>
   request<TurnResponse>('/runs', {
     method: 'POST',
+    body: JSON.stringify({
+      tutorial: opts.tutorial ?? true,
+      ...(opts.deck_ids && opts.deck_ids.length ? { deck_ids: opts.deck_ids } : {}),
+    }),
   });
 
 export const listRuns = () =>
@@ -136,5 +166,39 @@ export const getEndSummary = (runId: string) =>
 
 export const getHistory = (runId: string) =>
   request<HistoryDetailEntry[]>(`/runs/${runId}/history`);
+
+/* ─── Leaderboards ─────────────────────────────────────────────── */
+
+/** Public points board — top accounts by career achievement points. No auth
+ *  needed; the rows carry only a name + score. */
+export const getPointsLeaderboard = (limit?: number) =>
+  request<LeaderboardPointsRow[]>(
+    `/leaderboard/points${limit ? `?limit=${limit}` : ''}`,
+  );
+
+/** Public run highscore board — top runs by rounds survived. */
+export const getRunsLeaderboard = (limit?: number) =>
+  request<LeaderboardRunRow[]>(
+    `/leaderboard/runs${limit ? `?limit=${limit}` : ''}`,
+  );
+
+/** The caller's own published runs (≤5). Requires auth; used by the "Nur meine"
+ *  filter and the end-screen publish picker. */
+export const getMyLeaderboardRuns = () =>
+  request<LeaderboardRunRow[]>('/leaderboard/runs/mine');
+
+/** Publish a finished run to the highscore board. `replaceRunId` is only
+ *  consulted at the 5-run cap — it names which existing run to drop. A 409 with
+ *  a `{ reason: "leaderboard_full", current: [...] }` detail means the picker
+ *  must be shown. */
+export const publishRun = (runId: string, replaceRunId?: string) =>
+  request<PublishRunResponse>(`/leaderboard/runs/${runId}`, {
+    method: 'POST',
+    body: JSON.stringify(replaceRunId ? { replace_run_id: replaceRunId } : {}),
+  });
+
+/** Take one of the caller's runs back off the highscore board. */
+export const unpublishRun = (runId: string) =>
+  request<void>(`/leaderboard/runs/${runId}`, { method: 'DELETE' });
 
 export { ApiError };

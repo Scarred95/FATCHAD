@@ -15,7 +15,8 @@
 import { getAccessToken, useAuthStore } from '../stores/authStore';
 import { ApiError, http } from './http';
 import { ADMIN_API_BASE } from './config';
-import type { Card, Ending } from '../admin/types';
+import type { Achievement, AchievementCriteria, Card, Deck, DeckUnlockRule, Ending } from '../admin/types';
+import type { GameStatus, Stats } from './types';
 
 /* ─── Request/response types (HTTP-layer only) ─────────────────── */
 
@@ -31,7 +32,7 @@ export type PatchCardPayload = Partial<
 export type PatchEndingPayload = Partial<
   Pick<Ending,
     'title' | 'description' | 'priority' | 'requires'
-    | 'default' | 'enabled' | 'image_url'
+    | 'default' | 'enabled' | 'image_url' | 'deck_name'
   >
 >;
 
@@ -149,4 +150,235 @@ export const patchEnding = (endingId: string, payload: PatchEndingPayload) =>
 export const deleteEnding = (endingId: string) =>
   request<void>(`/endings/${encodeURIComponent(endingId)}`, {
     method: 'DELETE',
+  });
+
+/* ─── Deck endpoints ───────────────────────────────────────────── */
+
+/** Create payload — timestamps minted server-side. Backend matches
+ *  `CreateDeckRequest` in `admin_lambda/routes/decks.py`. */
+export interface CreateDeckPayload {
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  unlock_rule?: DeckUnlockRule;
+  removes_endings?: string[];
+  starting_card_id?: string | null;
+}
+
+/** Replace payload — `name` comes from the URL, timestamps are stamped. */
+export interface ReplaceDeckPayload {
+  description?: string;
+  enabled?: boolean;
+  unlock_rule?: DeckUnlockRule;
+  removes_endings?: string[];
+  starting_card_id?: string | null;
+}
+
+/** PATCH payload — partial update; updated_at refreshes any time. */
+export type PatchDeckPayload = Partial<ReplaceDeckPayload>;
+
+export const listDecks = (opts: { limit?: number; skip?: number } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+  if (opts.skip !== undefined) q.set('skip', String(opts.skip));
+  const qs = q.toString();
+  return request<Deck[]>(`/decks${qs ? `?${qs}` : ''}`);
+};
+
+export const getDeck = (deckName: string) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`);
+
+export const createDeck = (payload: CreateDeckPayload) =>
+  request<Deck>('/decks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const replaceDeck = (deckName: string, payload: ReplaceDeckPayload) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const patchDeck = (deckName: string, payload: PatchDeckPayload) =>
+  request<Deck>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteDeck = (deckName: string) =>
+  request<void>(`/decks/${encodeURIComponent(deckName)}`, {
+    method: 'DELETE',
+  });
+
+/* ─── Achievement endpoints ────────────────────────────────────── */
+
+/** Fields PATCH accepts — same as backend's PatchAchievementRequest. */
+export type PatchAchievementPayload = Partial<
+  Pick<Achievement,
+    'name' | 'description' | 'criteria' | 'points'
+    | 'unlocks_deck' | 'enabled' | 'image_url' | 'hint' | 'hidden'
+  >
+>;
+
+export const listAchievements = (opts: { limit?: number; skip?: number } = {}) => {
+  const q = new URLSearchParams();
+  if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+  if (opts.skip !== undefined) q.set('skip', String(opts.skip));
+  const qs = q.toString();
+  return request<Achievement[]>(`/achievements${qs ? `?${qs}` : ''}`);
+};
+
+export const getAchievement = (achId: string) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`);
+
+export const createAchievement = (ach: Achievement) =>
+  request<Achievement>('/achievements', {
+    method: 'POST',
+    body: JSON.stringify(ach),
+  });
+
+export const replaceAchievement = (achId: string, ach: Achievement) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(ach),
+  });
+
+export const patchAchievement = (achId: string, payload: PatchAchievementPayload) =>
+  request<Achievement>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteAchievement = (achId: string) =>
+  request<void>(`/achievements/${encodeURIComponent(achId)}`, {
+    method: 'DELETE',
+  });
+
+// Re-export so consumers can import the criteria shape from the API barrel
+// when they're already pulling other types from here.
+export type { AchievementCriteria };
+
+/* ─── Run inspection (debug) endpoints ─────────────────────────── */
+
+/** One history row from the admin run view. Unlike the player-facing
+ *  `HistoryEntry`, this carries the per-turn post-effect stat snapshot
+ *  (`stats`) used by group-C achievement predicates. `null` for turns
+ *  recorded before the snapshot field existed. */
+export interface AdminRunHistoryEntry {
+  event_id: string;
+  choice: number;
+  turn: number;
+  stats: Stats | null;
+}
+
+/** Full run document as returned by GET /admin/runs/:user/:run/history.
+ *  Read-only debugging view — mirrors backend GameState. */
+export interface AdminRunView {
+  _id: string;
+  user_id: string;
+  deck: string[];
+  flags: string[];
+  stats: Stats;
+  history: AdminRunHistoryEntry[];
+  turn: number;
+  status: GameStatus;
+  ending: string | null;
+  active_endings: string[];
+  /** Achievement ids this run granted at finalize. Empty for active runs. */
+  newly_unlocked: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** A player as surfaced by the directory (run-inspector + users picker).
+ *  Sourced from the USERS#all partition — every real account, guests excluded.
+ *  Live stats live on the detail view, not the listing. */
+export interface PlayerSummary {
+  user_id: string;
+  display_name: string;
+}
+
+/** A lightweight run row for the per-user run-picker (no deck/history). */
+export interface RunSummaryRow {
+  run_id: string;
+  status: GameStatus;
+  turn: number;
+  ending: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** An earned achievement on the user-detail view, joined against the catalog. */
+export interface UserAchievementRow {
+  id: string;
+  name: string;
+  points: number;
+  unlocks_deck: string | null;
+  unlocked_at: string | null;
+  /** True when the id no longer resolves in the working-copy catalog. */
+  orphaned: boolean;
+}
+
+/** Lifetime counters from the user's profile. */
+export interface UserTotals {
+  runs_started: number;
+  runs_completed: number;
+  runs_abandoned: number;
+  achievements_unlocked: number;
+}
+
+/** Aggregate user view — profile/stats + every run + earned achievements. */
+export interface UserDetail {
+  user_id: string;
+  display_name: string;
+  current_points: number;
+  totals: UserTotals;
+  created_at: string | null;
+  updated_at: string | null;
+  runs: RunSummaryRow[];
+  achievements: UserAchievementRow[];
+}
+
+/** Player directory, alphabetical. Feeds the user lookup + run-inspector
+ *  name search. Sourced from USERS#all — every real account, guests excluded
+ *  (still reachable by id via the detail route). */
+export const listPlayers = () =>
+  request<PlayerSummary[]>('/users');
+
+/** Full aggregate for one user: profile/stats, runs, earned achievements. */
+export const getUserDetail = (userId: string) =>
+  request<UserDetail>(`/users/${encodeURIComponent(userId)}`);
+
+/** Every run for a user (any status), newest first — the run-picker list. */
+export const listUserRuns = (userId: string) =>
+  request<RunSummaryRow[]>(`/runs/${encodeURIComponent(userId)}`);
+
+/** Fetch a run's full state + per-turn stat trail for debugging. Needs the
+ *  owning user id (run rows are partitioned under USER#<uid>; no run_id GSI). */
+export const getRunHistory = (userId: string, runId: string) =>
+  request<AdminRunView>(
+    `/runs/${encodeURIComponent(userId)}/${encodeURIComponent(runId)}/history`,
+  );
+
+/* ─── Publish endpoints ────────────────────────────────────────── */
+
+/** Mirrors backend `CatalogPointer` — the "what is currently live?" item.
+ *  `null` from getCurrentPointer means no publish has happened yet. */
+export interface CatalogPointer {
+  version: string;
+  /** ISO 8601 timestamp string from the backend. */
+  published_at: string;
+}
+
+/** Returns the currently live catalog pointer, or null before the first publish. */
+export const getCurrentPointer = () =>
+  request<CatalogPointer | null>('/publish/current');
+
+/** Snapshots the working catalog as a new published version.
+ *  `version` is optional — backend mints a UTC timestamp when omitted. */
+export const publishCatalog = (version?: string) =>
+  request<CatalogPointer>('/publish', {
+    method: 'POST',
+    body: JSON.stringify(version ? { version } : {}),
   });

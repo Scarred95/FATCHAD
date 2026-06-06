@@ -1,17 +1,19 @@
 /**
  * Top-level shell for the /admin/* surface.
  *
- * Loads the card catalogue from the server on first mount, then renders
- * the child route via <Outlet />. The "Reload" button re-fetches without
- * a full page refresh.
+ * Loads the card + ending catalogues on first mount, then renders the child
+ * route via <Outlet />. The chrome is the left rail (brand + nav + Publish
+ * panel + footer); pages render full-bleed into the main column.
  */
 import { useEffect } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useAdminCardStore } from './store';
 import { useAdminEndingStore } from './endingStore';
+import { useAdminDeckStore } from './deckStore';
+import { useAdminAchievementStore } from './achievementStore';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
-import admin from './admin.module.css';
+import { AdminSidebar } from './components/AdminSidebar';
 import styles from './AdminLayout.module.css';
 
 export function AdminLayout() {
@@ -21,6 +23,12 @@ export function AdminLayout() {
   const endingsLoaded = useAdminEndingStore((s) => s.loaded);
   const loadEndings = useAdminEndingStore((s) => s.loadFromServer);
   const clearEndingsLocal = useAdminEndingStore((s) => s.clearLocal);
+  const decksLoaded = useAdminDeckStore((s) => s.loaded);
+  const loadDecks = useAdminDeckStore((s) => s.loadFromServer);
+  const clearDecksLocal = useAdminDeckStore((s) => s.clearLocal);
+  const achievementsLoaded = useAdminAchievementStore((s) => s.loaded);
+  const loadAchievements = useAdminAchievementStore((s) => s.loadFromServer);
+  const clearAchievementsLocal = useAdminAchievementStore((s) => s.clearLocal);
   const logout = useAuthStore((s) => s.logout);
   const pushToast = useToastStore((s) => s.push);
   const nav = useNavigate();
@@ -32,49 +40,40 @@ export function AdminLayout() {
     if (!endingsLoaded) {
       void loadEndings();
     }
-    // Intentionally only on mount — explicit Reload re-runs it.
+    if (!decksLoaded) {
+      void loadDecks();
+    }
+    if (!achievementsLoaded) {
+      void loadAchievements();
+    }
+    // Intentionally only on mount — Reload re-runs it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Logout: drop both caches (server-side data, not local edits) and end the
+  function onReload() {
+    void loadFromServer();
+    void loadEndings();
+    void loadDecks();
+    void loadAchievements();
+  }
+
+  // Logout drops both server-side caches (not local edits) and ends the
   // Cognito session. RequireAdmin will redirect us out of /admin once the
   // session clears — but we navigate explicitly so the title screen is
   // reached even if React Router lags behind.
   function onLogout() {
     clearLocal();
     clearEndingsLocal();
+    clearDecksLocal();
+    clearAchievementsLocal();
     logout();
     pushToast('Abgemeldet', 'info');
     nav('/');
   }
 
-  // NavLink applies styles.navActive when the URL matches. `/admin` needs
-  // `end` so it only lights up on the exact index — without it, every
-  // sub-route ("/admin/endings" etc.) would also mark Decks as active.
-  const navItem = ({ isActive }: { isActive: boolean }) =>
-    isActive ? `${styles.navLink} ${styles.navActive}` : styles.navLink;
-
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <Link to="/" className={styles.back}>← Zurück zum Spiel</Link>
-        <span className={styles.brand}>FATCHAD Admin</span>
-        <nav className={styles.nav} aria-label="Admin-Navigation">
-          <NavLink to="/admin" end className={navItem}>Decks</NavLink>
-          <NavLink to="/admin/endings" className={navItem}>Endings</NavLink>
-        </nav>
-        <div className={styles.spacer} />
-        <button
-          type="button"
-          className={admin.btnSecondary}
-          onClick={() => { void loadFromServer(); void loadEndings(); }}
-        >Reload</button>
-        <button
-          type="button"
-          className={admin.btnDanger}
-          onClick={onLogout}
-        >Abmelden</button>
-      </header>
+      <AdminSidebar onReload={onReload} onLogout={onLogout} />
       <main className={styles.main}>
         {!loaded ? (
           <div className={styles.loading}>Lade Karten…</div>

@@ -9,11 +9,20 @@ from shared.schemas import GameState, Requirements, StatRange
 
 def requirements_satisfied(state: GameState, req: Requirements) -> bool:
     """True when every flag and stat predicate holds for the given state."""
+    return flags_satisfied(state, req) and _stats(state, req)
+
+
+def flags_satisfied(state: GameState, req: Requirements) -> bool:
+    """True when every FLAG predicate holds — stat constraints are ignored.
+
+    Used by the refill/redraw path: a card pulled into the deck now may not
+    surface for several turns, by which point stats have moved, so only the
+    more deliberate flag gates apply at refill. Stats are re-checked at draw
+    time via requirements_satisfied (is_eligible)."""
     return (
         _flags_all(state, req)
         and _flags_none(state, req)
         and _flags_any(state, req)
-        and _stats(state, req)
     )
 
 

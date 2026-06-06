@@ -7,13 +7,33 @@ gameplay.py can import them without circular imports.
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.schemas import Effects, Event, GameState, GameStatus, StatHint, Stats
+from shared.schemas import (
+    Effects,
+    Event,
+    GameState,
+    GameStatus,
+    LbPointsEntry,
+    LbRunEntry,
+    StatHint,
+    Stats,
+)
 from shared.views import public_card_dict
 
 
 # =============================================================================
 # Requests
 # =============================================================================
+
+class CreateRunRequest(BaseModel):
+    """Options for starting a run. Both fields optional so a bare POST still
+    works — defaults give a tutorial run over all default-unlocked decks."""
+    # Whether to play the scripted tutorial intro (seeds the tutorial starter
+    # card and holds off refill until it finishes).
+    tutorial: bool = True
+    # Decks to draw from. None/empty → the 'catch': all default-unlocked decks.
+    # The deck-selector on the new-run screen populates this explicitly.
+    deck_ids: list[str] | None = None
+
 
 class ChoiceRequest(BaseModel):
     choice_index: int = Field(ge=0)
@@ -117,10 +137,64 @@ class HistoryDetailEntry(BaseModel):
     triggered_ending: str | None = None
 
 
+class UnlockedAchievement(BaseModel):
+    """Per-achievement payload for the end-screen toast/banner stack. Built
+    from catalog at /summary time so a deleted achievement just drops out of
+    the list (no orphan rendering)."""
+    id: str
+    name: str
+    description: str = ""
+    points: int = 0
+    unlocks_deck: str | None = None
+    image_url: str | None = None
+
+
+# =============================================================================
+# Deck / achievement catalog responses (player-facing)
+# =============================================================================
+
+class DeckOption(BaseModel):
+    """A deck a player may pick on the new-run screen. Just a label — unlock
+    rules stay server-side (the endpoint only ever returns unlocked decks)."""
+    name: str
+    description: str = ""
+
+
+class AchievementView(BaseModel):
+    """Client-facing achievement label. Criteria stay server-side; `hint` is the
+    deliberate, player-safe nudge. Hidden achievements are filtered out by the
+    listing route until earned."""
+    id: str
+    name: str
+    description: str = ""
+    hint: str = ""
+    points: int = 0
+    unlocks_deck: str | None = None
+    image_url: str | None = None
+
+    @classmethod
+    def from_achievement(cls, ach) -> "AchievementView":
+        return cls(
+            id=ach.id, name=ach.name, description=ach.description,
+            hint=ach.hint, points=ach.points,
+            unlocks_deck=ach.unlocks_deck, image_url=ach.image_url,
+        )
+
+
+class UnlockedAchievementView(AchievementView):
+    """An achievement the caller has earned — adds when it was unlocked. Hidden
+    achievements DO appear here once earned (the reveal-on-unlock pattern)."""
+    unlocked_at: datetime
+
+
 class EndSummary(BaseModel):
     """End-of-run stats for the game-over screen. ending_title/description are
     denormalised from the Ending doc so the recap needs no second fetch; both
-    are None for an abandoned run or an ending id that no longer resolves."""
+    are None for an abandoned run or an ending id that no longer resolves.
+
+    newly_unlocked is reconstructed from `GameState.newly_unlocked` (ids
+    stamped at finalize) joined against the live catalog — survives refresh,
+    re-renders the same banner stack."""
     ending: str | None
     ending_title: str | None
     ending_description: str | None
@@ -128,3 +202,57 @@ class EndSummary(BaseModel):
     turns_survived: int
     final_stats: Stats
     cards_played: int
+    newly_unlocked: list[UnlockedAchievement] = []
+
+
+# =============================================================================
+# Leaderboards
+# =============================================================================
+
+class LeaderboardPointsRow(BaseModel):
+    """One row of the points board. user_id is omitted on purpose — the board is
+    public and only needs a name + score."""
+    display_name: str
+    score: int
+
+    @classmethod
+    def from_entry(cls, e: "LbPointsEntry") -> "LeaderboardPointsRow":
+        return cls(display_name=e.display_name, score=e.score)
+
+
+class LeaderboardRunRow(BaseModel):
+    """One row of the run (highscore) board, or one of a player's own published
+    runs. score = rounds survived; deck_ids/status/ending describe the run."""
+    display_name: str
+    score: int
+    run_id: str
+    deck_ids: list[str]
+    status: GameStatus
+    ending: str | None = None
+    published_at: datetime
+
+    @classmethod
+    def from_entry(cls, e: "LbRunEntry") -> "LeaderboardRunRow":
+        return cls(
+            display_name=e.display_name,
+            score=e.score,
+            run_id=e.run_id,
+            deck_ids=e.deck_ids,
+            status=e.status,
+            ending=e.ending,
+            published_at=e.published_at,
+        )
+
+
+class PublishRunRequest(BaseModel):
+    """Body for POST /leaderboard/runs/{run_id}. replace_run_id is only consulted
+    when the player is already at the 5-run cap — it names which existing run to
+    drop in favour of this one."""
+    replace_run_id: str | None = None
+
+
+class PublishRunResponse(BaseModel):
+    """Returned on a successful publish. evicted_run_id is set only when a
+    replace happened (the run dropped to make room)."""
+    entry: LeaderboardRunRow
+    evicted_run_id: str | None = None

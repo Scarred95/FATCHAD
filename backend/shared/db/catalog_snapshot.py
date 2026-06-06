@@ -5,8 +5,9 @@ GetItem on the pointer, plus an S3 GetObject + parse only when the version
 bumped. Warm containers keep the snapshot in RAM, so a publish costs exactly
 one S3 fetch per container — the design's "every tick hits a cache, not a row".
 
-Exposes the read surface (get_card, get_cards, cards_by_categories,
-default_ending_ids, ...) the game engine consumes in place of the old repos.
+Exposes the read surface (get_card, get_cards, cards_by_decks,
+default_deck_names, active_ending_ids_for_run, ...) the game engine consumes in place
+of the old repos.
 """
 from __future__ import annotations
 
@@ -14,7 +15,8 @@ import json
 
 from shared.db.ddb import catalog_bucket, catalog_table, s3_client
 from shared.db.keys import catalog_pointer_key
-from shared.schemas import Ending, Event
+from shared.game.constants import TUTORIAL_DECK_NAME
+from shared.schemas import Achievement, Deck, Ending, Event
 
 
 # Module-global cache. Reset on cold start; refreshed on pointer bump.
@@ -31,14 +33,19 @@ class CatalogSnapshot:
     (`get_card` not `get_by_id`) since one snapshot holds both cards and endings.
     """
 
-    def __init__(self, version: str, cards: list[Event], endings: list[Ending]):
+    def __init__(
+        self,
+        version: str,
+        cards: list[Event],
+        endings: list[Ending],
+        achievements: list[Achievement],
+        decks: list[Deck] | None = None,
+    ):
         self.version = version
         self._cards: dict[str, Event] = {c.id: c for c in cards}
         self._endings: dict[str, Ending] = {e.id: e for e in endings}
-        # Pre-compute defaults once so new-run creation doesn't refilter.
-        self._default_ending_ids: list[str] = [
-            e.id for e in endings if e.default and e.enabled
-        ]
+        self._achievements: dict[str, Achievement] = {a.id: a for a in achievements}
+        self._decks: dict[str, Deck] = {d.name: d for d in (decks or [])}
 
     # --- Card access ----------------------------------------------------
 
@@ -49,16 +56,33 @@ class CatalogSnapshot:
         """Old EventRepo.get_many — preserves order, skips stale (deleted) ids."""
         return [c for cid in ids if (c := self._cards.get(cid))]
 
-    def cards_by_categories(self, categories: list[str]) -> list[Event]:
-        """Old EventRepo.get_by_categories."""
-        if not categories:
+    def cards_by_decks(self, decks: list[str]) -> list[Event]:
+        """Cards whose deck_name is in `decks`. Feeds build_run_deck."""
+        if not decks:
             return []
-        cats = set(categories)
-        return [c for c in self._cards.values() if c.category in cats]
+        deck_set = set(decks)
+        return [c for c in self._cards.values() if c.deck_name in deck_set]
 
-    def ids_by_category(self, category: str) -> list[str]:
-        """Old EventRepo.list_ids_by_category."""
-        return [c.id for c in self._cards.values() if c.category == category]
+    # --- Deck access ----------------------------------------------------
+
+    def default_deck_names(self) -> list[str]:
+        """Enabled, default-unlocked deck names — the run-creation catch when no
+        decks are selected. `enabled` guard is defensive (bundle is enabled-only)."""
+        return [
+            d.name for d in self._decks.values()
+            if d.enabled and d.unlock_rule.kind == "default"
+        ]
+
+    def available_decks(self, unlocked: set[str]) -> list[Deck]:
+        """Decks a player may pick for a run: every enabled default-unlocked deck
+        plus any in `unlocked` (achievement grants), minus the Tutorial deck
+        (its own checkbox owns it). Feeds the deck-selector endpoint."""
+        return [
+            d for d in self._decks.values()
+            if d.enabled
+            and d.name != TUTORIAL_DECK_NAME
+            and (d.unlock_rule.kind == "default" or d.name in unlocked)
+        ]
 
     # --- Ending access --------------------------------------------------
 
@@ -72,9 +96,68 @@ class CatalogSnapshot:
         simply isn't here to return, which is how toggles take effect mid-run."""
         return [e for eid in ids if (e := self._endings.get(eid))]
 
-    def default_ending_ids(self) -> list[str]:
-        """Old EndingRepo.list_default_ids — pre-filtered to enabled."""
-        return list(self._default_ending_ids)
+    def active_ending_ids_for_run(self, selected_decks: list[str]) -> list[str]:
+        """Ending ids a fresh run starts with. Two ways in, then a subtraction:
+
+        * `default=True` → ALWAYS in the run, whether global (deck_name None) or
+          deck-bound — regardless of which decks were picked.
+        * `default=False` but bound to a SELECTED deck → in the run too.
+
+        Then each selected deck's removes_endings is subtracted. Card-driven
+        add/remove happens later, at play time.
+
+        A non-default global ending (deck_name None, default False) is never
+        auto-assigned — it's a secret reachable only via triggers_ending.
+        """
+        deck_set = set(selected_decks)
+        removed = {
+            eid
+            for name in deck_set
+            if (d := self._decks.get(name)) is not None
+            for eid in d.removes_endings
+        }
+        return [
+            e.id for e in self._endings.values()
+            if e.enabled
+            and (e.default or e.deck_name in deck_set)
+            and e.id not in removed
+        ]
+
+    # --- Achievement access --------------------------------------------
+
+    def get_achievement(self, ach_id: str) -> Achievement | None:
+        return self._achievements.get(ach_id)
+
+    def get_achievements(self) -> list[Achievement]:
+        """All published achievements (publisher strips disabled at publish).
+
+        Order is insertion order from the bundle — predicates run finalize-time
+        so admin priority isn't a concept here; the engine evaluates each in
+        turn and the user ends up with whatever matches."""
+        return list(self._achievements.values())
+
+    # --- Achievement access ---------------------------------------------
+
+    def get_achievement(self, ach_id: str) -> Achievement | None:
+        return self._achievements.get(ach_id)
+
+    def list_achievements(self) -> list[Achievement]:
+        return list(self._achievements.values())
+
+    # --- Deck access ----------------------------------------------------
+
+    def get_deck(self, name: str) -> Deck | None:
+        return self._decks.get(name)
+
+    def list_decks(self) -> list[Deck]:
+        return list(self._decks.values())
+
+    def cards_by_deck_names(self, deck_names: list[str]) -> list[Event]:
+        """All cards whose deck_name is in the given set."""
+        if not deck_names:
+            return []
+        names = set(deck_names)
+        return [c for c in self._cards.values() if c.deck_name in names]
 
 
 # =============================================================================
@@ -100,10 +183,18 @@ def get_current_snapshot() -> CatalogSnapshot:
     obj = s3_client().get_object(Bucket=catalog_bucket(), Key=bundle_key)
     data = json.loads(obj["Body"].read())
 
-    cards = [Event.model_validate(c) for c in data.get("cards", [])]
-    endings = [Ending.model_validate(e) for e in data.get("endings", [])]
+    cards        = [Event.model_validate(c)       for c in data.get("cards", [])]
+    endings      = [Ending.model_validate(e)      for e in data.get("endings", [])]
+    decks        = [Deck.model_validate(d)        for d in data.get("decks", [])]
+    achievements = [Achievement.model_validate(a) for a in data.get("achievements", [])]
 
-    _cached = CatalogSnapshot(version=version, cards=cards, endings=endings)
+    _cached = CatalogSnapshot(
+        version=version,
+        cards=cards,
+        endings=endings,
+        decks=decks,
+        achievements=achievements,
+    )
     _cached_version = version
     return _cached
 

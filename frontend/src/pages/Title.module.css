@@ -52,6 +52,12 @@
   animation: glitch-clip-slow 6s infinite step-end;
 }
 
+/* Honour the "disable glitch" display preference (settingsStore). */
+:global(html[data-no-glitch='true']) .glitch,
+:global(html[data-no-glitch='true']) .glitchSlow {
+  animation: none;
+}
+
 .tagline {
   font-size: var(--fs-body-sm);
   color: var(--color-text-faint);
@@ -123,6 +129,26 @@
 }
 
 .btnText:hover {
+  color: var(--color-accent);
+}
+
+.navRow {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+}
+
+.navLink {
+  color: var(--color-text-dim);
+  font-size: var(--fs-body-sm);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  transition: color var(--dur-quick);
+}
+
+.navLink:hover {
   color: var(--color-accent);
 }
 

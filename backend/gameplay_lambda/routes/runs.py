@@ -13,18 +13,29 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot
+from shared.db.leaderboard_repo import LeaderboardRepo
 from shared.db.user_repo import RunConflict, UserRepo
-from shared.game.deck import draw_eligible_card
+from shared.game.achievements import evaluate_achievements
+from shared.game.constants import (
+    MIN_RUN_DECKS,
+    MIN_RUN_REDRAW_CARDS,
+    TUTORIAL_DECK_NAME,
+)
+from shared.game.deck import build_run_deck, draw_eligible_card, refill_deck_if_needed
 from shared.schemas import Effects, GameState
 
 from gameplay_lambda.routes._deps import (
     get_catalog,
+    get_is_guest,
+    get_leaderboard_repo,
     get_owned_run,
     get_user_repo,
     require_active,
 )
+from gameplay_lambda.routes.leaderboard import sync_points_for_grants
 from gameplay_lambda.routes._schemas import (
     CardResponse,
+    CreateRunRequest,
     HistoryDetailEntry,
     RunSummary,
     TurnResponse,
@@ -34,25 +45,69 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 # Tutorial chains itself via adds_to_deck — seeding the whole list would
 # duplicate every card and clog the deck. One entry is enough.
-_STARTER_DECK = ["evt_tut_01_awakening"]
+_TUTORIAL_STARTER = ["evt_tut_01_awakening"]
 
 
 @router.post("", response_model=TurnResponse, status_code=201)
 def create_run(
+    body: CreateRunRequest | None = None,
     user_id: str = Depends(get_current_user_id),
     users: UserRepo = Depends(get_user_repo),
     catalog: CatalogSnapshot = Depends(get_catalog),
+    lb: LeaderboardRepo = Depends(get_leaderboard_repo),
+    is_guest: bool = Depends(get_is_guest),
 ):
     """Start a new run. Returns state + first card so the client needs one request."""
-    # Snapshot the default ending ids into the run — from here the set lives in
-    # the savestate, so admin edits to defaults won't change in-flight runs.
+    opts = body or CreateRunRequest()
+
+    # One seeded RNG for the whole creation (deck shuffle + initial refill),
+    # stored on the run so it replays deterministically.
+    rng_seed = random.randint(0, 2**31 - 1)
+    rng = random.Random(rng_seed)
+
+    # Resolve which decks feed the run. The 'catch': no explicit selection →
+    # every default-unlocked deck.
+    resolved = opts.deck_ids or catalog.default_deck_names()
+    if len(resolved) < MIN_RUN_DECKS:
+        raise HTTPException(409, "Nicht genügend Decks ausgewählt, um einen Run zu starten.")
+
+    # Tutorial is excluded from the random redraw pool (it has its own seeded
+    # path); its cards only ever enter via the starter seed + adds_to_deck chain.
+    deck_ids = [d for d in resolved if d != TUTORIAL_DECK_NAME]
+    redraw_deck = build_run_deck(deck_ids, catalog, rng)
+    if len(redraw_deck) < MIN_RUN_REDRAW_CARDS:
+        raise HTTPException(409, "Nicht genügend ziehbare Karten, um einen Run zu starten.")
+
+    # Seed the live start deck: the scripted tutorial starter (when enabled)
+    # plus each selected story deck's starting_card_id, so a story deck opens on
+    # its own scripted card that then chains via adds_to_deck. All seeds are
+    # shuffled together so multi-deck runs get a random scripted opener.
+    starting_deck: list[str] = list(_TUTORIAL_STARTER) if opts.tutorial else []
+    for name in deck_ids:
+        deck = catalog.get_deck(name)
+        if deck and deck.starting_card_id:
+            starting_deck.append(deck.starting_card_id)
+    rng.shuffle(starting_deck)
+
+    # Snapshot the run's ending set into the savestate — globals plus the
+    # selected decks' default endings, minus deck removals. From here the set
+    # lives in the run, so admin edits to defaults won't change in-flight runs.
     state = GameState.new_run(
         run_id=GameState.generate_id(),
         user_id=user_id,
-        rng_seed=random.randint(0, 2**31 - 1),
-        starting_deck=list(_STARTER_DECK),
-        starting_endings=catalog.default_ending_ids(),
+        rng_seed=rng_seed,
+        starting_deck=starting_deck,
+        starting_endings=catalog.active_ending_ids_for_run(deck_ids),
+        deck_ids=deck_ids,
+        redraw_deck=redraw_deck,
     )
+
+    # Fill the live deck from the redraw pool (force past the threshold) before
+    # peeking. Safe to call unconditionally: refill_deck_if_needed honours the
+    # tutorial gate internally, so a tutorial run keeps its scripted single-card
+    # opener while a story-starter or plain run gets a full deck — the scripted
+    # starter(s) stay on top and are drawn first.
+    state = refill_deck_if_needed(state, catalog, force=True, rng=rng)
 
     # Peek the first card before saving — if nothing's playable, end the run
     # up-front so we write the final state in a single DDB round-trip.
@@ -61,6 +116,11 @@ def create_run(
         # Engine sentinel, not an Ending doc — the run never really started.
         state.status = "ended"
         state.ending = "softlock_no_cards"
+        # A softlock can still satisfy turn/stat-based criteria; grade it.
+        unlocked = evaluate_achievements(state, user_id, catalog, users)
+        state.newly_unlocked = [a.id for a in unlocked]
+        # Mirror any points gained onto the points board (skips guests).
+        sync_points_for_grants(lb, users, user_id, unlocked, is_guest)
 
     try:
         users.insert_run(state)

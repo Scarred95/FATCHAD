@@ -30,6 +30,14 @@ export interface ChoicePreview {
   hints: Partial<Record<StatName, StatHint>>;
 }
 
+export interface DeckInfo {
+  name: string;
+  description: string;
+  unlocked: boolean;
+  is_default: boolean;
+  has_starting_card: boolean;
+}
+
 export interface CardResponse {
   id: string;
   title: string;
@@ -86,6 +94,18 @@ export interface RunSummary {
   updated_at: string;
 }
 
+/** An achievement that fired because of this run, joined against the live
+ *  catalog at summary time. Stale (deleted) ids drop out server-side. */
+export interface UnlockedAchievement {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  /** Deck name granted alongside the achievement, or null. */
+  unlocks_deck: string | null;
+  image_url: string | null;
+}
+
 export interface EndSummary {
   ending: string | null;
   /** Title from the Ending doc, denormalised at summary time. Null when
@@ -96,6 +116,9 @@ export interface EndSummary {
   turns_survived: number;
   final_stats: Stats;
   cards_played: number;
+  /** Achievements this run earned (re-derived from the run row each call, so
+   *  a refresh re-renders the same set). Empty when nothing fired. */
+  newly_unlocked: UnlockedAchievement[];
 }
 
 /** Server-joined history row — `GameState.history` enriched with card data.
@@ -119,6 +142,58 @@ export interface HistoryDetailEntry {
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: boolean;
+}
+
+/** A deck the player may pick on the new-run screen. Returned by GET /decks —
+ *  default-unlocked ∪ the caller's achievement-unlocked decks (Tutorial excluded). */
+export interface DeckOption {
+  name: string;
+  description: string;
+}
+
+/** Client-facing achievement label from GET /achievements. Criteria stay
+ *  server-side; `hint` is the player-safe nudge. Hidden ones are filtered out
+ *  by the listing route until earned. */
+export interface AchievementView {
+  id: string;
+  name: string;
+  description: string;
+  hint: string;
+  points: number;
+  unlocks_deck: string | null;
+  image_url: string | null;
+}
+
+/** An achievement the caller has earned (GET /achievements/unlocked) — adds
+ *  when it was unlocked. Hidden-but-earned achievements appear here. */
+export interface UnlockedAchievementView extends AchievementView {
+  unlocked_at: string;
+}
+
+/** One row of the points board (GET /leaderboard/points). Public-shaped —
+ *  the backend omits user_id; a name + career points is all it carries. */
+export interface LeaderboardPointsRow {
+  display_name: string;
+  score: number;
+}
+
+/** One row of the run highscore board (GET /leaderboard/runs and /runs/mine),
+ *  or one of the caller's own published runs. `score` is rounds survived. */
+export interface LeaderboardRunRow {
+  display_name: string;
+  score: number;
+  run_id: string;
+  deck_ids: string[];
+  status: GameStatus;
+  ending: string | null;
+  published_at: string;
+}
+
+/** Returned by POST /leaderboard/runs/{run_id}. `evicted_run_id` is set only
+ *  when publishing at the cap replaced an existing run. */
+export interface PublishRunResponse {
+  entry: LeaderboardRunRow;
+  evicted_run_id: string | null;
 }
 
 /** Player-safe catalog bundle served by GET /catalog/current.

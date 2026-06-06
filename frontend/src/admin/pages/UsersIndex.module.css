@@ -1,0 +1,126 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 760px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: var(--tracking-display);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1;
+}
+
+.sub {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-dim);
+  margin: 0;
+  max-width: 640px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-md);
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+  color: var(--color-text-faint);
+}
+
+.input {
+  width: 100%;
+  background: var(--color-bg-base);
+  color: var(--color-text);
+  border: 1px solid var(--color-text-faint);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-sm);
+  outline: none;
+  transition: border-color var(--dur-quick);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.error {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #ffb0b0;
+}
+
+.muted {
+  color: var(--color-text-faint);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-bg-overlay);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--dur-quick);
+}
+
+.row:hover {
+  border-color: var(--color-accent);
+}
+
+.name {
+  font-size: var(--fs-body-sm);
+  color: var(--color-text);
+}
+
+.id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.manualRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: 4px;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-bg-overlay);
+}
+
+.manualField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 220px;
+}
