@@ -147,7 +147,6 @@ class UnlockedAchievement(BaseModel):
     points: int = 0
     unlocks_deck: str | None = None
     image_url: str | None = None
-    unlocked_at: datetime
 
 
 # =============================================================================
