@@ -16,6 +16,9 @@ interface Props {
   slug: string;
   category?: string;
   deckName?: string | null;
+  /** Real artwork. When set, it's laid over the gradient and feathered into it
+   *  on every edge; the gradient still provides the colour + corner labels. */
+  imageUrl?: string | null;
 }
 
 function hashCode(s: string): number {
@@ -24,7 +27,7 @@ function hashCode(s: string): number {
   return h;
 }
 
-export default function CardArt({ slug, category, deckName }: Props) {
+export default function CardArt({ slug, category, deckName, imageUrl }: Props) {
   const h = hashCode(slug);
   const hue1 = (h * 37) % 360;
   const hue2 = (hue1 + 35) % 360;
@@ -40,6 +43,9 @@ export default function CardArt({ slug, category, deckName }: Props) {
   return (
     <div className={styles.art} style={{ background: bg }}>
       <div className={styles.stripes} style={{ background: stripe }} aria-hidden />
+      {imageUrl && (
+        <div className={styles.photo} style={{ backgroundImage: `url(${imageUrl})` }} aria-hidden />
+      )}
       <div className={styles.corner}>
         <span className={styles.category}>{leftLabel}</span>
         <span className={styles.deckChip}>{rightLabel}</span>

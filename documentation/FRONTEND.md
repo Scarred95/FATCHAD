@@ -44,17 +44,44 @@ server-side, so runs can be saved and resumed across sessions.
 | Concern | Choice |
 |---|---|
 | Build | Vite 5 + TypeScript 5 |
-| UI | React 18 |
+| UI | React 19 |
 | Routing | React Router v6 (`createBrowserRouter`) |
 | State | Zustand v5 |
-| Animation | Framer Motion v11 |
-| Admin graph | ReactFlow v11 (lazy-loaded) |
+| Animation | Framer Motion v12 |
+| CRT/scanline shell | `vault66-crt-effect` (wraps the whole app in `App.tsx`) |
+| Audio | plain `HTMLAudioElement` singletons (`src/audio/`), no library |
+| Admin graph | `@xyflow/react` v12 (lazy-loaded) |
 | Admin schema/validation | Zod v3 |
 | Admin import/export | JSZip |
 | Styling | CSS Modules + design tokens in `src/styles/tokens.css` |
 
 Scripts: `npm run dev` (Vite @ :5173), `npm run build` (`tsc && vite build`),
 `npm run typecheck`.
+
+### App shell & global systems (`src/App.tsx`, `src/main.tsx`)
+
+- **CRT shell** — the whole app is wrapped in `<CRTEffect>` (`vault66-crt-effect`).
+  `enabled` is held constantly `true` on purpose: the lib renders a *different*
+  tree when `enabled` flips, which would remount every child (closing any open
+  UI). The individual sub-effects (`enableScanlines` / `enableSweep` /
+  `enableEdgeGlow` + scanline opacity) are toggled instead, driven by
+  `settingsStore`.
+- **Page transitions** — `AnimatePresence mode="wait"` around a `motion.div`
+  keyed on the pathname: the old page fades fully out, the new one fades + drifts
+  ~24px in from the direction of travel (`useNavigationType` → PUSH from the
+  right, POP from the left). Exit is opacity-only so `position:fixed` chrome
+  (cog, banner) doesn't get dragged by the transform. All `/admin/*` routes share
+  one transition key so sub-navigation doesn't remount the sidebar. Honors
+  `reducedMotion`.
+- **Audio** (`src/audio/`) — two dependency-free `HTMLAudioElement` singletons.
+  `sfx.ts` plays one-shots (`click` / `swipe` / `error` / `gameOver`); `click`
+  is wired app-wide via a single capture-phase delegated listener (`initClickSfx`,
+  opt out with `data-no-click-sfx`). `music.ts` loops the soundtrack; it starts
+  on the login submit and has a first-gesture autostart fallback
+  (`initMusicAutostart`). Both read volume/mute live from `settingsStore` and
+  no-op safely when muted, at zero volume, or when an asset is missing. Boot
+  wiring lives in `main.tsx` (`preloadSfx` + `initClickSfx` + `initMusicAutostart`
+  after `initSettings`).
 
 ---
 
@@ -80,7 +107,7 @@ Authenticated (`<RequireAuth>`):
 |---|---|---|
 | `/` | Title | `src/pages/Title.tsx` |
 | `/profile` | Profile | `src/pages/Profile.tsx` |
-| `/settings` | Settings | `src/pages/Settings.tsx` |
+| `/settings` | *retired* → redirects to `/` | — |
 | `/achievements` | Achievements grid | `src/pages/Achievements.tsx` |
 | `/runs` | Run list | `src/pages/RunList.tsx` |
 | `/runs/new` | New run setup | `src/pages/NewRun.tsx` |
@@ -113,7 +140,10 @@ exist in `src/admin/pages/` but are not wired into the router nav.
 First screen *after* the auth gate. Glitch-animated FATCHAD logo + tagline.
 Buttons: **Neue Runde** → `/runs/new`; **Fortsetzen** → `/runs` (disabled if no
 runs); **Über FATCHAD** → `/about`. Admin users get an entry into `/admin`.
-Offline status pill when the server is unreachable.
+Offline status pill when the server is unreachable. A floating **settings cog**
+(`SettingsRadial`) opens a radial menu for the client prefs in `settingsStore`
+(motion, glitch, mute + SFX/music volume, CRT sub-effects) — this replaced the
+old `/settings` page, which now just redirects to `/`.
 
 ### About (`/about`)
 Static explainer: concept, stat meanings (Chaos ±100 = victory), credits, and a
@@ -205,7 +235,7 @@ it calls `useAuthStore.logout()` so the guard bounces the user to `/login`. A
 | `authStore` | Cognito session — `userId` (`sub`), `accessToken`, `isAdmin` (`admin` group) | `login`, `register`, `logout`, `initFromSession`, `getAccessToken` |
 | `runStore` | `state` (GameState), `currentCard`, `lastDeltas`, loading/submitting/error | `loadRun`, `createRun`, `submitChoice`, `abandonRun`, `exitRun`, `clearDeltas` |
 | `catalogStore` | public catalog bundle (decks/cards/endings/achievements), TTL + sessionStorage cache | `ensureLoaded(force)`, `invalidate` |
-| `settingsStore` | client UI prefs | — |
+| `settingsStore` | client UI prefs, persisted to localStorage — `reducedMotion`, `disableGlitch`, `muted` (master), `volume` (SFX), `musicVolume`, and the CRT toggles `crtScanlines` / `crtScanlineOpacity` / `crtSweep` / `crtGlow` | per-field setters + `initSettings` |
 | `toastStore` | toast queue | `push(msg, variant, ms)` |
 | `admin/store.ts`, `admin/endingStore.ts`, `admin/deckStore.ts`, `admin/achievementStore.ts` | server-synced card/ending/deck/achievement catalogues with optimistic CRUD, import/export | — |
 
@@ -413,6 +443,7 @@ stat-colour chips keep it unmistakably FATCHAD.
 | `VITE_COGNITO_USER_POOL_ID` | Cognito user pool (auth) | unset → auth disabled |
 | `VITE_COGNITO_APP_CLIENT_ID` | Cognito app client (auth) | unset → auth disabled |
 | `VITE_WIP_MODE` | short-circuit API for backend-less preview | unset/false |
+| `VITE_MOCK_MODE` | route every API call to the in-browser mock engine (`src/api/mock.ts`); set by `npm run dev:mock` | unset/false |
 
 The two Cognito vars are read by `authStore`; when either is missing
 (`authConfigured === false`) the auth methods reject with a clear error instead

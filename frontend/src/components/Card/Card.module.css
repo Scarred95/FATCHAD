@@ -10,10 +10,18 @@
   display: flex;
   flex-direction: column;
   user-select: none;
+  /* 2-choice cards only need horizontal drags, so let the browser keep vertical
+     panning. Trilemma cards (data-has-down) also need the down-swipe, so they
+     claim all gestures — otherwise touch devices steal the vertical drag for
+     scrolling and the down-commit never fires. */
   touch-action: pan-y;
   cursor: grab;
   transition: border-color var(--dur-quick), box-shadow var(--dur-quick);
   will-change: transform;
+}
+
+.card[data-has-down='true'] {
+  touch-action: none;
 }
 
 .card[data-intent='-1'] {
@@ -24,21 +32,6 @@
 .card[data-intent='1'] {
   border-color: var(--color-success);
   box-shadow: 8px 8px 28px rgba(74, 222, 128, 0.18), var(--shadow-card);
-}
-
-/* image variant — used when a card carries a real image_url */
-.image {
-  flex: 0 0 38%;
-  width: 100%;
-  background-size: cover;
-  background-position: center;
-  position: relative;
-}
-
-.imageFade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 50%, var(--color-bg-elevated) 100%);
 }
 
 .body {

@@ -5,21 +5,12 @@
   overflow: hidden;
 }
 
-.ambient {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(255, 62, 127, 0.08), transparent 60%),
-    radial-gradient(ellipse at 70% 80%, rgba(96, 80, 255, 0.06), transparent 60%);
-  z-index: 0;
-}
-
 .logoBlock {
   position: relative;
   z-index: 1;
   text-align: center;
   margin-top: var(--space-7);
+  margin-bottom: var(--space-6);
 }
 
 .logo {
@@ -83,34 +74,92 @@
   border-radius: var(--radius-md);
   font-family: var(--font-display);
   font-size: var(--fs-display-sm);
-  letter-spacing: var(--tracking-display);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-align: center;
-  transition: transform var(--dur-instant), background var(--dur-quick), border-color var(--dur-quick), color var(--dur-quick);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: transform var(--dur-instant), background var(--dur-quick), border-color var(--dur-quick), color var(--dur-quick), box-shadow var(--dur-quick);
+}
+
+/* Leading glyph on the action buttons — sits just left of the label. */
+.btnIcon {
+  width: 20px;
+  height: 50%;
+  transform: translateY(-4px);
+}
+
+/* Both real buttons get a diagonal shine that sweeps across on hover. */
+.btnPrimary,
+.btnSecondary {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.btnPrimary::before,
+.btnSecondary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+}
+
+.btnPrimary:hover::before,
+.btnSecondary:not(:disabled):hover::before {
+  transform: translateX(120%);
 }
 
 .btnPrimary {
-  background: var(--color-accent);
+  /* Hero action — noticeably taller than the secondary buttons. min-height
+     guarantees the growth regardless of the (fixed) text line-height, which
+     otherwise dominates and swallows small padding bumps. */
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  min-height: 4.5rem;
+  background: linear-gradient(135deg, #ff5c97 0%, var(--color-accent) 55%, #d62a66 100%);
   color: var(--color-bg-base);
-  box-shadow: 0 4px 24px rgba(255, 62, 127, 0.35);
+  border: none;
+  /* Inner highlight stays; the outer glow is hover-only (see below). */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .btnPrimary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 32px rgba(255, 62, 127, 0.5);
+  box-shadow: 0 0 32px rgba(255, 50, 130, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btnPrimary:active { transform: scale(0.97); }
 
 .btnSecondary {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   color: var(--color-text);
   border: var(--border-mid);
 }
 
 .btnSecondary:not(:disabled):hover {
+  transform: translateY(-1px);
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+/* Neon edge while pressed — focuses the glow on the active button rather than
+   bathing the whole stack in light. */
+.btnSecondary:not(:disabled):active {
+  transform: scale(0.98);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 18px rgba(255, 50, 130, 0.45), inset 0 0 0 1px var(--color-accent);
 }
 
 .btnSecondary:disabled {
@@ -125,7 +174,7 @@
   color: var(--color-text-dim);
   font-size: var(--fs-body-sm);
   letter-spacing: var(--tracking-loose);
-  display: block;
+  /* Inherit the shared flex centering so the link sits centered. */
 }
 
 .btnText:hover {
@@ -134,7 +183,9 @@
 
 .navRow {
   display: flex;
-  justify-content: center;
+  /* Span the full button width and distribute the three links evenly. */
+  width: 100%;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4);
   margin-top: var(--space-1);

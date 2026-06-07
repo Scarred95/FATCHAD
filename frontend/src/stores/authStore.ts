@@ -127,7 +127,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({
         userId: 'mock-user',
         accessToken: 'mock-token',
-        isAdmin: false,
+        isAdmin: true,
         isGuest: false,
         displayName: 'Tester',
         email: 'tester@local',

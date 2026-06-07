@@ -1,15 +1,15 @@
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import { Link } from 'react-router-dom';
 import type { Card } from '../types';
 import { colourForDeck } from '../utils/graph';
 import { useAdminCardStore } from '../store';
 import styles from './CardNode.module.css';
 
-export interface CardNodeData {
+export type CardNodeData = {
   card: Card;
   highlighted: boolean;
   dimmed: boolean;
-}
+};
 
 export function CardNode({ data }: { data: CardNodeData }) {
   const c = data.card;

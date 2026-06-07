@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listRuns, getHealth } from '../api/client';
+import Ambient from '../components/Ambient/Ambient';
+import SettingsRadial from '../components/SettingsRadial/SettingsRadial';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './Title.module.css';
@@ -39,7 +41,7 @@ export default function Title() {
 
   return (
     <main className={`page ${styles.page}`}>
-      <div className={styles.ambient} aria-hidden />
+      <Ambient />
 
       <motion.div
         className={styles.logoBlock}
@@ -66,6 +68,7 @@ export default function Title() {
           className={styles.btnPrimary}
           onClick={() => nav('/runs/new')}
         >
+          <span className={styles.btnIcon} aria-hidden>▶</span>
           Neue Runde
         </button>
         <button
@@ -73,6 +76,7 @@ export default function Title() {
           onClick={() => nav('/runs')}
           disabled={!hasRuns}
         >
+          <span className={styles.btnIcon} aria-hidden>⟳</span>
           Fortsetzen
         </button>
         {/* Boards are public — shown to everyone, not gated behind a run/login. */}
@@ -80,13 +84,13 @@ export default function Title() {
           className={styles.btnSecondary}
           onClick={() => nav('/leaderboard')}
         >
+          <span className={styles.btnIcon} aria-hidden>🏆</span>
           Bestenliste
         </button>
         {userId && (
           <nav className={styles.navRow}>
             <Link to="/profile" className={styles.navLink}>Profil</Link>
             <Link to="/achievements" className={styles.navLink}>Erfolge</Link>
-            <Link to="/settings" className={styles.navLink}>Einstellungen</Link>
           </nav>
         )}
 
@@ -135,6 +139,8 @@ export default function Title() {
           Offline — Server nicht erreichbar
         </div>
       )}
+
+      <SettingsRadial />
     </main>
   );
 }

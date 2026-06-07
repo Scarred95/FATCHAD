@@ -3,7 +3,10 @@
  * failed lazy chunk, 404). Themed, faintly amused fallback instead of React
  * Router's raw stack-trace screen.
  */
+import { useEffect } from 'react';
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router-dom';
+import Ambient from '../components/Ambient/Ambient';
+import { playSfx } from '../audio/sfx';
 import styles from './RouteError.module.css';
 
 // Stat-flavored quips, picked at random so the same crash reads differently
@@ -21,6 +24,11 @@ export default function RouteError() {
   const error = useRouteError();
   const notFound = isRouteErrorResponse(error) && error.status === 404;
 
+  // Sting the error cue when the fallback mounts (404 or any thrown route).
+  useEffect(() => {
+    playSfx('error');
+  }, []);
+
   const code = notFound ? '404' : '500';
   const title = notFound ? 'Hier ist nichts' : 'Etwas ist zerbrochen';
   const quip = notFound
@@ -29,7 +37,7 @@ export default function RouteError() {
 
   return (
     <main className={`page ${styles.page}`}>
-      <div className={styles.ambient} aria-hidden />
+      <Ambient />
 
       <div className={styles.block}>
         <h1 className={`display ${styles.code}`} data-text={code}>

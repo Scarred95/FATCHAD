@@ -11,12 +11,13 @@
  *     mono section header, accent on hover).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Background, Controls, MiniMap,
   type Edge, type Node, type EdgeMarker, MarkerType,
   type NodeChange, applyNodeChanges,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { cardsInDeck, decksOf, useAdminCardStore } from '../store';
 import { buildGraph, colourForDeck } from '../utils/graph';
 import { CardNode, type CardNodeData } from '../components/CardNode';

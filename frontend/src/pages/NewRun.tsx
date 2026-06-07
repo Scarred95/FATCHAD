@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '../api/client';
 import { errorMessage } from '../api/http';
 import type { DeckOption } from '../api/types';
+import Ambient from '../components/Ambient/Ambient';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
@@ -56,7 +57,11 @@ export default function NewRun() {
   }
 
   async function start() {
-    if (selected.size < MIN_DECKS) return;
+    if (selected.size < MIN_DECKS) {
+      // Error toast plays the error sfx via the toast store.
+      pushToast(`Wähle mindestens ${MIN_DECKS} Decks`, 'error');
+      return;
+    }
     try {
       const id = await create({
         tutorial: !skipTutorial,
@@ -68,10 +73,13 @@ export default function NewRun() {
     }
   }
 
-  const canStart = selected.size >= MIN_DECKS && !isLoading && !decksLoading;
+  // Stays clickable even with too few decks so the click gives error feedback
+  // (sfx + toast) instead of a dead, silent button. Only loading disables it.
+  const canStart = !isLoading && !decksLoading;
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <motion.h1
         className={`display ${styles.heading}`}
         initial={{ opacity: 0, y: 16 }}
@@ -170,6 +178,13 @@ export default function NewRun() {
                         onClick={() => toggleDeck(d.name)}
                       >
                         <span className={styles.deckTitle}>{d.name}</span>
+                        {d.image_url && (
+                          <span
+                            className={styles.deckPhoto}
+                            style={{ backgroundImage: `url(${d.image_url})` }}
+                            aria-hidden
+                          />
+                        )}
                         {d.description && (
                           <span className={styles.deckDesc}>{d.description}</span>
                         )}

@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import type { StatName } from '../../api/types';
 import { STAT_COLOR_VAR } from '../statMeta';
 import styles from './StatIcon.module.css';

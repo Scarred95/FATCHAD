@@ -16,6 +16,7 @@
  * as shared <datalist>s ONCE at the root and referenced by stable ids, so
  * deeply-nested inputs don't each duplicate a 1000-option list.
  */
+import type { JSX } from 'react';
 import { STAT_KEYS, STAT_LABELS } from '../types';
 import type { StatKey } from '../types';
 import styles from './PredicateBuilder.module.css';

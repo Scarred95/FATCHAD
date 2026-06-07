@@ -14,7 +14,7 @@
  * script sets it, and `MOCK_MODE` is a compile-time constant so the bundler can
  * tree-shake the module out of production output.
  */
-import { STAT_NAMES } from './types';
+import { MAIN_STAT_NAMES, STAT_NAMES } from './types';
 import type {
   CardResponse,
   ChoicePreview,
@@ -103,7 +103,7 @@ function toCardResponse(def: MockCardDef): CardResponse {
     description: def.description,
     category: def.category,
     deck_name: 'Test-Deck',
-    image_url: null,
+    image_url: def.id === 'mock-1' ? '/images/this_is_fine.gif' : null,
     choices: def.choices.map((c) => ({ text: c.text, hints: hintsFor(c.effect) })),
   };
 }
@@ -224,7 +224,16 @@ function submitChoice(choiceIndex: number): TurnResponse {
   r.history.push({ event_id: def.id, choice: choiceIndex, turn: r.turn });
   r.turn += 1;
   r.updated_at = new Date().toISOString();
-  // Endless by design — the deck just loops so you can test indefinitely.
+  // End the run when any core stat hits an extreme (0 or 100). The real backend
+  // does this via data-driven threshold endings; the mock approximates it so the
+  // end screen is reachable. Chaos is excluded — it's its own meter, not a doom
+  // stat. Otherwise the deck just loops so you can test indefinitely.
+  const doomed = MAIN_STAT_NAMES.some((k) => r.stats[k] <= 0 || r.stats[k] >= 100);
+  if (doomed) {
+    r.status = 'ended';
+    r.ending = 'mock-ending';
+    return { state: r, next_card: null };
+  }
   return { state: r, next_card: cardForTurn(r.turn) };
 }
 
@@ -259,8 +268,8 @@ function route(method: string, path: string, body: { choice_index?: number } | u
   }
   if (path === '/decks') {
     return [
-      { name: 'Test-Deck', description: 'Lokales Test-Deck' },
-      { name: 'Chaos-Deck', description: 'Noch ein Test-Deck' },
+      { name: 'Test-Deck', description: 'Lokales Test-Deck', image_url: '/images/this_is_fine.gif' },
+      { name: 'Chaos-Deck', description: 'Noch ein Test-Deck', image_url: '/images/doge.jpg' },
     ];
   }
   if (path === '/achievements') {

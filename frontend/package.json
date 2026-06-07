@@ -11,19 +11,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@xyflow/react": "^12.11.0",
     "amazon-cognito-identity-js": "^6.3.16",
-    "framer-motion": "^11.11.0",
+    "framer-motion": "^12.40.0",
     "jszip": "^3.10.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-router-dom": "^6.27.0",
-    "reactflow": "^11.11.4",
+    "vault66-crt-effect": "^2.1.0",
     "zod": "^3.25.76",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.5.3",
     "vite": "^5.4.2"

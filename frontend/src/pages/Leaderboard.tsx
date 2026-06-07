@@ -15,6 +15,7 @@ import {
 } from '../api/client';
 import { errorMessage } from '../api/http';
 import type { LeaderboardPointsRow, LeaderboardRunRow } from '../api/types';
+import Ambient from '../components/Ambient/Ambient';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
@@ -67,6 +68,7 @@ export default function Leaderboard() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <Header
         left={<IconButton label="Zurück" onClick={() => nav('/')}><BackArrow /></IconButton>}
         center="Bestenliste"

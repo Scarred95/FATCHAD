@@ -1,0 +1,27 @@
+/* Full-viewport (fixed, not bound to the narrow .page column) so the drifting
+   glow covers the whole screen, not just the centred content strip. */
+.ambient {
+  position: fixed;
+  /* Oversized so the drifting blobs never expose a hard edge. */
+  inset: -25%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 25% 18%, rgba(255, 62, 127, 0.16), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 75% 82%, rgba(96, 80, 255, 0.14), transparent 60%),
+    radial-gradient(ellipse 50% 45% at 85% 22%, rgba(96, 200, 255, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 45% at 12% 75%, rgba(255, 62, 127, 0.08), transparent 60%);
+  /* Behind all page content — html paints the base bg beneath it, so the
+     blobs read as a backdrop rather than tinting the UI on top. */
+  z-index: -1;
+  animation: aurora-drift 22s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes aurora-drift {
+  0%   { transform: translate3d(-3%, -2%, 0) scale(1);   }
+  50%  { transform: translate3d(4%, 3%, 0)  scale(1.12); }
+  100% { transform: translate3d(-2%, 4%, 0) scale(1.05); }
+}
+
+/* Respect the "disable glitch" preference: freeze the drift. */
+:global(html[data-no-glitch='true']) .ambient { animation: none; }

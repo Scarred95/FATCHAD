@@ -9,6 +9,7 @@ import { ApiError, errorMessage } from '../api/http';
 import { STAT_NAMES } from '../api/types';
 import type { EndSummary, LeaderboardRunRow, Stats, UnlockedAchievement } from '../api/types';
 import { STAT_LABEL } from '../components/statMeta';
+import Ambient from '../components/Ambient/Ambient';
 import StatIcon from '../components/StatIcon/StatIcon';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -100,6 +101,7 @@ export default function EndScreen() {
   if (error) {
     return (
       <main className={`page ${styles.page}`}>
+        <Ambient />
         <p className={styles.errorMsg}>{error}</p>
         <Link to="/runs" className={styles.backLink}>Zurück zur Übersicht</Link>
       </main>
@@ -109,6 +111,7 @@ export default function EndScreen() {
   if (!summary) {
     return (
       <main className={`page ${styles.page}`}>
+        <Ambient />
         <p className={styles.dim}>Lade Zusammenfassung…</p>
       </main>
     );
@@ -122,6 +125,7 @@ export default function EndScreen() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <motion.div
         className={styles.banner}
         data-status={summary.status}

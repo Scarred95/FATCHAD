@@ -7,6 +7,7 @@
  */
 import { motion } from 'framer-motion';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import Ambient from '../components/Ambient/Ambient';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './Title.module.css';
@@ -35,7 +36,7 @@ export default function Welcome() {
 
   return (
     <main className={`page ${styles.page}`}>
-      <div className={styles.ambient} aria-hidden />
+      <Ambient />
 
       <motion.div
         className={styles.logoBlock}

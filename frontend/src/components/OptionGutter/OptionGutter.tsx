@@ -40,6 +40,7 @@ export default function OptionGutter({ position, choice, active, disabled, onCli
       className={`${styles.gutter} ${styles[position]}${active ? ' ' + styles.active : ''}`}
       disabled={disabled}
       onClick={onClick}
+      data-no-click-sfx
     >
       <span className={styles.arrow} aria-hidden>
         {ARROW[position]}
