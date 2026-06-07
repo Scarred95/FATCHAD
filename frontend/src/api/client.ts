@@ -31,6 +31,7 @@ import type {
 } from './types';
 import { ApiError, http } from './http';
 import { API_BASE } from './config';
+import { MOCK_MODE, mockRequest } from './mock';
 
 // VITE_WIP_MODE is set to "true" at build time by the deploy-frontend workflow
 // for the S3 preview deploy, where the backend is not yet reachable. In that
@@ -54,6 +55,8 @@ function notifyWip() {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Frontend-only test mode: serve everything from the in-memory mock backend.
+  if (MOCK_MODE) return mockRequest<T>(path, init);
   if (WIP_MODE) {
     notifyWip();
     throw new ApiError(0, 'WIP — Backend nicht verfügbar');
