@@ -277,29 +277,21 @@ export default function SettingsRadial({ showHint = false }: { showHint?: boolea
           {showHint && !open && (
             <motion.div
               className={styles.hint}
-              // Container handles the fade-in/fade-out mount animations for AnimatePresence
+              // Wrapper animates opacity only; the inner spans own their own
+              // looping transforms (rotate / x) so nothing fights over `transform`.
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               aria-hidden={true}
             >
-              {/* TEXT ANIMATION
-                By omitting transformOrigin, it defaults to 'center center'.
-                The rotation now bounces slightly around the flat 0-degree baseline 
-                instead of keeping the text angled.
-              */}
-              <motion.span 
+              <motion.span
                 className={styles.hintText}
-                // Subtly wiggles between -2 and 2 degrees. Adjust these numbers if you want more/less intensity.
                 animate={reducedMotion ? { rotate: 0 } : { rotate: [-2, 2, -2] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
               >
                 Einstellungen
               </motion.span>
 
-              {/* ARROW ANIMATION
-                Handles only the horizontal left/right translation.
-              */}
               <motion.span
                 className={styles.hintArrow}
                 animate={reducedMotion ? { x: 0 } : { x: [0, 15, 0] }}

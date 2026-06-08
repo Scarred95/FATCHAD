@@ -176,8 +176,8 @@ extra cost):
    `aws-actions/configure-aws-credentials@v4`, assuming
    `FatchadLambdaDeployRole`. That role's trust policy only accepts
    tokens whose `sub` claim matches `refs/tags/lambda-v*` (or
-   workflow_dispatch from `main` / the active dev branch), so a leaked
-   ARN can't be assumed from arbitrary branches.
+   workflow_dispatch from `main`), so a leaked ARN can't be assumed
+   from arbitrary branches.
 
 3. **Bundle** — `cdk synth` invokes the Docker bundler. Each Lambda's
    asset is built fresh from `backend/requirements.txt` + the source

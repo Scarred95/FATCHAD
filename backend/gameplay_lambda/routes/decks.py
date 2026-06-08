@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 from shared.auth import get_current_user_id
 from shared.db.catalog_snapshot import CatalogSnapshot
 from shared.db.user_repo import UserRepo
+from shared.game.constants import TUTORIAL_DECK_NAME
 
 from gameplay_lambda.routes._deps import get_catalog, get_user_repo
 from gameplay_lambda.routes._schemas import DeckOption
@@ -36,6 +37,10 @@ def list_available_decks(
 
     result: list[DeckOption] = []
     for deck in catalog.list_decks():
+        # The Tutorial deck is owned by the tutorial checkbox, not the deck
+        # picker — its cards are seeded one-by-one via the scripted intro.
+        if deck.name == TUTORIAL_DECK_NAME:
+            continue
         is_default = deck.unlock_rule.kind == "default"
         unlocked = is_default or deck.name in unlocked_names
         if not unlocked:
