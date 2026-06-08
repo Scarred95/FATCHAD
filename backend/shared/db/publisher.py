@@ -173,6 +173,7 @@ def _dump_deck_public(deck: Deck) -> dict:
     return {
         "name":        deck.name,
         "description": deck.description,
+        "image_url":   deck.image_url,
     }
 
 

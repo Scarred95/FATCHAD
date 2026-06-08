@@ -155,6 +155,8 @@ export interface Deck {
    *  so the deck opens on its own scripted card (which then chains via
    *  adds_to_deck). null = no scripted opener. */
   starting_card_id?: string | null;
+  /** Cover/art image URL for the deck. null = none. */
+  image_url?: string | null;
   /** ISO 8601, server-stamped. */
   created_at?: string;
   /** ISO 8601, server-stamped. */

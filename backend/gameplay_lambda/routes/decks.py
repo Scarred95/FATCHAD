@@ -43,6 +43,7 @@ def list_available_decks(
         result.append(DeckOption(
             name=deck.name,
             description=deck.description,
+            image_url=deck.image_url,
         ))
 
     return result

@@ -9,7 +9,7 @@
  *               (changing it would orphan every card pointing at it; the
  *               backend doesn't support rename in one shot).
  *
- * Fields: name (only when new), description, enabled, unlock_rule,
+ * Fields: name (only when new), description, image_url, enabled, unlock_rule,
  * removes_endings, starting_card_id. Unlock rule: a radio between "Standard"
  * (kind=default) and "Achievement" (kind=achievement, requires
  * achievement_id). removes_endings is an autocomplete chip list of endings
@@ -65,6 +65,7 @@ export function DeckEditorPage({ mode }: Props) {
   const [achievementId, setAchId]     = useState<string>('');
   const [removesEndings, setRemoves]  = useState<string[]>([]);
   const [startingCardId, setStartId]  = useState<string>('');
+  const [imageUrl, setImageUrl]       = useState<string>('');
   // CardPicker seeds its text box only at mount; bump this on hydrate so it
   // remounts once with the loaded starting card instead of rendering blank.
   const [cardPickerKey, setCardPickerKey] = useState<number>(0);
@@ -82,6 +83,7 @@ export function DeckEditorPage({ mode }: Props) {
     setAchId(existing.unlock_rule?.achievement_id ?? '');
     setRemoves(existing.removes_endings ?? []);
     setStartId(existing.starting_card_id ?? '');
+    setImageUrl(existing.image_url ?? '');
     setCardPickerKey((k) => k + 1);
     setDirty(false);
   }, [mode, existing]);
@@ -138,6 +140,7 @@ export function DeckEditorPage({ mode }: Props) {
           unlock_rule: buildUnlock(),
           removes_endings: removesEndings,
           starting_card_id: startingCardId || null,
+          image_url: imageUrl.trim() || null,
         });
         if (created) {
           setDirty(false);
@@ -150,6 +153,7 @@ export function DeckEditorPage({ mode }: Props) {
           unlock_rule: buildUnlock(),
           removes_endings: removesEndings,
           starting_card_id: startingCardId || null,
+          image_url: imageUrl.trim() || null,
         });
         if (saved) setDirty(false);
       }
@@ -243,6 +247,18 @@ export function DeckEditorPage({ mode }: Props) {
           value={description}
           onChange={(e) => onChange(setDescription)(e.target.value)}
           placeholder="Kurze Notiz wofür dieses Deck da ist."
+        />
+      </section>
+
+      <section className={styles.section}>
+        <label className={styles.fieldLabel}>Bild-URL</label>
+        <input
+          className={styles.input}
+          type="text"
+          value={imageUrl}
+          onChange={(e) => onChange(setImageUrl)(e.target.value)}
+          placeholder="(optional)"
+          spellCheck={false}
         />
       </section>
 
