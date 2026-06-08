@@ -58,7 +58,7 @@ pay-per-request.
 | Backend      | FastAPI / uvicorn-Prozess     | **API Gateway** → **AWS Lambda** (✅, gesplittet)|
 | Persistenz   | MongoDB                       | **DynamoDB** (✅ Single-Table)                   |
 | Auth / Token | Static-Bearer aus `.env`      | **Cognito** (JWT, Admin-Group) ✅               |
-| Observability| Lokale Logs                   | CloudWatch Logs + Metrics + Alarms              |
+| Observability| Lokale Logs                   | CloudWatch Logs + Dashboard (✅), Alarms (geplant)|
 | Deployment   | manuell                       | **IaC** mit AWS **CDK** (✅) + GitHub Actions   |
 
 ## Knackpunkte beim Port

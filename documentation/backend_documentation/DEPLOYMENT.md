@@ -123,10 +123,10 @@ time just to call `PutRetentionPolicy`.
 
 ## Observability
 
-> **Status: mostly planned.** Today the only observability wiring that actually
-> exists is request-id correlation plus the raw Lambda log groups above.
-> Structured JSON logging and the CloudWatch dashboard are **not built** — they're
-> the intended next step.
+> **Status: partially built.** Request-id correlation and the raw Lambda log
+> groups exist; the CloudWatch dashboard and structured logging on the support
+> Lambdas are now built too. Structured per-request JSON logging on the
+> gameplay/admin path is still the one planned piece.
 
 ### Request correlation (implemented)
 
@@ -138,22 +138,29 @@ log line; it just makes the id available to any logger that wants to correlate.
 Plain `logging` is used elsewhere (e.g. the CORS wildcard warning in the same
 file); Lambda forwards stdout/stderr to the per-function log groups above.
 
-### Structured logging (planned)
+### Structured logging (partially built)
 
-The intent is one JSON log entry per request so CloudWatch can filter by field
-(`request_id`, `method`, `path`, `status_code`, `duration_ms`, `cold_start`).
-Not wired yet: `aws-lambda-powertools` is not in `backend/requirements.txt`, and
-`RequestIDMiddleware` emits no per-request line. Implementing it means adding the
-logging dependency (or hand-rolling a JSON formatter) and having the middleware
-log keyed by the existing `request_id`.
+The two support Lambdas — Cognito post-confirm (`cognito_lambda`) and guest
+cleanup (`cleanup_lambda`) — emit structured JSON via `aws-lambda-powertools`
+`Logger` (in `backend/requirements.txt`, bundled into each function), keyed by a
+`service` name and per-event fields (`sub`, `items`, `scanned`, `deleted`, …).
 
-### Dashboard (planned)
+**Still planned:** one JSON line per *gameplay/admin request* so CloudWatch can
+filter by field (`request_id`, `method`, `path`, `status_code`, `duration_ms`,
+`cold_start`). `RequestIDMiddleware` still emits no per-request line — wiring it
+means having the middleware log (via Powertools or a hand-rolled JSON formatter)
+keyed by the existing `request_id`.
 
-The intent is a CloudWatch Dashboard named `fatchad` built from free built-in AWS
-metrics (no custom metrics, no extra cost): Lambda Errors / Duration / Invocations
-(per function) + DDB consumed capacity on `fatchad_user_data`. There is no
-dashboard code in any stack yet — it would be added as a `cloudwatch.Dashboard`
-construct in `infra/lib/api-stack.ts`.
+### Dashboard (implemented)
+
+A CloudWatch Dashboard named `fatchad` is built in `infra/lib/api-stack.ts`
+(`cloudwatch.Dashboard`) from free built-in AWS metrics (no custom metrics, no
+extra cost):
+- **Lambda Errors / Duration / Invocations** for the admin + gameplay functions.
+- **DDB consumed read/write capacity** on `fatchad_user_data`.
+- **Support Lambda Errors / Invocations** for `fatchad-guest-cleanup` and
+  `fatchad-post-confirm` — those live in `FatchadCognitoStack`, so they're
+  referenced by function name (no cross-stack ref) rather than by construct.
 
 ---
 
@@ -242,6 +249,7 @@ GitHub Actions on tag push.
 | What's the API base URL? | CloudFormation → `FatchadApiStack` → Outputs → `HttpApiUrl`. Also in the GH Actions run summary. |
 | What routes exist?       | API Gateway → APIs → `fatchad-api` → Routes. |
 | Did a Lambda crash?      | CloudWatch Logs → `/aws/lambda/fatchad-admin` or `/aws/lambda/fatchad-gameplay`. |
+| How's the system doing?  | CloudWatch → Dashboards → `fatchad` (Lambda errors/duration/invocations, DDB capacity, support Lambdas). |
 | What env vars are live?  | Lambda console → function → Configuration → Environment variables. |
 | What got published?      | S3 → `fatchad-catalog/` (prefixes are `v1/`, `v2/`, …) and DDB `fatchad_catalog` item `PK=META, SK=current`. |
 | Last deploy succeeded?   | GitHub → Actions → "Deploy lambdas". |
