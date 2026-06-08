@@ -36,6 +36,47 @@
   box-shadow: 0 0 28px rgba(255, 50, 130, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
+/* "Einstellungen →" nudge sitting just left of the cog, vertically centered on
+   it. Flex centering (not translateY) so framer-motion's x animation is free.
+   Non-interactive — the cog itself is the target. */
+.hint {
+  position: absolute;
+  top: -11rem;
+  bottom: 0;
+  right: 68px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hintText {
+  position: absolute;
+  right: -90px;
+  top: 110px;
+  font-family: var(--font-display);
+  font-size: calc(var(--fs-body-xs) * 3);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.hintArrow {
+  color: var(--color-accent);
+  font-size: 8.4rem;
+  line-height: 1;
+  position: absolute;
+  right: -15px;
+  bottom: -10px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: nowrap;
+
+
+}
+
 .spokes {
   position: absolute;
   inset: 0;

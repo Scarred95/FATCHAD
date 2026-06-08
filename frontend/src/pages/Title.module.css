@@ -10,43 +10,18 @@
   z-index: 1;
   text-align: center;
   margin-top: var(--space-7);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-7);
 }
 
-.logo {
-  font-size: var(--fs-display-xl);
-  color: var(--color-text);
-  margin-bottom: var(--space-3);
-  letter-spacing: 0.02em;
-}
-
-@keyframes glitch-clip {
-  0%, 88%, 100% { clip-path: inset(0 0 0 0); transform: translate(0, 0); }
-  90% { clip-path: inset(20% 0 60% 0); transform: translate(2px, -1px); color: var(--color-accent); }
-  92% { clip-path: inset(70% 0 10% 0); transform: translate(-2px, 1px); color: var(--color-stat-rizz); }
-  94% { clip-path: inset(0 0 0 0); transform: translate(0, 0); }
-}
-
-@keyframes glitch-clip-slow {
-  0%, 95%, 100% { clip-path: inset(0 0 0 0); }
-  96% { clip-path: inset(40% 0 30% 0); transform: translate(-1px, 2px); color: var(--color-accent); }
-  98% { clip-path: inset(0 0 0 0); }
-}
-
-.glitch {
-  display: inline-block;
-  animation: glitch-clip 4s infinite step-end;
-}
-
-.glitchSlow {
-  display: inline-block;
-  animation: glitch-clip-slow 6s infinite step-end;
-}
-
-/* Honour the "disable glitch" display preference (settingsStore). */
-:global(html[data-no-glitch='true']) .glitch,
-:global(html[data-no-glitch='true']) .glitchSlow {
-  animation: none;
+/* Hero strapline under the wordmark — larger and more spaced-out than the
+   utility .tagline used elsewhere (e.g. the guest notice). DecodeText scrambles
+   it in on mount. */
+.heroTagline {
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-faint);
+  max-width: 34ch;
+  margin: var(--space-6) auto var(--space-2);
+  line-height: 1.6;
 }
 
 .tagline {

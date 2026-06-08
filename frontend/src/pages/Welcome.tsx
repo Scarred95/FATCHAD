@@ -8,6 +8,9 @@
 import { motion } from 'framer-motion';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import Ambient from '../components/Ambient/Ambient';
+import DecodeText from '../components/DecodeText/DecodeText';
+import GlitchLogo from '../components/GlitchLogo/GlitchLogo';
+import SettingsRadial from '../components/SettingsRadial/SettingsRadial';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './Title.module.css';
@@ -44,12 +47,9 @@ export default function Welcome() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       >
-        <h1 className={`display ${styles.logo}`}>
-          F<span className={styles.glitch}>A</span>TCH
-          <span className={styles.glitchSlow}>A</span>D
-        </h1>
-        <p className={styles.tagline}>
-          Eine Welt. Vier Werte. Eine schlechte Idee nach der anderen.
+        <GlitchLogo />
+        <p className={styles.heroTagline}>
+          <DecodeText text="Eine Welt. Vier Werte. Eine schlechte Idee nach der anderen." />
         </p>
       </motion.div>
 
@@ -76,6 +76,8 @@ export default function Welcome() {
           Über FATCHAD
         </Link>
       </motion.div>
+
+      <SettingsRadial showHint />
     </main>
   );
 }

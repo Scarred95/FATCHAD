@@ -66,7 +66,10 @@ type TierNode =
       onChange: (value: number) => void;
     };
 
-export default function SettingsRadial() {
+/** `showHint` renders the "Einstellungen →" nudge beside the cog — used on the
+ *  front gate (Welcome) to point first-time visitors at the wheel. Off by
+ *  default so the post-login Title screen stays clean. */
+export default function SettingsRadial({ showHint = false }: { showHint?: boolean }) {
   const [open, setOpen] = useState(false);
   const [tier, setTier] = useState<Category | null>(null);
 
@@ -81,6 +84,7 @@ export default function SettingsRadial() {
   const muted = useSettingsStore((s) => s.muted);
   const volume = useSettingsStore((s) => s.volume);
   const musicVolume = useSettingsStore((s) => s.musicVolume);
+  const reducedMotion = useSettingsStore((s) => s.reducedMotion);
   const setMuted = useSettingsStore((s) => s.setMuted);
   const setVolume = useSettingsStore((s) => s.setVolume);
   const setMusicVolume = useSettingsStore((s) => s.setMusicVolume);
@@ -266,6 +270,46 @@ export default function SettingsRadial() {
         >
           <span aria-hidden>⚙</span>
         </motion.button>
+
+        {/* Onboarding nudge: a label + arrow pointing at the cog, shown only
+            while the menu is closed so it never overlaps the fanned-out spokes. */}
+        <AnimatePresence>
+          {showHint && !open && (
+            <motion.div
+              className={styles.hint}
+              // Container handles the fade-in/fade-out mount animations for AnimatePresence
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              aria-hidden={true}
+            >
+              {/* TEXT ANIMATION
+                By omitting transformOrigin, it defaults to 'center center'.
+                The rotation now bounces slightly around the flat 0-degree baseline 
+                instead of keeping the text angled.
+              */}
+              <motion.span 
+                className={styles.hintText}
+                // Subtly wiggles between -2 and 2 degrees. Adjust these numbers if you want more/less intensity.
+                animate={reducedMotion ? { rotate: 0 } : { rotate: [-2, 2, -2] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                Einstellungen
+              </motion.span>
+
+              {/* ARROW ANIMATION
+                Handles only the horizontal left/right translation.
+              */}
+              <motion.span
+                className={styles.hintArrow}
+                animate={reducedMotion ? { x: 0 } : { x: [0, 15, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                →
+              </motion.span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
