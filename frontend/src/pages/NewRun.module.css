@@ -121,7 +121,7 @@
 
 .dialog {
   width: 100%;
-  max-width: 480px;
+  max-width: min(1180px, 94vw);
   max-height: 80dvh;
   overflow-y: auto;
   background: var(--color-bg-elevated);
@@ -154,7 +154,9 @@
 
 .deckGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Auto-fill so the now page-wide dialog tiles 3–4 decks per row instead of
+     stretching two giant tiles; collapses to one column on narrow screens. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--space-3);
 }
 

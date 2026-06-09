@@ -56,16 +56,43 @@ After this, all further deploys ride on GitHub Actions.
 | Stack | Contains | How it's deployed |
 |---|---|---|
 | `FatchadBootstrapStack` | OIDC provider, `FatchadGitHubDeployRole`, `FatchadFrontendUploadRole` | Manual from a laptop. Re-deploy only when IAM trust changes. |
-| `FatchadFrontendStack` | `fatchad-frontend` S3 bucket (versioned, public website hosting) | First time manual. After that, `deploy-infra.yml` redeploys it whenever `infra/**` changes. |
+| `FatchadFrontendStack` | `fatchad-frontend` S3 bucket (versioned, public website hosting) + CloudFront distribution, ACM cert, Route 53 alias for `fatchad.de` | First time manual. After that, `deploy-infra.yml` redeploys it whenever `infra/**` changes. |
 | `FatchadDataStack` | `fatchad_catalog` + `fatchad_user_data` DynamoDB tables (pay-per-request, streams enabled) | Tag-driven via `deploy-data.yml`. Push a `database-v*` tag (e.g. `database-v0.1.0`) or run the workflow manually. Backend wiring lands in a later step. |
 
 ### `FatchadFrontendStack`
 
 | Resource | Purpose |
 |---|---|
-| `fatchad-frontend` S3 bucket | Hosts the React SPA build via S3 static-website hosting (public read). CloudFront was considered but dropped — plain S3 hosting is what we ship. |
+| `fatchad-frontend` S3 bucket | Hosts the React SPA build via S3 static-website hosting (public read). |
 | Object versioning + 90d retention | Every PUT keeps the prior version. Lets us roll back without rebuilding. |
 | Removal policy: RETAIN | `cdk destroy` keeps the bucket. The bucket name is globally unique — losing it is permanent. |
+| CloudFront distribution | TLS + edge caching in front of the bucket. Origin is the S3 *website* endpoint (HTTP-only, so the origin hop is HTTP; the viewer hop is forced to HTTPS). The website endpoint serves index.html for unknown paths, so SPA deep links work without a custom error rule. |
+| ACM certificate (us-east-1) | TLS cert for `fatchad.de`. CloudFront only reads certs from us-east-1; provisioned there via `DnsValidatedCertificate` (DNS-validated against the Route 53 zone). |
+| Route 53 A/AAAA alias | Points the `fatchad.de` apex at the distribution. Alias records are free to query and work on the bare domain (a plain CNAME can't). |
+
+**Custom domain is gated on context.** `cdk.json` carries `domainName`
+(`fatchad.de`) and `hostedZoneId`. The CloudFront/ACM/Route 53 resources only
+render when **both** are set, so a context-free `cdk synth` still produces the
+bucket alone. Get the zone id once with:
+
+```bash
+aws route53 list-hosted-zones-by-name --dns-name fatchad.de \
+  --query "HostedZones[0].Id" --output text   # strip the /hostedzone/ prefix
+```
+
+and replace `REPLACE_WITH_ROUTE53_ZONE_ID` in `infra/cdk.json`.
+
+The first `cdk deploy FatchadFrontendStack` that includes the domain takes
+~15–20 min (CloudFront propagation + ACM validation). After that, every
+`frontend-v*` release syncs the new build to S3 **and invalidates the
+CloudFront cache** (`/*`, one path, free) so it's visible immediately instead
+of after the TTL. The upload role carries `cloudfront:CreateInvalidation` for
+this — no new GitHub secret.
+
+> **Why bucket stays public:** we use the S3 website origin for free SPA
+> routing, which requires public read. Locking the bucket private behind
+> CloudFront OAC is a later step — it needs the S3 REST origin plus a custom
+> 404→index.html response rule to keep deep links working.
 
 ### `FatchadDataStack`
 

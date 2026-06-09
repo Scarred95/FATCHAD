@@ -12,10 +12,12 @@ interface Props {
 
 export function CardPicker({ value, onChange, cards, placeholder = 'Card id…' }: Props) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(value);
 
+  // Drive the input straight off `value` (no internal copy): the parent reuses
+  // one CardPicker instance per row index across choice tabs, so a cached query
+  // state would keep showing the previous choice's card_id after a tab switch.
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = value.trim().toLowerCase();
     if (!q) return cards.slice(0, 12);
     return cards
       .filter((c) =>
@@ -24,13 +26,13 @@ export function CardPicker({ value, onChange, cards, placeholder = 'Card id…' 
         (c.deck_name ?? '').toLowerCase().includes(q),
       )
       .slice(0, 20);
-  }, [query, cards]);
+  }, [value, cards]);
 
   return (
     <div className={styles.wrap}>
       <input
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); onChange(e.target.value); }}
+        value={value}
+        onChange={(e) => { setOpen(true); onChange(e.target.value); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         placeholder={placeholder}
@@ -49,7 +51,6 @@ export function CardPicker({ value, onChange, cards, placeholder = 'Card id…' 
               onMouseDown={(e) => {
                 e.preventDefault();
                 onChange(c._id);
-                setQuery(c._id);
                 setOpen(false);
               }}
               className={styles.option}

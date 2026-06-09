@@ -16,6 +16,8 @@
   "context": {
     "githubOwner": "Scarred95",
     "githubRepo": "FATCHAD",
+    "domainName": "fatchad.de",
+    "hostedZoneId": "Z096753118IO6EBFDIFZO",
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],

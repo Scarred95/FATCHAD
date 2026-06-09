@@ -116,6 +116,25 @@ jobs:
           echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
           echo "Resolved User Pool: $POOL_ID"
 
+      # Pull the CloudFront distribution id from FatchadFrontendStack so we can
+      # invalidate the edge cache after the sync. Empty if CloudFront isn't
+      # provisioned yet (domain not wired) — the invalidation step then no-ops.
+      - name: Resolve CloudFront distribution id
+        id: cdn
+        run: |
+          set -euo pipefail
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name FatchadFrontendStack \
+            --region eu-central-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" \
+            --output text 2>/dev/null || true)
+          if [[ -z "$DIST_ID" || "$DIST_ID" == "None" ]]; then
+            echo "::warning::FatchadFrontendStack/DistributionId not found — skipping cache invalidation"
+            DIST_ID=""
+          fi
+          echo "dist_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          echo "Resolved distribution: $DIST_ID"
+
       - name: Build
         working-directory: frontend
         env:
@@ -146,8 +165,22 @@ jobs:
             --cache-control "public, max-age=60, must-revalidate" \
             --content-type "text/html; charset=utf-8"
 
+      # Bust the CloudFront edge cache so the new build is served immediately.
+      # `/*` counts as a single invalidation path (well within the 1,000/month
+      # free allowance). No-ops when CloudFront isn't wired yet.
+      - name: Invalidate CloudFront cache
+        if: steps.cdn.outputs.dist_id != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.cdn.outputs.dist_id }}" \
+            --paths "/*"
+
       - name: Summary
         run: |
           echo "### Deployed frontend ${{ steps.ver.outputs.label }}" >> $GITHUB_STEP_SUMMARY
           echo "- Bucket: \`s3://fatchad-frontend\`" >> $GITHUB_STEP_SUMMARY
-          echo "- URL: http://fatchad-frontend.s3-website.eu-central-1.amazonaws.com" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 URL: http://fatchad-frontend.s3-website.eu-central-1.amazonaws.com" >> $GITHUB_STEP_SUMMARY
+          if [[ -n "${{ steps.cdn.outputs.dist_id }}" ]]; then
+            echo "- Live URL: https://fatchad.de" >> $GITHUB_STEP_SUMMARY
+            echo "- CloudFront cache invalidated (\`/*\`)" >> $GITHUB_STEP_SUMMARY
+          fi

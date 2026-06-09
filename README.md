@@ -7,8 +7,9 @@ absurde Alltagssituationen; Karten bilden einen gerichteten Graphen, der den
 Lauf verzweigt (Folgekarten in den Stapel pushen, Flags setzen / erfordern,
 Endings auslösen).
 
-**FATCHAD läuft als cloud-native Web-App auf AWS.** Die React-SPA wird per
-S3-Static-Website-Hosting ausgeliefert, das FastAPI-Backend ist auf mehrere
+**FATCHAD läuft als cloud-native Web-App auf AWS.** Die React-SPA liegt in einem
+S3-Bucket und wird über CloudFront unter [`https://fatchad.de`](https://fatchad.de)
+mit TLS und Edge-Caching ausgeliefert, das FastAPI-Backend ist auf mehrere
 Lambdas hinter API Gateway aufgeteilt, der Spielzustand liegt in DynamoDB, der
 Karten-Content als versionierte Bundles in S3, Auth läuft über Cognito, und die
 gesamte Infrastruktur ist als AWS-CDK definiert und wird per GitHub Actions
@@ -30,11 +31,12 @@ Serverloses Setup auf AWS — kein eigener Server, auto-scaling,
 pay-per-request:
 
 ```
-                          statische Assets (HTML/JS/CSS)
-        Browser ──────────────────────────────────▶ ┌────────────────────┐
-           │                                         │ S3: SPA-Bucket     │ ◀── Vite-Build
-           │  REST-Aufrufe (HTTPS)                   │ (Static-Website)   │
-           ▼                                         └────────────────────┘
+                  HTTPS (fatchad.de)   ┌──────────────┐   Origin   ┌────────────────────┐
+        Browser ────────────────────▶ │ CloudFront   │ ─────────▶ │ S3: SPA-Bucket     │ ◀── Vite-Build
+           │      statische Assets     │ (TLS, Cache) │            │ (Static-Website)   │
+           │                           └──────────────┘            └────────────────────┘
+           │  REST-Aufrufe (HTTPS)
+           ▼
    ┌──────────────┐
    │ API Gateway  │
    │ (HTTPS)      │
@@ -67,7 +69,7 @@ ans Frontend weiter.
 
 | Komponente      | Umsetzung                                                          |
 | --------------- | ----------------------------------------------------------------- |
-| Frontend        | React 18 + TypeScript + Vite + Zustand → **S3 Static-Website-Hosting** |
+| Frontend        | React 18 + TypeScript + Vite + Zustand → **S3** + **CloudFront** (TLS) unter `fatchad.de` |
 | Backend         | FastAPI (Pydantic) via Mangum, auf mehrere **AWS Lambdas** hinter **API Gateway** |
 | Persistenz      | **DynamoDB** — zwei Tabellen: `fatchad_user_data` (Runs, User, Leaderboards) + `fatchad_catalog` (Working-Catalog, Version-Pointer) |
 | Content/Katalog | versionierte JSON-Bundles in **S3**, von der Lambda gelesen        |
@@ -89,7 +91,7 @@ ans Frontend weiter.
   Bundles in S3) und von der Lambda gecacht gelesen, statt ihn pro Request aus
   der DB zusammenzubauen.
 - **CORS in FastAPI:** Das API Gateway bleibt CORS-agnostisch; die Allow-List
-  (inkl. S3-Website-Origin) sitzt in der `CORSMiddleware`.
+  (inkl. `https://fatchad.de`) sitzt in der `CORSMiddleware`.
 
 ## Aufbau des Repositorys
 
@@ -147,15 +149,26 @@ drei kommen 1:1 aus den Bootstrap-Outputs, die letzten beiden definierst du selb
 | `AWS_FRONTEND_UPLOAD_ROLE_ARN` | `FatchadBootstrapStack.FrontendUploadRoleArn` | `deploy-frontend` |
 | `AWS_LAMBDA_DEPLOY_ROLE_ARN` | `FatchadBootstrapStack.LambdaDeployRoleArn` | `deploy-lambdas` |
 | `ADMIN_TOKEN` | frei gewähltes Geheimnis (Static-Bearer für Admin-Fallback) | `deploy-lambdas` (CDK-Context `adminToken`) |
-| `CORS_ORIGINS` | erlaubte Origins, kommagetrennt (z. B. die S3-Website-URL) | `deploy-lambdas` (CDK-Context `corsOrigins`) |
+| `CORS_ORIGINS` | erlaubte Origins, kommagetrennt, exakt (z. B. `https://fatchad.de`) | `deploy-lambdas` (CDK-Context `corsOrigins`) |
 
 Drei getrennte Rollen wegen Least-Privilege: ein geleaktes Frontend-Token kann
 nur den SPA-Bucket überschreiben, sonst nichts.
 
-### 3. Frontend-Bucket anlegen (einmalig)
+### 3. Frontend-Bucket + Domain anlegen (einmalig)
 
-`FatchadFrontendStack` erstellt den `fatchad-frontend`-Bucket. Beim ersten Mal
-lokal deployen; danach übernimmt das die `infra-v*`-Pipeline.
+`FatchadFrontendStack` erstellt den `fatchad-frontend`-Bucket und — sobald
+`domainName` + `hostedZoneId` in `infra/cdk.json` gesetzt sind — CloudFront,
+das ACM-Zertifikat (in `us-east-1`) und den Route-53-Alias für `fatchad.de`.
+Die Zone-ID einmalig auslesen und den Platzhalter in `cdk.json` ersetzen:
+
+```bash
+aws route53 list-hosted-zones-by-name --dns-name fatchad.de \
+  --query "HostedZones[0].Id" --output text   # /hostedzone/-Präfix abschneiden
+```
+
+Beim ersten Mal lokal deployen; danach übernimmt das die `infra-v*`-Pipeline.
+Der erste Deploy mit Domain dauert ~15–20 min (CloudFront-Propagation +
+ACM-Validierung).
 
 ```bash
 npx cdk deploy FatchadFrontendStack
@@ -189,7 +202,7 @@ Hotfix-Redeploy ohne neuen Tag.
 | --- | --- | --- |
 | `database-v*` | `deploy-data.yml` | `FatchadDataStack` (DynamoDB-Tabellen) |
 | `lambda-v*` | `deploy-lambdas.yml` | `FatchadCognitoStack` + `FatchadApiStack` |
-| `frontend-v*` | `deploy-frontend.yml` | Build → `s3://fatchad-frontend` |
+| `frontend-v*` | `deploy-frontend.yml` | Build → `s3://fatchad-frontend` + CloudFront-Cache invalidieren |
 | `infra-v*` | `deploy-infra.yml` | `FatchadFrontendStack` |
 
 ### 5. Katalog publishen

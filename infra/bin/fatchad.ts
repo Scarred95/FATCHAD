@@ -25,9 +25,17 @@ new FatchadBootstrapStack(app, 'FatchadBootstrapStack', {
   githubRepo,
 });
 
+// domainName + hostedZoneId: when both are set, FatchadFrontendStack fronts
+// the bucket with CloudFront + ACM and points the Route 53 apex at it. Pulled
+// from cdk.json context; omit them and the stack ships the bucket alone.
+const domainName = app.node.tryGetContext('domainName') as string | undefined;
+const hostedZoneId = app.node.tryGetContext('hostedZoneId') as string | undefined;
+
 new FatchadFrontendStack(app, 'FatchadFrontendStack', {
   env,
-  description: 'FATCHAD frontend: S3 website bucket for the React SPA.',
+  description: 'FATCHAD frontend: S3 website bucket + CloudFront/Route 53 for the React SPA.',
+  domainName,
+  hostedZoneId,
 });
 
 new FatchadDataStack(app, 'FatchadDataStack', {

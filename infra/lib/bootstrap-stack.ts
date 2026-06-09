@@ -155,7 +155,23 @@ export class FatchadBootstrapStack extends cdk.Stack {
         resources: [
           `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadApiStack/*`,
           `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadCognitoStack/*`,
+          // FatchadFrontendStack publishes the CloudFront DistributionId the
+          // deploy workflow needs to invalidate the edge cache after a sync.
+          `arn:aws:cloudformation:${this.region}:${this.account}:stack/FatchadFrontendStack/*`,
         ],
+      }),
+    );
+
+    // After syncing a new build to S3, the deploy workflow must bust the
+    // CloudFront edge cache or users keep getting the previous build until the
+    // TTL expires. CreateInvalidation can't be scoped to a single distribution
+    // in IAM, so it's granted on `*` — the only power it adds is "force a
+    // cache refresh", harmless on its own.
+    frontendUploadRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'InvalidateFrontendCdn',
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: ['*'],
       }),
     );
 
