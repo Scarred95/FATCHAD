@@ -11,7 +11,8 @@
  */
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAdminCardStore, deckNamesOf, categoryNamesOf } from '../store';
+import { useAdminCardStore, deckNamesOf, categoryNamesOf, isInDeck } from '../store';
+import { ORPHAN_DECK } from '../types';
 import { useAdminEndingStore } from '../endingStore';
 import { validateCard } from '../utils/validate';
 import { SectionToolbar, type ViewMode } from '../components/SectionToolbar';
@@ -61,6 +62,7 @@ export function CardsIndex() {
   }, [cards]);
 
   const deckChips = useMemo(() => deckNamesOf(cards), [cards]);
+  const hasOrphans = useMemo(() => cards.some((c) => !c.deck_name), [cards]);
 
   const issuesByCard = useMemo(() => {
     const map = new Map<string, ReturnType<typeof validateCard>>();
@@ -74,7 +76,7 @@ export function CardsIndex() {
       if (q && ![c.title, c._id, c.description, c.deck_name ?? '']
         .some((s) => (s ?? '').toLowerCase().includes(q))) return false;
       if (cats.length > 0 && !cats.includes(c.category)) return false;
-      if (decks.length > 0 && !(c.deck_name && decks.includes(c.deck_name))) return false;
+      if (decks.length > 0 && !decks.some((d) => isInDeck(c, d))) return false;
       if (!includeDisabled && c.enabled === false) return false;
       return true;
     };
@@ -137,7 +139,7 @@ export function CardsIndex() {
       </div>
 
       {/* ─── Filter row: decks ───────────────────────────────────── */}
-      {deckChips.length > 0 && (
+      {(deckChips.length > 0 || hasOrphans) && (
         <div className={styles.filterRow}>
           <span className={styles.filterLabel}>Deck</span>
           {deckChips.map((d) => {
@@ -153,6 +155,15 @@ export function CardsIndex() {
               </button>
             );
           })}
+          {hasOrphans && (
+            <button
+              type="button"
+              className={`${styles.fChip} ${styles.deckChip} ${decks.includes(ORPHAN_DECK) ? styles.fChipOn : ''}`}
+              onClick={() => toggleDeck(ORPHAN_DECK)}
+            >
+              ▦ Ohne Deck
+            </button>
+          )}
           {(cats.length > 0 || decks.length > 0) && (
             <>
               <span className={styles.spacer} />
