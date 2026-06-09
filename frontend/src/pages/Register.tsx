@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Ambient from '../components/Ambient/Ambient';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import styles from './auth.module.css';
@@ -85,6 +86,7 @@ export default function Register() {
   if (step === 'claim') {
     return (
       <main className={`page ${styles.page}`}>
+        <Ambient />
         <div className={styles.card}>
           <h1 className={styles.title}>Fortschritt übernehmen?</h1>
           <p className={styles.hint}>
@@ -113,6 +115,7 @@ export default function Register() {
   if (step === 'confirm') {
     return (
       <main className={`page ${styles.page}`}>
+        <Ambient />
         <div className={styles.card}>
           <h1 className={styles.title}>E-Mail bestätigen</h1>
           <p className={styles.hint}>
@@ -140,6 +143,7 @@ export default function Register() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <div className={styles.card}>
         <h1 className={styles.title}>Registrieren</h1>
 

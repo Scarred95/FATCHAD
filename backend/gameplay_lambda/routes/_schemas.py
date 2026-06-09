@@ -158,6 +158,7 @@ class DeckOption(BaseModel):
     rules stay server-side (the endpoint only ever returns unlocked decks)."""
     name: str
     description: str = ""
+    image_url: str | None = None
 
 
 class AchievementView(BaseModel):

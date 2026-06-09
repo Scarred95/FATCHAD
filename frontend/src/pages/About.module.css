@@ -51,6 +51,17 @@
   font-size: var(--fs-body-sm);
 }
 
+.link {
+  color: var(--color-accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-quick);
+}
+
+.link:hover {
+  border-bottom-color: var(--color-accent);
+}
+
 .healthDot {
   display: inline-block;
   width: 8px;

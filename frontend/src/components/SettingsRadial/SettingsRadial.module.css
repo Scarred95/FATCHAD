@@ -1,0 +1,264 @@
+/* Bottom-right anchored cog + radial menu. The dock is the pivot point: spokes
+   are absolutely positioned over the cog and animate out to their arc spots. */
+.dock {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 70;
+  width: 56px;
+  height: 56px;
+}
+
+/* Dismiss layer behind the open radial (above the page, below the spokes). */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+}
+
+.cog {
+  position: relative;
+  z-index: 2;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-bg-base);
+  font-size: 1.6rem;
+  line-height: 1;
+  box-shadow: 0 6px 20px rgba(255, 50, 130, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: box-shadow var(--dur-quick);
+}
+
+.cog:hover {
+  box-shadow: 0 0 28px rgba(255, 50, 130, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* "Einstellungen →" nudge sitting just left of the cog, vertically centered on
+   it. Flex centering (not translateY) so framer-motion's x animation is free.
+   Non-interactive — the cog itself is the target. */
+.hint {
+  position: absolute;
+  top: -11rem;
+  bottom: 0;
+  right: 68px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hintText {
+  position: absolute;
+  right: -90px;
+  top: 110px;
+  font-family: var(--font-display);
+  font-size: calc(var(--fs-body-xs) * 3);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.hintArrow {
+  color: var(--color-accent);
+  font-size: 8.4rem;
+  line-height: 1;
+  position: absolute;
+  right: -15px;
+  bottom: -10px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: nowrap;
+
+
+}
+
+.spokes {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each spoke sits centered over the cog, then transforms (x/y) into place. */
+.spoke {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.spokeBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 56px;
+  height: 56px;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  border: var(--border-mid);
+  color: var(--color-text);
+  transition: border-color var(--dur-quick), color var(--dur-quick), box-shadow var(--dur-quick);
+}
+
+.spokeBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: 0 0 16px rgba(255, 50, 130, 0.35);
+}
+
+/* The chosen category bubble stays put as the anchor for its stack. */
+.spokeBtnActive {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(255, 50, 130, 0.12);
+  box-shadow: 0 0 18px rgba(255, 50, 130, 0.45);
+}
+
+.spokeIcon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.spokeLabel {
+  font-size: var(--fs-body-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-loose);
+}
+
+/* ── Tier 2 — setting bubbles stacked above the chosen category ──── */
+.stack {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Like .spoke: centered over the cog, then transformed (x/y) into place. */
+.cell {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* Shared width so every tier-2 bubble lines up uniformly in the stack. */
+.bubble,
+.volBubble {
+  width: 140px;
+}
+
+/* A glowing on/off bubble. Glows when its feature is enabled, dark when off.
+   Grows vertically when it reveals its inline slider. */
+.bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  border: var(--border-mid);
+  color: var(--color-text-dim);
+  transition: color var(--dur-quick), border-color var(--dur-quick),
+    background var(--dur-quick), box-shadow var(--dur-quick), opacity var(--dur-quick);
+}
+
+.bubble:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+/* The clickable label fills the bubble width; carries the bubble's text style. */
+.bubbleLabel {
+  width: 100%;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: var(--fs-body-xs);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.8;
+  cursor: pointer;
+}
+
+/* Inline opacity bar, revealed below the label when the feature is on. */
+.bubbleSlider {
+  width: 100%;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* The glow state — feature is ON. */
+.bubbleOn {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  background: rgba(255, 50, 130, 0.14);
+  box-shadow: 0 0 18px rgba(255, 50, 130, 0.5), inset 0 0 10px rgba(255, 50, 130, 0.18);
+  animation: bubble-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes bubble-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(255, 50, 130, 0.4), inset 0 0 8px rgba(255, 50, 130, 0.15); }
+  50% { box-shadow: 0 0 24px rgba(255, 50, 130, 0.65), inset 0 0 12px rgba(255, 50, 130, 0.25); }
+}
+
+/* Respect reduced-motion: keep the glow, drop the pulse. */
+:global(html[data-reduced-motion='true']) .bubbleOn {
+  animation: none;
+}
+
+/* Volume slider rides in the Sound stack as a wider pill. */
+.volBubble {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 46px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  border: var(--border-mid);
+}
+
+.volBubble[data-disabled='true'] {
+  opacity: 0.4;
+}
+
+.volLabel {
+  font-family: var(--font-display);
+  font-size: var(--fs-body-xs);
+  letter-spacing: var(--tracking-loose);
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.volBubble input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.volBubble input[type='range']:disabled {
+  cursor: not-allowed;
+}
+
+.volValue {
+  min-width: 1.8em;
+  text-align: right;
+  font-size: var(--fs-body-xs);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono, monospace);
+}

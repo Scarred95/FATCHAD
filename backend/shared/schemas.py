@@ -258,6 +258,7 @@ class Deck(BaseModel):
     # The first card drawn when a run starts with this deck selected.
     # Chains the deck's storyline via adds_to_deck, just like the tutorial.
     starting_card_id: Optional[str] = None
+    image_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

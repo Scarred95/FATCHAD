@@ -149,6 +149,9 @@ export interface HealthResponse {
 export interface DeckOption {
   name: string;
   description: string;
+  /** Optional cover art. When present it's feathered into the tile between the
+   *  title and description; absent decks just show title + description. */
+  image_url?: string | null;
 }
 
 /** Client-facing achievement label from GET /achievements. Criteria stay

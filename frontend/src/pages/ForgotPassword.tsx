@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Ambient from '../components/Ambient/Ambient';
 import { useAuthStore } from '../stores/authStore';
 import styles from './auth.module.css';
 
@@ -48,6 +49,7 @@ export default function ForgotPassword() {
   if (step === 'reset') {
     return (
       <main className={`page ${styles.page}`}>
+        <Ambient />
         <div className={styles.card}>
           <h1 className={styles.title}>Neues Passwort</h1>
           <p className={styles.hint}>
@@ -83,6 +85,7 @@ export default function ForgotPassword() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <div className={styles.card}>
         <h1 className={styles.title}>Passwort vergessen</h1>
         <p className={styles.hint}>

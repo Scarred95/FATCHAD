@@ -87,8 +87,8 @@ export class FatchadBootstrapStack extends cdk.Stack {
     // FatchadFrontendUploadRole — scoped to frontend bucket sync only.
     //
     // Trust: only the deploy-frontend.yml workflow can assume this, and only
-    // when running on a `frontend-v*` tag or a `workflow_dispatch` from main
-    // or the active dev branch. Branch pushes / PRs cannot assume it.
+    // when running on a `frontend-v*` tag or a `workflow_dispatch` from main.
+    // Other branch pushes / PRs cannot assume it.
     //
     // Permissions: list/get/put/delete on `fatchad-frontend` bucket + its
     // objects. Nothing else.
@@ -108,7 +108,6 @@ export class FatchadBootstrapStack extends cdk.Stack {
             'token.actions.githubusercontent.com:sub': [
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/frontend-v*`,
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/main`,
-              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/aurendev-CICD_AWS_TEST`,
             ],
           },
         },
@@ -168,10 +167,10 @@ export class FatchadBootstrapStack extends cdk.Stack {
     // ------------------------------------------------------------------
     // FatchadLambdaDeployRole — scoped to `cdk deploy FatchadApiStack`.
     //
-    // Trust: only `lambda-v*` tag pushes or workflow_dispatch from main /
-    // the active dev branch. Mirrors the scoping pattern used by the
-    // frontend upload role so the blast radius of a leaked token is bounded
-    // to "the workflow that's allowed to deploy Lambdas".
+    // Trust: only `lambda-v*` tag pushes or workflow_dispatch from main.
+    // Mirrors the scoping pattern used by the frontend upload role so the
+    // blast radius of a leaked token is bounded to "the workflow that's
+    // allowed to deploy Lambdas".
     //
     // Permissions: same shape as FatchadGitHubDeployRole — assume the
     // cdk-bootstrap roles + read the bootstrap version SSM parameter. The
@@ -190,7 +189,6 @@ export class FatchadBootstrapStack extends cdk.Stack {
             'token.actions.githubusercontent.com:sub': [
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/tags/lambda-v*`,
               `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/main`,
-              `repo:${props.githubOwner}/${props.githubRepo}:ref:refs/heads/aurendev-CICD_AWS_TEST`,
             ],
           },
         },

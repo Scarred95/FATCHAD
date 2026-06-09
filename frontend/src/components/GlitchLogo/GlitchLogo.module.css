@@ -1,0 +1,80 @@
+/* FATCHAD wordmark — see GlitchLogo.tsx for the three-effect breakdown.
+   rgbDrift animates only text-shadow; letterGlitch only transform/clip-path; so
+   the two .char animations never fight over a property. neonFlicker rides on the
+   whole word via filter + opacity. */
+.logo {
+  position: relative;
+  display: inline-block;
+  font-size: var(--fs-display-xl);
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  /* Anton has no true italic — a skew gives the wordmark a forward-leaning,
+     aggressive oblique. Extra right padding so the lean doesn't clip. */
+  transform: skewX(-8deg);
+  padding-right: 0.12em;
+  animation: neonFlicker 7s steps(1, end) infinite;
+}
+
+/* Drop-in wrapper: framer-motion owns this span's transform for the entrance,
+   keeping it off the inner .char so the CSS glitch transform never collides. */
+.drop {
+  display: inline-block;
+}
+
+.char {
+  display: inline-block;
+  /* Always-on chromatic split; rgbDrift breathes the offsets. */
+  text-shadow:
+    -1px 0 rgba(255, 50, 130, 0.5),
+    1px 0 rgba(0, 240, 255, 0.5);
+  animation:
+    rgbDrift 3.6s ease-in-out infinite,
+    letterGlitch var(--glitch-dur, 5s) steps(1, end) var(--glitch-delay, 0s) infinite;
+  will-change: transform, clip-path;
+}
+
+@keyframes rgbDrift {
+  0%, 100% {
+    text-shadow: -1px 0 rgba(255, 50, 130, 0.5), 1px 0 rgba(0, 240, 255, 0.5);
+  }
+  50% {
+    text-shadow: -3px 0 rgba(255, 50, 130, 0.6), 3px 0 rgba(0, 240, 255, 0.6);
+  }
+}
+
+/* Mostly identity; the brief tail (88–96%) is the actual tear, so each letter is
+   only glitching a few percent of its cycle. */
+@keyframes letterGlitch {
+  0%, 88%, 100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+  89% { transform: translate(-3px, 1px); clip-path: inset(15% 0 55% 0); }
+  91% { transform: translate(3px, -2px); clip-path: inset(58% 0 18% 0); }
+  93% { transform: translate(-2px, 1px); clip-path: inset(35% 0 38% 0); }
+  95% { transform: translate(2px, 0); clip-path: inset(70% 0 8% 0); }
+  96% { transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+}
+
+/* Dying-neon flicker — irregular dips in glow + opacity. */
+@keyframes neonFlicker {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 50, 130, 0.4)); opacity: 1; }
+  41% { filter: drop-shadow(0 0 10px rgba(255, 50, 130, 0.4)); opacity: 1; }
+  42% { filter: drop-shadow(0 0 3px rgba(255, 50, 130, 0.2)); opacity: 0.78; }
+  43% { filter: drop-shadow(0 0 16px rgba(255, 50, 130, 0.55)); opacity: 1; }
+  68% { opacity: 1; }
+  69% { opacity: 0.72; filter: drop-shadow(0 0 4px rgba(255, 50, 130, 0.25)); }
+  70% { opacity: 1; filter: drop-shadow(0 0 12px rgba(255, 50, 130, 0.45)); }
+}
+
+/* Glitch disabled: flatten to a clean white wordmark. */
+:global(html[data-no-glitch='true']) .logo,
+:global(html[data-no-glitch='true']) .char {
+  animation: none;
+}
+:global(html[data-no-glitch='true']) .char {
+  text-shadow: none;
+}
+
+/* Reduced motion: keep the static chromatic look, drop all movement/flicker. */
+:global(html[data-reduced-motion='true']) .logo,
+:global(html[data-reduced-motion='true']) .char {
+  animation: none;
+}

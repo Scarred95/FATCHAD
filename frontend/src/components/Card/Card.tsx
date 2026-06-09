@@ -50,18 +50,18 @@ export default function Card({
       className={styles.card}
       style={{ x: swipe.x, y: swipe.y, rotate: swipe.rotate, opacity: swipe.opacity }}
       data-intent={String(swipe.intent)}
+      data-has-down={String(hasDown)}
       onPointerDown={swipeable ? swipe.onPointerDown : undefined}
       onPointerMove={swipeable ? swipe.onPointerMove : undefined}
       onPointerUp={swipeable ? swipe.onPointerUp : undefined}
       onPointerCancel={swipeable ? swipe.onPointerUp : undefined}
     >
-      {card.image_url ? (
-        <div className={styles.image} style={{ backgroundImage: `url(${card.image_url})` }}>
-          <div className={styles.imageFade} aria-hidden />
-        </div>
-      ) : (
-        <CardArt slug={card.id} category={card.category} deckName={card.deck_name} />
-      )}
+      <CardArt
+        slug={card.id}
+        category={card.category}
+        deckName={card.deck_name}
+        imageUrl={card.image_url}
+      />
 
       <div className={styles.body}>
         <h2 className={`display ${styles.title}`}>{card.title}</h2>

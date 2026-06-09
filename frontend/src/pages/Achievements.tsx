@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { listAchievements, listUnlockedAchievements } from '../api/client';
 import { errorMessage } from '../api/http';
 import type { AchievementView, UnlockedAchievementView } from '../api/types';
+import Ambient from '../components/Ambient/Ambient';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import { useToastStore } from '../stores/toastStore';
 import styles from './Achievements.module.css';
@@ -46,6 +47,7 @@ export default function Achievements() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <Header
         left={<IconButton label="Zurück" onClick={() => nav('/')}><BackArrow /></IconButton>}
         center="Erfolge"

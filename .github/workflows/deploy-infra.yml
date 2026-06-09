@@ -2,11 +2,8 @@ name: Deploy infra
 
 on:
   push:
-    branches:
-      - aurendev-CICD_AWS_TEST
-    paths:
-      - 'infra/**'
-      - '.github/workflows/deploy-infra.yml'
+    tags:
+      - 'infra-v*'
   workflow_dispatch:
 
 # OIDC requires id-token: write. contents: read is the default minimum.

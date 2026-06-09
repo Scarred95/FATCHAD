@@ -52,6 +52,7 @@ class CreateDeckRequest(BaseModel):
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
     removes_endings: list[str] = Field(default_factory=list)
     starting_card_id: str | None = None
+    image_url: str | None = None
 
 
 @router.post("", response_model=Deck, status_code=201)
@@ -67,6 +68,7 @@ def create_deck(
         unlock_rule=payload.unlock_rule,
         removes_endings=payload.removes_endings,
         starting_card_id=payload.starting_card_id,
+        image_url=payload.image_url,
         created_at=now,
         updated_at=now,
     )
@@ -85,6 +87,7 @@ class ReplaceDeckRequest(BaseModel):
     unlock_rule: DeckUnlockRule = Field(default_factory=DeckUnlockRule)
     removes_endings: list[str] = Field(default_factory=list)
     starting_card_id: str | None = None
+    image_url: str | None = None
 
 
 @router.put("/{deck_name}", response_model=Deck)
@@ -103,6 +106,7 @@ def replace_deck(
         unlock_rule=payload.unlock_rule,
         removes_endings=payload.removes_endings,
         starting_card_id=payload.starting_card_id,
+        image_url=payload.image_url,
         created_at=existing.created_at,
         updated_at=_now(),
     )
@@ -118,6 +122,7 @@ class PatchDeckRequest(BaseModel):
     unlock_rule: DeckUnlockRule | None = None
     removes_endings: list[str] | None = None
     starting_card_id: str | None = None
+    image_url: str | None = None
 
 
 @router.patch("/{deck_name}", response_model=Deck)

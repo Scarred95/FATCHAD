@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import Ambient from '../components/Ambient/Ambient';
 import { useAuthStore } from '../stores/authStore';
+import { startMusic } from '../audio/music';
 import styles from './auth.module.css';
 
 export default function Login() {
@@ -24,6 +26,8 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    // Submit is a user gesture, so this satisfies the browser autoplay policy.
+    startMusic();
     try {
       await login(email, password);
       navigate('/');
@@ -34,6 +38,7 @@ export default function Login() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <div className={styles.card}>
         <h1 className={styles.title}>Anmelden</h1>
 

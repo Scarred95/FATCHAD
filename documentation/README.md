@@ -13,6 +13,7 @@ column to find the right one.
 | [backend_documentation/GAME_FLOW.md](backend_documentation/GAME_FLOW.md) | The run engine: lifecycle, the per-turn `apply_choice` pipeline, endings, refill | You're changing game mechanics |
 | [backend_documentation/categories.md](backend_documentation/categories.md) | Card-authoring guide — categories, flag naming, weights, questline patterns | You're authoring card content |
 | [backend_documentation/DEPLOYMENT.md](backend_documentation/DEPLOYMENT.md) | AWS infra: the five CDK stacks, deploy flow, secrets, observability, smoke tests | You're deploying or debugging infra |
+| [INFRA.md](INFRA.md) | The CDK app itself: one-time bootstrap, stack/role layout, frontend & DB release commands | You're running CDK or editing `infra/` |
 | [backend_documentation/cognito.md](backend_documentation/cognito.md) | Cognito auth: user pool, groups, JWT verification, guest/claim flow | You're working on auth |
 | [FEATURE_IDEAS.md](FEATURE_IDEAS.md) | Backlog of proposed features, with status | You're planning what to build next |
 

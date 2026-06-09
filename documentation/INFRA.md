@@ -1,7 +1,7 @@
 # FATCHAD Infra
 
 CDK app for the FATCHAD AWS deployment. Currently covers step 1 of the
-migration plan in [`CLOUD_DESIGN.md`](../CLOUD_DESIGN.md): IAM trust for CI
+migration plan in [`CLOUD_DESIGN.md`](history/CLOUD_DESIGN.md): IAM trust for CI
 and the public S3 bucket that hosts the React SPA. The backend (Lambda + API
 Gateway + DynamoDB + Cognito) arrives in later steps.
 
@@ -63,7 +63,7 @@ After this, all further deploys ride on GitHub Actions.
 
 | Resource | Purpose |
 |---|---|
-| `fatchad-frontend` S3 bucket | Hosts the React SPA build. Public read for v1; private + CloudFront OAC in step 2. |
+| `fatchad-frontend` S3 bucket | Hosts the React SPA build via S3 static-website hosting (public read). CloudFront was considered but dropped — plain S3 hosting is what we ship. |
 | Object versioning + 90d retention | Every PUT keeps the prior version. Lets us roll back without rebuilding. |
 | Removal policy: RETAIN | `cdk destroy` keeps the bucket. The bucket name is globally unique — losing it is permanent. |
 
@@ -81,14 +81,14 @@ Different PK strategies on purpose:
 - **`fatchad_catalog`** uses one PK per entity type (`DECK`, `EVENT`, `ENDING`, `ACH`, `META`). No parent/child fetches happen at runtime — gameplay reads from a cached snapshot, so the single-table "Query returns parent + children" trick is wasted here. Per-type PKs make admin listings a clean `Query pk=EVENT` and spread load across partitions.
 - **`fatchad_user_data`** uses `PK=USER#<uid>` for everything user-scoped, plus `PK=LB#<scope>` for leaderboards. This is real single-table design — loading a user's full state (profile + unlocks + achievements + active run) is one Query. Leaderboards live in their own partitions because they're never joined with user items.
 
-See header comments in [`lib/ddb-stack.ts`](lib/ddb-stack.ts) for the full PK/SK conventions per entity.
+See header comments in [`lib/ddb-stack.ts`](../infra/lib/ddb-stack.ts) for the full PK/SK conventions per entity.
 
 **Removal policy is currently `DESTROY` on both tables.** That's deliberate for the development phase — schema can change, data is fixture-only. Flip both to `RETAIN` before any real user account is created; the day we forget is the day we accidentally `cdk destroy` and lose history.
 
 The bucket itself is provisioned by CDK; the actual SPA files are uploaded
 by `deploy-frontend.yml` with `aws s3 sync`, not by `cdk deploy`. This split
 keeps the CDK stack stable across releases — only true infrastructure
-changes (e.g. adding CloudFront) trigger a CDK deploy.
+changes (e.g. bucket policy or versioning) trigger a CDK deploy.
 
 ## Releasing the frontend
 
@@ -166,7 +166,7 @@ npx cdk deploy FatchadFrontendStack   # deploy from your laptop (skips CI)
   CDK stacks defined in this repo.
 - **Least-privilege frontend upload role**: only `s3:Put/Get/Delete` on
   the `fatchad-frontend` bucket and its objects. Trust is scoped to the
-  `frontend-v*` tag pattern and listed branches (`main`, plus the active
-  dev branch until the pipeline is stable).
-- **Public S3 bucket** is acceptable for v1. Step 2 of the migration moves
-  to CloudFront + Origin Access Control with the bucket private.
+  `frontend-v*` tag pattern and `main` only.
+- **Public S3 bucket** with static-website hosting is the shipped frontend
+  serving model. CloudFront + Origin Access Control was evaluated and dropped;
+  plain S3 hosting keeps the setup simple and is what's live.

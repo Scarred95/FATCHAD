@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getHealth } from '../api/client';
+import Ambient from '../components/Ambient/Ambient';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import styles from './About.module.css';
 
@@ -18,6 +19,7 @@ export default function About() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <Header
         left={<IconButton label="Zurück" onClick={() => nav('/')}><BackArrow /></IconButton>}
         center="Über"
@@ -54,7 +56,43 @@ export default function About() {
           <p className={styles.dim}>
             Backend: FastAPI, Motor, MongoDB.<br />
             Frontend: React, Vite, Framer Motion, Zustand.<br />
-            Schriften: Anton, Inter.
+            Schriften: Anton, Inter.<br />
+            CRT-Effekt:{' '}
+            <a
+              className={styles.link}
+              href="https://www.npmjs.com/package/vault66-crt-effect"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              vault66-crt-effect
+            </a>
+            .
+          </p>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={`display ${styles.h}`}>Audio</h2>
+          <p className={styles.dim}>
+            Musik:{' '}
+            <a
+              className={styles.link}
+              href="https://pixabay.com/music/search/lofi/"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              PulseBox – „Lofi Smooth"
+            </a>{' '}
+            (Pixabay).<br />
+            Run-Ende (Wilhelm-Scream):{' '}
+            <a
+              className={styles.link}
+              href="https://bigsoundbank.com/wilhelm-scream-s0477.html"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              BigSoundBank
+            </a>
+            .
           </p>
         </section>
 

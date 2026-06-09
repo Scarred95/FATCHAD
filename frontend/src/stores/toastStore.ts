@@ -2,6 +2,7 @@
  * Lightweight toast queue. Auto-dismisses after a TTL.
  */
 import { create } from 'zustand';
+import { playSfx } from '../audio/sfx';
 
 export type ToastVariant = 'info' | 'warning' | 'error';
 
@@ -23,6 +24,7 @@ export const useToastStore = create<ToastStore>((set, get) => ({
   toasts: [],
   push(message, variant = 'info', ttlMs = 3000) {
     const id = nextId++;
+    if (variant === 'error') playSfx('error');
     set({ toasts: [...get().toasts, { id, message, variant }] });
     setTimeout(() => get().dismiss(id), ttlMs);
   },

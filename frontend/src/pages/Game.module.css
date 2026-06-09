@@ -43,20 +43,47 @@
      stays a comfortable phone-sized column in the middle. */
   grid-template-columns:
     minmax(0, 1fr) clamp(200px, 28vw, 280px) minmax(0, 1fr);
+  grid-template-areas: "left card right";
   align-items: center;
-  gap: clamp(var(--space-4), 6vw, 96px);
+  gap: clamp(var(--space-4), 4vw, 56px);
   padding: 0 var(--space-5);
   min-height: 0;
   position: relative;
   z-index: 1;
-  max-width: 1400px;
+  max-width: 960px;
 }
 
-@media (max-width: 380px) {
+/* The three children are, in DOM order: left gutter, card stack, right gutter.
+   Mapping them to named areas lets the mobile layout reflow them without
+   touching the markup. */
+.cardRow > :nth-child(1) { grid-area: left; min-width: 0; }
+.cardRow > :nth-child(2) { grid-area: card; }
+.cardRow > :nth-child(3) { grid-area: right; min-width: 0; }
+
+/* Phones: the side-gutter layout has no room to breathe, so make the card the
+   hero and drop the two options below it as a side-by-side pair (the 3rd
+   "down" choice already sits in its own row beneath cardRow). Swipe still
+   works on the card; the options double as the tap targets. */
+@media (max-width: 700px) {
   .cardRow {
-    grid-template-columns: minmax(0, 1fr) clamp(170px, 50%, 220px) minmax(0, 1fr);
-    gap: var(--space-2);
-    padding: 0 var(--space-2);
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "card card"
+      "left right";
+    align-items: stretch;
+    align-content: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-3);
+  }
+
+  .cardStack {
+    /* Don't let the grid cell stretch the card to full width — center it and
+       let the 3/4 aspect-ratio derive the width from the capped height. */
+    justify-self: center;
+    width: auto;
+    height: min(50dvh, 420px);
+    max-height: none;
+    margin: 0 auto var(--space-1);
   }
 }
 

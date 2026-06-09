@@ -44,17 +44,44 @@ server-side, so runs can be saved and resumed across sessions.
 | Concern | Choice |
 |---|---|
 | Build | Vite 5 + TypeScript 5 |
-| UI | React 18 |
+| UI | React 19 |
 | Routing | React Router v6 (`createBrowserRouter`) |
 | State | Zustand v5 |
-| Animation | Framer Motion v11 |
-| Admin graph | ReactFlow v11 (lazy-loaded) |
+| Animation | Framer Motion v12 |
+| CRT/scanline shell | `vault66-crt-effect` (wraps the whole app in `App.tsx`) |
+| Audio | plain `HTMLAudioElement` singletons (`src/audio/`), no library |
+| Admin graph | `@xyflow/react` v12 (lazy-loaded) |
 | Admin schema/validation | Zod v3 |
 | Admin import/export | JSZip |
 | Styling | CSS Modules + design tokens in `src/styles/tokens.css` |
 
 Scripts: `npm run dev` (Vite @ :5173), `npm run build` (`tsc && vite build`),
 `npm run typecheck`.
+
+### App shell & global systems (`src/App.tsx`, `src/main.tsx`)
+
+- **CRT shell** — the whole app is wrapped in `<CRTEffect>` (`vault66-crt-effect`).
+  `enabled` is held constantly `true` on purpose: the lib renders a *different*
+  tree when `enabled` flips, which would remount every child (closing any open
+  UI). The individual sub-effects (`enableScanlines` / `enableSweep` /
+  `enableEdgeGlow` + scanline opacity) are toggled instead, driven by
+  `settingsStore`.
+- **Page transitions** — `AnimatePresence mode="wait"` around a `motion.div`
+  keyed on the pathname: the old page fades fully out, the new one fades + drifts
+  ~24px in from the direction of travel (`useNavigationType` → PUSH from the
+  right, POP from the left). Exit is opacity-only so `position:fixed` chrome
+  (cog, banner) doesn't get dragged by the transform. All `/admin/*` routes share
+  one transition key so sub-navigation doesn't remount the sidebar. Honors
+  `reducedMotion`.
+- **Audio** (`src/audio/`) — two dependency-free `HTMLAudioElement` singletons.
+  `sfx.ts` plays one-shots (`click` / `swipe` / `error` / `gameOver`); `click`
+  is wired app-wide via a single capture-phase delegated listener (`initClickSfx`,
+  opt out with `data-no-click-sfx`). `music.ts` loops the soundtrack; it starts
+  on the login submit and has a first-gesture autostart fallback
+  (`initMusicAutostart`). Both read volume/mute live from `settingsStore` and
+  no-op safely when muted, at zero volume, or when an asset is missing. Boot
+  wiring lives in `main.tsx` (`preloadSfx` + `initClickSfx` + `initMusicAutostart`
+  after `initSettings`).
 
 ---
 
@@ -70,6 +97,7 @@ Public (eager-loaded):
 |---|---|---|
 | `/welcome` | Auth gate / landing | `src/pages/Welcome.tsx` |
 | `/about` | About | `src/pages/About.tsx` |
+| `/leaderboard` | Leaderboard (public read) | `src/pages/Leaderboard.tsx` |
 | `/login` | Sign in | `src/pages/Login.tsx` |
 | `/register` | Sign up | `src/pages/Register.tsx` |
 | `/forgot-password` | Password reset | `src/pages/ForgotPassword.tsx` |
@@ -80,15 +108,15 @@ Authenticated (`<RequireAuth>`):
 |---|---|---|
 | `/` | Title | `src/pages/Title.tsx` |
 | `/profile` | Profile | `src/pages/Profile.tsx` |
-| `/settings` | Settings | `src/pages/Settings.tsx` |
+| `/settings` | *retired* → redirects to `/` | — |
 | `/achievements` | Achievements grid | `src/pages/Achievements.tsx` |
 | `/runs` | Run list | `src/pages/RunList.tsx` |
 | `/runs/new` | New run setup | `src/pages/NewRun.tsx` |
 | `/runs/:runId` | Game (main loop) | `src/pages/Game.tsx` |
 | `/runs/:runId/end` | End screen | `src/pages/EndScreen.tsx` |
 
-Admin surface — **lazy-loaded** (keeps reactflow/zod/jszip out of the gameplay
-bundle), gated by `<RequireAdmin>` (Cognito `admin` group):
+Admin surface — **lazy-loaded** (keeps `@xyflow/react`/zod/jszip out of the
+gameplay bundle), gated by `<RequireAdmin>` (Cognito `admin` group):
 
 | Path | Screen |
 |---|---|
@@ -113,11 +141,21 @@ exist in `src/admin/pages/` but are not wired into the router nav.
 First screen *after* the auth gate. Glitch-animated FATCHAD logo + tagline.
 Buttons: **Neue Runde** → `/runs/new`; **Fortsetzen** → `/runs` (disabled if no
 runs); **Über FATCHAD** → `/about`. Admin users get an entry into `/admin`.
-Offline status pill when the server is unreachable.
+Offline status pill when the server is unreachable. A floating **settings cog**
+(`SettingsRadial`) opens a radial menu for the client prefs in `settingsStore`
+(motion, glitch, mute + SFX/music volume, CRT sub-effects) — this replaced the
+old `/settings` page, which now just redirects to `/`.
 
 ### About (`/about`)
 Static explainer: concept, stat meanings (Chaos ±100 = victory), credits, and a
 live server/DB **health** indicator (dots fed by `GET /healthz`).
+
+### Leaderboard (`/leaderboard`)
+**Public** (browsable signed-out). Toggles between the career **points** board
+(`getPointsLeaderboard`) and the **run highscore** board (`getRunsLeaderboard`);
+signed-in users get a "Nur meine" filter (`getMyLeaderboardRuns`). Runs reach the
+board via the End screen's publish action (capped at 5 per player, so a full
+board prompts a replace-picker).
 
 ### New Run (`/runs/new`)
 Pre-game setup. A working **"Tutorial überspringen" toggle** (sends
@@ -147,9 +185,11 @@ title (`Lauf <last-4-of-id>`), turn count + dominant stat, History button,
 Delete (with confirm). Empty state + fixed "Neue Runde" CTA.
 
 ### End Screen (`/runs/:runId/end`)
-Animated ending banner (or "Aufgegeben"), flavor text, 5-stat final grid, turns
-survived + cards played. Actions: Neue Runde, Verlauf, **Teilen** (copies a
-formatted summary to clipboard), back to overview.
+Animated ending banner (or "Aufgegeben"), flavor text, any **newly-unlocked
+achievements**, 5-stat final grid, turns survived + cards played. Actions: Neue
+Runde, Verlauf, **Aufs Leaderboard** (`publishRun`; a 409 "board full" opens a
+replace-picker modal), **Teilen** (copies a formatted summary to clipboard), back
+to overview.
 
 ---
 
@@ -188,8 +228,8 @@ across Decks/Cards/Achievements/Endings/Runs/Users plus a `PublishPanel`.
 - **Publish panel** (`PublishPanel`): shows the live `CatalogPointer` and
   snapshots the working catalog to a new versioned S3 bundle via
   `POST /admin/publish`.
-- **Graph view** (`/admin/graph`): ReactFlow node graph of card→card links via
-  deck additions. **WIP**; node positions persist to localStorage.
+- **Graph view** (`/admin/graph`): `@xyflow/react` node graph of card→card links
+  via deck additions. **WIP**; node positions persist to localStorage.
 
 Admin client behavior (`src/api/admin.ts`): attaches the Cognito access token as
 `Authorization: Bearer <jwt>` on every call; on a **401** (token missing/expired)
@@ -205,7 +245,7 @@ it calls `useAuthStore.logout()` so the guard bounces the user to `/login`. A
 | `authStore` | Cognito session — `userId` (`sub`), `accessToken`, `isAdmin` (`admin` group) | `login`, `register`, `logout`, `initFromSession`, `getAccessToken` |
 | `runStore` | `state` (GameState), `currentCard`, `lastDeltas`, loading/submitting/error | `loadRun`, `createRun`, `submitChoice`, `abandonRun`, `exitRun`, `clearDeltas` |
 | `catalogStore` | public catalog bundle (decks/cards/endings/achievements), TTL + sessionStorage cache | `ensureLoaded(force)`, `invalidate` |
-| `settingsStore` | client UI prefs | — |
+| `settingsStore` | client UI prefs, persisted to localStorage — `reducedMotion`, `disableGlitch`, `muted` (master), `volume` (SFX), `musicVolume`, and the CRT toggles `crtScanlines` / `crtScanlineOpacity` / `crtSweep` / `crtGlow` | per-field setters + `initSettings` |
 | `toastStore` | toast queue | `push(msg, variant, ms)` |
 | `admin/store.ts`, `admin/endingStore.ts`, `admin/deckStore.ts`, `admin/achievementStore.ts` | server-synced card/ending/deck/achievement catalogues with optimistic CRUD, import/export | — |
 
@@ -261,6 +301,18 @@ Frontend-specific notes: `submitChoice` sends `expected_turn` for
 optimistic-locking; 204 responses (delete) resolve to `undefined` in `http()`.
 For the full per-endpoint semantics (status codes, 409 cases) see API.md.
 
+### Leaderboard endpoints
+
+The two read boards are **public** (no auth); the rest require the Cognito JWT.
+
+| Frontend fn (`client.ts`) | Method + path | Used by |
+|---|---|---|
+| `getPointsLeaderboard(limit?)` | `GET /leaderboard/points` | Leaderboard (points board) |
+| `getRunsLeaderboard(limit?)` | `GET /leaderboard/runs` | Leaderboard (run highscores) |
+| `getMyLeaderboardRuns()` | `GET /leaderboard/runs/mine` | Leaderboard "Nur meine" filter |
+| `publishRun(runId, replaceRunId?)` | `POST /leaderboard/runs/:id` | EndScreen publish (409 → replace-picker) |
+| `unpublishRun(runId)` | `DELETE /leaderboard/runs/:id` | take a run back off the board |
+
 ### Admin endpoints (Cognito `admin` group; `Authorization: Bearer <jwt>`)
 
 | Frontend fn (`admin.ts`) | Method + path |
@@ -301,7 +353,9 @@ both sides or the field silently drops on the wire.
 **Built since this doc's first draft** (no longer gaps): Cognito auth + login/
 register/forgot-password screens, guest sessions + "claim my runs", the New Run
 tutorial toggle + deck picker, the player Achievements surface, the admin
-Achievements / Users / Run-inspector views, and the Publish panel.
+Achievements / Users / Run-inspector views, the Publish panel, and the
+**Leaderboards** (public points + run-highscore boards, publish/unpublish from
+the End screen).
 
 **Stubbed or incomplete in the current UI:**
 - **Graph view** (`/admin/graph`) — drafted, incomplete.
@@ -310,7 +364,6 @@ Achievements / Users / Run-inspector views, and the Publish panel.
   the router nav.
 
 **Architectural seams still open (from [history/CLOUD_DESIGN.md](history/CLOUD_DESIGN.md)):**
-- **Leaderboards** — designed in the cloud doc, no frontend yet.
 - **Run version pinning** (FEATURE_IDEAS.md) — runs resolve against the *live*
   catalog; mid-run publishes can change content. A frontend-visible concern if
   surfaced.
@@ -413,6 +466,7 @@ stat-colour chips keep it unmistakably FATCHAD.
 | `VITE_COGNITO_USER_POOL_ID` | Cognito user pool (auth) | unset → auth disabled |
 | `VITE_COGNITO_APP_CLIENT_ID` | Cognito app client (auth) | unset → auth disabled |
 | `VITE_WIP_MODE` | short-circuit API for backend-less preview | unset/false |
+| `VITE_MOCK_MODE` | route every API call to the in-browser mock engine (`src/api/mock.ts`); set by `npm run dev:mock` | unset/false |
 
 The two Cognito vars are read by `authStore`; when either is missing
 (`authConfigured === false`) the auth methods reject with a clear error instead

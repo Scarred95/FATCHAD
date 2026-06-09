@@ -8,6 +8,9 @@ declare module '*.module.css' {
 interface ImportMetaEnv {
   /** When 'true', API calls short-circuit and a banner is shown. Set by CI. */
   readonly VITE_WIP_MODE?: 'true' | 'false';
+  /** When 'true', auth + every API call are served by an in-memory mock backend
+   *  for local frontend testing with no server. Set by `npm run dev:mock`. */
+  readonly VITE_MOCK_MODE?: 'true' | 'false';
   /** Version string baked into the build (e.g. 'v0.1.0' or 'dev-a1b2c3d'). */
   readonly VITE_APP_VERSION?: string;
   /**

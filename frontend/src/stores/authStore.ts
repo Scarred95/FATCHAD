@@ -19,6 +19,7 @@ import {
   CognitoUserPool,
   CognitoUserSession,
 } from 'amazon-cognito-identity-js';
+import { MOCK_MODE } from '../api/mock';
 
 const POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID as string | undefined;
 const CLIENT_ID = import.meta.env.VITE_COGNITO_APP_CLIENT_ID as string | undefined;
@@ -120,6 +121,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initializing: true,
 
   async initFromSession() {
+    // Frontend-only test mode (npm run dev:mock): skip Cognito entirely and
+    // drop straight into a fake signed-in session.
+    if (MOCK_MODE) {
+      set({
+        userId: 'mock-user',
+        accessToken: 'mock-token',
+        isAdmin: true,
+        isGuest: false,
+        displayName: 'Tester',
+        email: 'tester@local',
+        initializing: false,
+      });
+      return;
+    }
     if (!authConfigured) { set({ initializing: false }); return; }
     const user = getUserPool().getCurrentUser();
     if (!user) { set({ initializing: false }); return; }

@@ -4,3 +4,4 @@ pydantic
 boto3
 mangum
 python-jose[cryptography]
+aws-lambda-powertools

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import App from './App';
 import Title from './pages/Title';
@@ -10,7 +10,6 @@ import EndScreen from './pages/EndScreen';
 import About from './pages/About';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
-import Settings from './pages/Settings';
 import Achievements from './pages/Achievements';
 import RouteError from './pages/RouteError';
 import Welcome from './pages/Welcome';
@@ -96,7 +95,9 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Title /> },
           { path: 'profile', element: <Profile /> },
-          { path: 'settings', element: <Settings /> },
+          // Settings retired — prefs moved into the SettingsRadial cog on Title.
+          // Keep a redirect so stale bookmarks/links don't 404.
+          { path: 'settings', element: <Navigate to="/" replace /> },
           { path: 'achievements', element: <Achievements /> },
           { path: 'runs', element: <RunList /> },
           { path: 'runs/new', element: <NewRun /> },

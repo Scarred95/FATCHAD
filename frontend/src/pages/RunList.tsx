@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { deleteRun, listRuns } from '../api/client';
 import { errorMessage } from '../api/http';
 import type { RunSummary } from '../api/types';
+import Ambient from '../components/Ambient/Ambient';
 import Header, { BackArrow, IconButton } from '../components/Header/Header';
 import Modal from '../components/Modal/Modal';
 import HistoryModal from '../components/HistoryModal/HistoryModal';
@@ -52,6 +53,7 @@ export default function RunList() {
 
   return (
     <main className={`page ${styles.page}`}>
+      <Ambient />
       <Header
         left={<IconButton label="Zurück" onClick={() => nav('/')}><BackArrow /></IconButton>}
         center="Deine Runden"

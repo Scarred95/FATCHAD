@@ -15,6 +15,7 @@ import StatRow from '../components/StatBar/StatRow';
 import { useChaosAmbient } from '../hooks/useChaosAmbient';
 import { useRunStore } from '../stores/runStore';
 import { useToastStore } from '../stores/toastStore';
+import { playSfx } from '../audio/sfx';
 import styles from './Game.module.css';
 
 export default function Game() {
@@ -47,9 +48,10 @@ export default function Game() {
     }
   }, [runId, state, loadRun]);
 
-  // When the run ends, route to the end screen.
+  // When the run ends, sting the game-over cue and route to the end screen.
   useEffect(() => {
     if (state && state.status !== 'active') {
+      playSfx('gameOver');
       const t = setTimeout(() => nav(`/runs/${state._id}/end`), 1400);
       return () => clearTimeout(t);
     }
@@ -69,8 +71,10 @@ export default function Game() {
     async (index: number) => {
       if (!state || isSubmitting) return;
       if (!currentCard || index < 0 || index >= currentCard.choices.length) return;
+      playSfx('swipe');
       const result = await submitChoice(index);
       if (!result) {
+        // pushToast plays the error sfx via the toast store.
         pushToast('Konnte deine Entscheidung nicht senden', 'error');
       }
     },
